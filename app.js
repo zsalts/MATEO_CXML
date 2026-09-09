@@ -950,8 +950,9 @@ function selectElement(id) {
     if (el.propTimeMode)  el.propTimeMode.value = e.timeMode || 'fixed';
     if (el.exclusiveBadge) el.exclusiveBadge.textContent = (e.exclusiveIds || []).length;
     
-    el.propLead.value  = e.lead ?? 0;
-    el.propLag.value   = e.lag  ?? 1;
+    // Sin ?? : no existe antes de Safari 13.4 y rompe el parseo del archivo entero
+    el.propLead.value  = (e.lead === undefined || e.lead === null) ? 0 : e.lead;
+    el.propLag.value   = (e.lag  === undefined || e.lag  === null) ? 1 : e.lag;
     if (el.propDescriptors) el.propDescriptors.value = (e.popups || []).join(', ');
     if (el.lineBadge) el.lineBadge.textContent = (e.lineMemberIds || []).length;
     if (el.propLineExclusive) el.propLineExclusive.checked = e.lineExclusive !== false;
@@ -2118,3 +2119,6 @@ function exportCustomXML(eventsList, title, inicio) {
 }
 
 init();
+
+// Marca para la trampa de errores de index.html
+window.__tagviewOk = true;

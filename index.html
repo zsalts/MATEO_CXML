@@ -6,6 +6,45 @@
     <title>Tag & View Pro</title>
     <link rel="manifest" href="manifest.json">
     <!-- Tailwind precompilado: CSS estático, sin JS. Regenerar con build-tailwind.py -->
+    <!-- Trampa de errores. ES5 puro a propósito: tiene que poder correr en
+         cualquier Safari, incluso en uno que no entienda el resto del código.
+         Si algo falla, se ve en pantalla en vez de dejar la app muda. -->
+    <script>
+    (function () {
+        function mostrar(txt) {
+            var d = document.getElementById('errorBanner');
+            if (!d) {
+                d = document.createElement('div');
+                d.id = 'errorBanner';
+                d.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:99999;'
+                    + 'background:#b91c1c;color:#fff;padding:10px 12px;max-height:50%;overflow:auto;'
+                    + 'white-space:pre-wrap;font-family:Menlo,monospace;font-size:11px;line-height:1.45;');
+                (document.body || document.documentElement).appendChild(d);
+            }
+            d.appendChild(document.createTextNode(txt + '\n'));
+        }
+        window.onerror = function (msg, url, linea, columna) {
+            mostrar('ERROR: ' + msg + '\n  en ' + (url || '?') + ':' + linea + ':' + columna);
+            return false;
+        };
+        window.addEventListener('error', function (ev) {
+            if (ev.target && ev.target.src) mostrar('NO CARGÓ: ' + ev.target.src);
+        }, true);
+        window.addEventListener('unhandledrejection', function (ev) {
+            var r = ev.reason;
+            mostrar('PROMESA RECHAZADA: ' + (r && r.message ? r.message : r));
+        });
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                if (!window.__tagviewOk) {
+                    mostrar('app.js no llegó a ejecutarse por completo.\n'
+                          + 'Safari: ' + navigator.userAgent);
+                }
+            }, 400);
+        });
+    })();
+    </script>
+
     <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="style.css">
     <meta name="theme-color" content="#1f2937">
