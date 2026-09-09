@@ -315,23 +315,30 @@ function safeFileName(name, ext) {
 async function saveBlobToFiles(filename, blob) {
     const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-    // En iPad esto abre la hoja de Compartir, con "Guardar en Archivos"
+    // Camino bueno: hoja de Compartir con archivos. Necesita iOS 15+.
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
             await navigator.share({ files: [file], title: filename });
             return true;
         } catch (err) {
             if (err && err.name === 'AbortError') return false;   // lo canceló el usuario
-            // cualquier otro fallo: caemos a la descarga de abajo
+            // cualquier otro fallo: seguimos por la descarga
         }
     }
 
-    const url = URL.createObjectURL(file);
+    // Safari viejo ignora el atributo download y, si sabe representar el tipo,
+    // abre el archivo en pantalla en vez de guardarlo. Con octet-stream no
+    // puede representarlo, así que ofrece guardarlo o abrirlo con otra app.
+    const paraBajar = new Blob([blob], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(paraBajar);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
     return true;
 }
 
@@ -405,6 +412,7 @@ function init() {
     setMode('setup');
     setPage('botonera');
     reportarFaltantes();
+    mostrarVersion();
 }
 
 function buildSvgDefs() {
@@ -651,6 +659,27 @@ function bindEvents() {
 // Si el HTML y el JS no son de la misma versión (caché a medias), faltarán
 // elementos. Antes eso tumbaba bindEvents en la primera excepción y la app
 // quedaba muerta al tacto; ahora se avisa y el resto sigue funcionando.
+// Muestra versión y navegador al pie de Plantillas: sirve para diagnosticar
+// sin tener que adivinar contra qué Safari estamos.
+function mostrarVersion() {
+    const nodo = D('infoVersion');
+    if (!nodo) return;
+    const ua = navigator.userAgent;
+    const iOS = ua.match(/OS (\d+[_\d]*) like Mac OS X/);
+    const saf = ua.match(/Version\/(\d+\.\d+)/);
+    let so;
+    if (iOS) so = 'iOS ' + iOS[1].replace(/_/g, '.') + (saf ? ' / Safari ' + saf[1] : '');
+    else if (saf) so = 'Safari ' + saf[1];
+    else so = ua.slice(0, 60);   // sea lo que sea, que se pueda leer
+    const escribir = v => { nodo.textContent = 'Tag&View ' + v + ' · ' + so; };
+    if (window.caches && caches.keys) {
+        caches.keys().then(k => escribir((k.find(x => x.indexOf('tagview-') === 0) || '—').replace('tagview-', '')))
+                     .catch(() => escribir('—'));
+    } else {
+        escribir('—');
+    }
+}
+
 function reportarFaltantes() {
     const faltan = Object.keys(el).filter(k => !el[k]);
     if (!faltan.length) return;
