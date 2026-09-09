@@ -986,6 +986,7 @@ const state = {
 
     time: 0,
     isPlaying: false,
+    sessionStartedAt: null,    // momento real del primer PLAY, para SESSION_INFO
     lastTick: 0,
     timerInterval: null,
 
@@ -1270,8 +1271,8 @@ function safeFileName(name, ext) {
     return base + ext;
 }
 
-async function saveToFiles(filename, text, mime) {
-    const file = new File([text], filename, { type: mime || 'application/json' });
+async function saveBlobToFiles(filename, blob) {
+    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
     // En iPad esto abre la hoja de Compartir, con "Guardar en Archivos"
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -1291,6 +1292,10 @@ async function saveToFiles(filename, text, mime) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     return true;
+}
+
+function saveToFiles(filename, text, mime) {
+    return saveBlobToFiles(filename, new Blob([text], { type: mime || 'application/json' }));
 }
 
 // Abre el selector de Archivos y devuelve { name, text } o null si se canceló
@@ -1492,6 +1497,7 @@ function setMode(mode) {
 
         state.time = 0; state.isPlaying = false;
         state.events = []; state.counters = {}; state.toi = {};
+        state.sessionStartedAt = null;
         setLiveTab('log');
         updateTimerUI();
         el.btnPlayPause.textContent = '▶ PLAY';
@@ -2204,6 +2210,7 @@ function getContainerSiblingPopups(eventEl) {
 function toggleTimer() { state.isPlaying ? pauseTimer() : startTimer(); }
 function startTimer() {
     acquireWakeLock();
+    if (!state.sessionStartedAt) state.sessionStartedAt = new Date();
     state.isPlaying = true; state.lastTick = Date.now();
     state.timerInterval = setInterval(tick, 100);
     el.btnPlayPause.textContent = '⏸ PAUSE';
@@ -2591,10 +2598,8 @@ function exportToiCSV() {
     rows.forEach(r => {
         csv += `"${String(r.name).replace(/"/g, '""')}",${r.shifts},${r.total.toFixed(1)},${fmt(r.total)}\n`;
     });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `ToI_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
+    saveBlobToFiles(`ToI_${new Date().toISOString().slice(0,10)}.csv`,
+                    new Blob([csv], { type: 'text/csv' }));
 }
 
 // ─────────────────────────────────────────────
@@ -2633,6 +2638,41 @@ function renderEventList() {
 // ─────────────────────────────────────────────
 // EXPORT XML
 // ─────────────────────────────────────────────
+// Sportscode escribe la fecha en UTC con este formato exacto
+function fechaSportscode(d) {
+    const p = n => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate())
+         + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds())
+         + ' +0000';
+}
+
+// Los colores de ROWS van en 16 bits (0-65535), no en 0-255
+function a16bits(v) { return Math.round(v / 255 * 65535); }
+
+function rgbDeEvento(nombre, buttonId) {
+    let e = state.elements.find(x => x.id === buttonId);
+    if (!e) e = state.elements.find(x => x.type === 'event' && x.name === nombre);
+    let hex = (e && e.color) || defaultColor(e ? e.type : 'event') || '#3a8fd6';
+    hex = String(hex).replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    return {
+        r: parseInt(hex.slice(0, 2), 16) || 0,
+        g: parseInt(hex.slice(2, 4), 16) || 0,
+        b: parseInt(hex.slice(4, 6), 16) || 0
+    };
+}
+
+// Sportscode espera UTF-16 LE con BOM, no UTF-8
+function blobUtf16(texto) {
+    const buf = new ArrayBuffer(2 + texto.length * 2);
+    const vista = new DataView(buf);
+    vista.setUint16(0, 0xFEFF, true);
+    for (let i = 0; i < texto.length; i++) {
+        vista.setUint16(2 + i * 2, texto.charCodeAt(i), true);
+    }
+    return new Blob([buf], { type: 'text/xml' });
+}
+
 function xmlEsc(v) {
     return String(v)
         .replace(/&/g, '&amp;')
@@ -2642,7 +2682,9 @@ function xmlEsc(v) {
 }
 
 function exportXML() {
-    exportCustomXML(state.events, `Tagging_${new Date().toISOString().slice(0,10)}`);
+    exportCustomXML(state.events,
+        `Tagging_${new Date().toISOString().slice(0,10)}`,
+        state.sessionStartedAt);
 }
 
 // ─────────────────────────────────────────────
@@ -2902,7 +2944,7 @@ function renderSessionsList() {
         });
 
         row.querySelector('.btn-export-sess').addEventListener('click', () => {
-            exportCustomXML(s.events, s.name);
+            exportCustomXML(s.events, s.name, s.startedAt ? new Date(s.startedAt) : null);
         });
 
         row.querySelector('.btn-file-sess').addEventListener('click', () => exportSessionToFile(s));
@@ -2934,6 +2976,7 @@ async function saveCurrentSession() {
         name: name.trim(),
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         duration: fmt(state.time),
+        startedAt: state.sessionStartedAt ? state.sessionStartedAt.toISOString() : null,
         events: JSON.parse(JSON.stringify(state.events)),
         counters: JSON.parse(JSON.stringify(state.counters)),
         toi: JSON.parse(JSON.stringify(state.toi))
@@ -2943,28 +2986,68 @@ async function saveCurrentSession() {
     renderSessionsList();
 }
 
-function exportCustomXML(eventsList, title) {
+function exportCustomXML(eventsList, title, inicio) {
     if (!eventsList || !eventsList.length) { customAlert('No hay eventos para exportar.', 'Exportar XML'); return; }
-    const sorted = [...eventsList].sort((a,b)=>a.start-b.start);
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<file>\n  <ALL_INSTANCES>\n`;
-    sorted.forEach((ev,i) => {
-        const startVal = typeof ev.start === 'number' ? parseFloat(ev.start.toFixed(2)) : ev.start;
-        const endVal = (ev.end !== null && ev.end !== undefined) ? (typeof ev.end === 'number' ? parseFloat(ev.end.toFixed(2)) : ev.end) : startVal + 1;
-        xml += `    <instance>\n      <ID>${i+1}</ID>\n      <start>${startVal}</start>\n      <end>${endVal}</end>\n      <code>${xmlEsc(ev.name)}</code>\n`;
-        // Una instancia por turno; la línea que lo abrió viaja como etiqueta
+
+    // Los IDs se numeran por orden cronologico, pero el archivo va agrupado
+    // por codigo: asi lo escribe Sportscode.
+    const porTiempo = [...eventsList].sort((a, b) => a.start - b.start);
+    const idDe = new Map();
+    porTiempo.forEach((ev, i) => idDe.set(ev, i + 1));
+
+    const ordenado = [...eventsList].sort(
+        (a, b) => a.name.localeCompare(b.name) || a.start - b.start);
+
+    const T = '\t';
+    let xml = '<file>\n';
+
+    xml += T + '<SESSION_INFO>\n';
+    xml += T + T + '<start_time>' + fechaSportscode(inicio || new Date()) + '</start_time>\n';
+    xml += T + '</SESSION_INFO>\n';
+
+    xml += T + '<ALL_INSTANCES>\n';
+    ordenado.forEach(ev => {
+        const fin = (ev.end !== null && ev.end !== undefined) ? ev.end : ev.start + 1;
+        xml += T + T + '<instance>\n';
+        xml += T + T + T + '<ID>' + idDe.get(ev) + '</ID>\n';
+        xml += T + T + T + '<start>' + Number(ev.start).toFixed(2) + '</start>\n';
+        xml += T + T + T + '<end>' + Number(fin).toFixed(2) + '</end>\n';
+        xml += T + T + T + '<code>' + xmlEsc(ev.name) + '</code>\n';
+        // Las etiquetas solo salen si de verdad se usaron
         if (ev.line) {
-            xml += `      <label>\n        <group>Línea</group>\n        <text>${xmlEsc(ev.line)}</text>\n      </label>\n`;
+            xml += T + T + T + '<label>\n';
+            xml += T + T + T + T + '<group>Linea</group>\n';
+            xml += T + T + T + T + '<text>' + xmlEsc(ev.line) + '</text>\n';
+            xml += T + T + T + '</label>\n';
         }
         (ev.descriptors || []).forEach(d => {
-            xml += `      <label>\n        <group>Etiqueta</group>\n        <text>${xmlEsc(d)}</text>\n      </label>\n`;
+            xml += T + T + T + '<label>\n';
+            xml += T + T + T + T + '<group>Etiqueta</group>\n';
+            xml += T + T + T + T + '<text>' + xmlEsc(d) + '</text>\n';
+            xml += T + T + T + '</label>\n';
         });
-        xml += `    </instance>\n`;
+        xml += T + T + '</instance>\n';
     });
-    xml += `  </ALL_INSTANCES>\n</file>`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([xml],{type:'text/xml'}));
-    a.download = `${title.replace(/[^a-z0-9_\-]/gi, '_')}.xml`;
-    a.click();
+    xml += T + '</ALL_INSTANCES>\n';
+
+    // Un renglon por codigo, en orden alfabetico, con su color
+    const codigos = [...new Set(ordenado.map(e => e.name))].sort((a, b) => a.localeCompare(b));
+    xml += T + '<ROWS>\n';
+    codigos.forEach(c => {
+        const ev = ordenado.find(e => e.name === c);
+        const rgb = rgbDeEvento(c, ev && ev.buttonId);
+        xml += T + T + '<row>\n';
+        xml += T + T + T + '<code>' + xmlEsc(c) + '</code>\n';
+        xml += T + T + T + '<R>' + a16bits(rgb.r) + '</R>\n';
+        xml += T + T + T + '<G>' + a16bits(rgb.g) + '</G>\n';
+        xml += T + T + T + '<B>' + a16bits(rgb.b) + '</B>\n';
+        xml += T + T + '</row>\n';
+    });
+    xml += T + '</ROWS>\n';
+    xml += '</file>\n';
+
+    const nombre = String(title || 'Tagging').replace(/[^a-z0-9_\- ]/gi, '_') + '.xml';
+    saveBlobToFiles(nombre, blobUtf16(xml));
 }
 
 init();
