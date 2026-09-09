@@ -1799,7 +1799,7 @@ function handleDown(cx, cy, target, shiftKey) {
                 state.selectedIds.push(id);
                 state.selectedId = id;
             }
-            renderElements();
+            updateSelectionClasses();
             updateInspectorForSelection();
             return;
         }
@@ -1837,7 +1837,7 @@ function handleDown(cx, cy, target, shiftKey) {
         state.isMarquee    = true;
         state.marqueeStart = pos;
         state.marqueeEnd   = pos;
-        renderElements();
+        updateSelectionClasses();
     }
 }
 
@@ -1862,7 +1862,7 @@ function handleMove(cx, cy) {
                 e.y = Math.max(0, snap(s.y + dy));
             }
         });
-        renderElements(); renderLinks();
+        updateElementPositions(); renderLinks();
         return;
     }
 
@@ -1872,7 +1872,7 @@ function handleMove(cx, cy) {
             const dx = pos.x - state.dragStart.x, dy = pos.y - state.dragStart.y;
             if (state.resizeDir.includes('e')) e.w = Math.max(40, snap(state.elStart.w + dx));
             if (state.resizeDir.includes('s')) e.h = Math.max(24, snap(state.elStart.h + dy));
-            renderElements(); renderLinks();
+            updateElementPositions(); renderLinks();
         }
     }
 }
@@ -1987,7 +1987,7 @@ function selectElement(id) {
     } else {
         state.selectedIds = [];
     }
-    renderElements();
+    updateSelectionClasses();
     if (!id) {
         el.inspectorPanel.classList.add('hidden');
         return;
@@ -2163,6 +2163,28 @@ function startLinking() {
 // RENDER
 // ─────────────────────────────────────────────
 function renderAll() { renderElements(); renderLinks(); }
+
+// renderElements() vacía el lienzo y lo reconstruye. Durante un gesto táctil
+// eso es fatal: iOS sigue mandando los touchmove al nodo original, y si ese
+// nodo ya no está en el documento los eventos no llegan a document y el
+// arrastre se corta. Por eso, mientras se toca, se actualiza en el lugar.
+function updateSelectionClasses() {
+    el.canvas.querySelectorAll('.canvas-element[data-id]').forEach(nodo => {
+        const id = parseInt(nodo.dataset.id);
+        nodo.classList.toggle('selected', id === state.selectedId);
+    });
+}
+
+function updateElementPositions() {
+    state.elements.forEach(e => {
+        const nodo = el.canvas.querySelector('.canvas-element[data-id="' + e.id + '"]');
+        if (!nodo) return;
+        nodo.style.left   = e.x + 'px';
+        nodo.style.top    = e.y + 'px';
+        nodo.style.width  = e.w + 'px';
+        nodo.style.height = e.h + 'px';
+    });
+}
 
 function defaultColor(type) {
     return { event:'#3a8fd6', popup_label:'#f8d022', descriptor:'#fef08a', counter:null, container:null, line:'#4c51bf' }[type] || '#3a8fd6';
