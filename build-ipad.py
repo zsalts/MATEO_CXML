@@ -34,15 +34,15 @@ def main():
     html = leer('index.html')
     css = leer('style.css')
     app = leer('app.js')
-    tailwind = leer('tailwind.js')
+    tailwind = leer('tailwind.css')
 
     # Favicon embebido para que no pida un archivo externo
     icono = base64.b64encode(open(os.path.join(RAIZ, 'icon-192.png'), 'rb').read()).decode()
 
     reemplazos = [
         # Tailwind y estilos, en línea
-        ('<script src="tailwind.js"></script>',
-         '<script>%s</script>' % blindar(tailwind)),
+        ('<link rel="stylesheet" href="tailwind.css">',
+         '<style>\n%s\n</style>' % tailwind),
         ('<link rel="stylesheet" href="style.css">',
          '<style>\n%s\n</style>' % css),
         ('<script src="app.js"></script>',

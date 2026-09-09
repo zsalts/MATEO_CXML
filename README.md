@@ -51,6 +51,16 @@ Para regenerarlo después de tocar el código:
 python3 build-ipad.py
 ```
 
+## Sobre los estilos
+
+`tailwind.css` es CSS estático, generado una vez a partir de las clases que la
+app realmente usa (~16 KB). Antes se cargaba el *Play CDN* de Tailwind, un
+compilador de 400 KB que corre en el navegador: en Safari de iPad viejo no
+llegaba a ejecutarse y la app quedaba sin la mitad de los estilos.
+
+Si agregás clases de Tailwind nuevas, regenerá el CSS con `build-tailwind.py`.
+Si solo tocás `style.css`, no hace falta.
+
 ## Al modificar el código
 
 Subí el número de `CACHE_VERSION` en `sw.js`. Si no, los dispositivos que ya
@@ -63,7 +73,9 @@ tienen la app instalada siguen sirviendo la versión vieja desde el caché.
 | `index.html` | Estructura, paneles y modales |
 | `app.js` | Toda la lógica |
 | `style.css` | Estilos propios (el resto es Tailwind) |
-| `tailwind.js` | Tailwind local, para que arranque sin señal |
+| `tailwind.css` | Tailwind precompilado: solo las clases que la app usa |
+| `tailwind.js` | Compilador de Tailwind, solo para regenerar el CSS |
+| `build-tailwind.py` | Regenera `tailwind.css` |
 | `sw.js` | Service worker (caché offline) |
 | `manifest.json` | Metadatos de la PWA |
 | `build-ipad.py` | Genera el archivo único |
