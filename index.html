@@ -36,6 +36,60 @@
         </div>
     </header>
 
+    <!-- BARRA DE HERRAMIENTAS (Setup) — arriba: abajo la tapa la barra de Safari en iPad -->
+    <div id="setupBar" class="bg-[#f2f2f7] border-b border-gray-300 z-30 relative">
+        <div class="flex items-center justify-between px-4 py-2">
+
+            <!-- Insertar -->
+            <div class="relative">
+                <button id="btnInsertMenu" class="text-[#007aff] text-base font-normal">Insertar ▼</button>
+                <div id="insertMenu" class="absolute top-full left-0 mt-2 w-56 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
+                    <button class="tool-btn ios-menu-row" data-type="event">
+                        <div class="swatch" style="background:linear-gradient(to bottom,#5cb0f5,#3a8fd6);border-color:#2a5b84;"></div>
+                        <span>Evento</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="popup_label">
+                        <div class="swatch popup-dot" style="background:linear-gradient(to bottom,#ffe55a,#f8d022);border-color:#d6a50e;"></div>
+                        <span>Etiqueta emergente</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="descriptor">
+                        <div class="swatch" style="background:#fef08a;border-color:#d6b30e;"></div>
+                        <span>Etiqueta</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="container">
+                        <div class="swatch" style="background:#fff;border:2px solid #aaa;border-radius:4px;"></div>
+                        <span>Contenedor</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="counter">
+                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#f0f0f0;border-color:#aaa;">12</div>
+                        <span>Contador</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="line">
+                        <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
+                        <span>Línea (ToI)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Iniciar Codificación -->
+            <button id="btnStartCoding" class="bg-[#2ca038] text-white font-bold text-base px-5 py-1.5 rounded-full shadow">
+                ▶ Iniciar Codificación
+            </button>
+
+            <!-- Eliminar -->
+            <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
+        </div>
+    </div>
+
+    <!-- BARRA DE HERRAMIENTAS (Live) -->
+    <div id="liveBar" class="hidden bg-[#f2f2f7] border-b border-gray-300 z-30">
+        <div class="flex items-center justify-between px-4 py-2">
+            <button id="btnPlayPause" class="bg-[#2ca038] text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">▶ PLAY</button>
+            <div id="timerLive" class="font-mono text-xl font-bold">00:00</div>
+            <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
+        </div>
+    </div>
+
     <!-- WORKSPACE -->
     <div class="flex-1 flex overflow-hidden relative">
 
@@ -179,61 +233,6 @@
 
     </div>
 
-    <!-- BOTTOM TOOLBAR (Setup) -->
-    <footer id="setupBar" class="bg-[#f2f2f7] border-t border-gray-300 z-30 relative"
-            style="padding-bottom:env(safe-area-inset-bottom,0px);">
-        <div class="flex items-center justify-between px-4 py-2">
-
-            <!-- Insertar -->
-            <div class="relative">
-                <button id="btnInsertMenu" class="text-[#007aff] text-base font-normal">Insertar ▲</button>
-                <div id="insertMenu" class="absolute bottom-full left-0 mb-2 w-56 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
-                    <button class="tool-btn ios-menu-row" data-type="event">
-                        <div class="swatch" style="background:linear-gradient(to bottom,#5cb0f5,#3a8fd6);border-color:#2a5b84;"></div>
-                        <span>Evento</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="popup_label">
-                        <div class="swatch popup-dot" style="background:linear-gradient(to bottom,#ffe55a,#f8d022);border-color:#d6a50e;"></div>
-                        <span>Etiqueta emergente</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="descriptor">
-                        <div class="swatch" style="background:#fef08a;border-color:#d6b30e;"></div>
-                        <span>Etiqueta</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="container">
-                        <div class="swatch" style="background:#fff;border:2px solid #aaa;border-radius:4px;"></div>
-                        <span>Contenedor</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="counter">
-                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#f0f0f0;border-color:#aaa;">12</div>
-                        <span>Contador</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="line">
-                        <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
-                        <span>Línea (ToI)</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Iniciar Codificación -->
-            <button id="btnStartCoding" class="bg-[#2ca038] text-white font-bold text-base px-5 py-1.5 rounded-full shadow">
-                ▶ Iniciar Codificación
-            </button>
-
-            <!-- Eliminar -->
-            <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
-        </div>
-    </footer>
-
-    <!-- BOTTOM TOOLBAR (Live) -->
-    <footer id="liveBar" class="hidden bg-[#f2f2f7] border-t border-gray-300 z-30"
-            style="padding-bottom:env(safe-area-inset-bottom,0px);">
-        <div class="flex items-center justify-between px-4 py-2">
-            <button id="btnPlayPause" class="bg-[#2ca038] text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">▶ PLAY</button>
-            <div id="timerLive" class="font-mono text-xl font-bold">00:00</div>
-            <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
-        </div>
-    </footer>
 
     <!-- MODAL SELECCIONAR EVENTOS EXCLUYENTES -->
     <div id="exclusiveModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex-col justify-end p-4 pb-8">

@@ -485,8 +485,10 @@ function setMode(mode) {
         }
     } else {
         el.btnToggleMode.textContent = '← Volver';
-        el.titleLogo.classList.add('hidden');
-        el.timerDisplay.classList.remove('hidden');
+        // El cronómetro vive en la barra de herramientas, justo debajo del
+        // encabezado: mostrarlo también acá lo duplicaba.
+        el.titleLogo.classList.remove('hidden');
+        el.timerDisplay.classList.add('hidden');
         el.btnExport.classList.remove('hidden');
         el.inspectorPanel.classList.add('hidden');
         el.livePanel.classList.remove('hidden');
