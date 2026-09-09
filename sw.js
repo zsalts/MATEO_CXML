@@ -1,6 +1,6 @@
 // Service worker de Tag & View Pro.
 // Subí CACHE_VERSION cada vez que cambien index.html / app.js / style.css.
-const CACHE_VERSION = 'tagview-v6';
+const CACHE_VERSION = 'tagview-v7';
 
 const ASSETS = [
     './',
@@ -30,8 +30,10 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Stale-while-revalidate: abre al instante desde caché (sirve sin señal en la cancha)
-// y se actualiza de fondo para el próximo arranque.
+// Cache-first sobre una caché versionada. Nada de refrescar archivos sueltos:
+// hacerlo puede dejar un index.html nuevo con un app.js viejo, y con los IDs
+// desfasados la app no engancha ningún botón. La versión entra completa o no
+// entra: al cambiar CACHE_VERSION, el install baja todo de nuevo de una vez.
 self.addEventListener('fetch', event => {
     const req = event.request;
     if (req.method !== 'GET') return;
@@ -40,13 +42,13 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.open(CACHE_VERSION).then(cache =>
             cache.match(req).then(hit => {
-                const fresh = fetch(req)
+                if (hit) return hit;
+                return fetch(req)
                     .then(res => {
                         if (res && res.status === 200) cache.put(req, res.clone());
                         return res;
                     })
-                    .catch(() => hit || (req.mode === 'navigate' ? cache.match('./index.html') : undefined));
-                return hit || fresh;
+                    .catch(() => req.mode === 'navigate' ? cache.match('./index.html') : undefined);
             })
         )
     );

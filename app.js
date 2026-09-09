@@ -53,9 +53,9 @@ const el = {
     canvasContainer: D('canvasContainer'),
     svgArrows:       D('svgArrows'),
 
-    navBotonera:   D('navBotonera'),
-    navPlantillas: D('navPlantillas'),
-    navXml:        D('navXml'),
+    btnMenu:       D('btnMenu'),
+    mainMenu:      D('mainMenu'),
+    menuPageName:  D('menuPageName'),
     pageBotonera:  D('pageBotonera'),
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
@@ -105,7 +105,6 @@ const el = {
     toiList:               D('toiList'),
     btnExportToi:          D('btnExportToi'),
 
-    propExclusive:         D('propExclusive'),
     fixedTimesSubSection:  D('fixedTimesSubSection'),
     propLead:              D('propLead'),
     propLag:               D('propLag'),
@@ -404,6 +403,7 @@ function init() {
     bindEvents();
     setMode('setup');
     setPage('botonera');
+    reportarFaltantes();
 }
 
 function buildSvgDefs() {
@@ -469,11 +469,7 @@ function setPage(page) {
         plantillas: el.pagePlantillas,
         xml:        el.pageXml
     };
-    const navs = {
-        botonera:   el.navBotonera,
-        plantillas: el.navPlantillas,
-        xml:        el.navXml
-    };
+    const nombres = { botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
 
     Object.keys(paginas).forEach(k => {
         const activa = (k === page);
@@ -481,10 +477,15 @@ function setPage(page) {
             paginas[k].classList.toggle('hidden', !activa);
             paginas[k].classList.toggle('flex', activa);
         }
-        if (navs[k]) navs[k].classList.toggle('nav-active', activa);
+    });
+
+    if (el.menuPageName) el.menuPageName.textContent = nombres[page] || '';
+    document.querySelectorAll('.menu-page').forEach(b => {
+        b.classList.toggle('is-current', b.dataset.page === page);
     });
 
     // El menú Insertar y el Inspector son de la botonera
+    closeMainMenu();
     closeInsertMenu();
     if (page !== 'botonera') el.inspectorPanel.classList.add('hidden');
 
@@ -551,71 +552,84 @@ function setMode(mode) {
 // ─────────────────────────────────────────────
 // BIND
 // ─────────────────────────────────────────────
-function bindEvents() {
-    el.navBotonera.addEventListener('click',   () => setPage('botonera'));
-    el.navPlantillas.addEventListener('click', () => setPage('plantillas'));
-    el.navXml.addEventListener('click',        () => setPage('xml'));
-    el.btnStartCoding.addEventListener('click',() => setMode('live'));
-    el.btnStopCoding.addEventListener('click', () => setMode('setup'));
+// Engancha un listener sin tumbar la app si el elemento no existe.
+// Un index.html y un app.js desfasados (por caché del navegador o del service
+// worker) dejaban la app muerta: la primera excepción cortaba bindEvents y no
+// se enganchaba ningún botón.
+function on(nodo, evento, fn, opts) {
+    if (!nodo) return false;
+    nodo.addEventListener(evento, fn, opts);
+    return true;
+}
 
-    el.btnInsertMenu.addEventListener('click', () => el.insertMenu.classList.toggle('hidden'));
+function bindEvents() {
+    on(el.btnMenu, 'click', e => { e.stopPropagation(); el.mainMenu.classList.toggle('hidden'); });
+    document.querySelectorAll('.menu-page').forEach(b => {
+        b.addEventListener('click', () => setPage(b.dataset.page));
+    });
+    on(el.btnStartCoding, 'click',() => setMode('live'));
+    on(el.btnStopCoding, 'click', () => setMode('setup'));
+
+    on(el.btnInsertMenu, 'click', () => el.insertMenu.classList.toggle('hidden'));
     document.querySelectorAll('.tool-btn').forEach(btn => {
         btn.addEventListener('click', () => { closeInsertMenu(); createElement(btn.dataset.type); });
     });
 
-    el.btnPlayPause.addEventListener('click', toggleTimer);
-    el.btnExport.addEventListener('click', exportXML);
-    el.btnClearEvents.addEventListener('click', async () => {
+    on(el.btnPlayPause, 'click', toggleTimer);
+    on(el.btnExport, 'click', exportXML);
+    on(el.btnClearEvents, 'click', async () => {
         if (await customConfirm('¿Borrar todos los eventos y el tiempo acumulado?', 'Limpiar Eventos', true)) {
             state.events = []; state.counters = {}; state.toi = {}; state.openEvents = [];
             renderLivePanel(); renderElements();
         }
     });
 
-    el.propName.addEventListener('input', updateSelected);
-    el.propType.addEventListener('change', updateSelected);
-    el.propColor.addEventListener('input', updateSelected);
+    on(el.propName, 'input', updateSelected);
+    on(el.propType, 'change', updateSelected);
+    on(el.propColor, 'input', updateSelected);
 
-    if (el.btnSaveCurrentTemplate) el.btnSaveCurrentTemplate.addEventListener('click', saveCurrentTemplate);
-    if (el.btnNewTemplate) el.btnNewTemplate.addEventListener('click', createNewTemplate);
+    on(el.btnSaveCurrentTemplate, 'click', saveCurrentTemplate);
+    on(el.btnNewTemplate, 'click', createNewTemplate);
 
 
-    if (el.btnSaveCurrentSession) el.btnSaveCurrentSession.addEventListener('click', saveCurrentSession);
+    on(el.btnSaveCurrentSession, 'click', saveCurrentSession);
 
-    if (el.btnOpenExclusiveModal) el.btnOpenExclusiveModal.addEventListener('click', openExclusiveModal);
-    if (el.btnExportTemplateFile) el.btnExportTemplateFile.addEventListener('click', () => exportTemplateToFile(null));
-    if (el.btnImportTemplateFile) el.btnImportTemplateFile.addEventListener('click', importTemplateFromFile);
-    if (el.btnImportSessionFile)  el.btnImportSessionFile.addEventListener('click', importSessionFromFile);
-    if (el.btnBackupAll)  el.btnBackupAll.addEventListener('click', backupAll);
-    if (el.btnRestoreAll) el.btnRestoreAll.addEventListener('click', restoreAll);
-    if (el.btnOpenLineModal)  el.btnOpenLineModal.addEventListener('click', openLineModal);
-    if (el.btnCloseLineModal) el.btnCloseLineModal.addEventListener('click', closeLineModal);
-    if (el.propLineExclusive) el.propLineExclusive.addEventListener('change', updateSelected);
-    if (el.tabLog) el.tabLog.addEventListener('click', () => setLiveTab('log'));
-    if (el.tabToi) el.tabToi.addEventListener('click', () => setLiveTab('toi'));
-    if (el.btnExportToi) el.btnExportToi.addEventListener('click', exportToiCSV);
-    if (el.btnCloseExclusiveModal) el.btnCloseExclusiveModal.addEventListener('click', closeExclusiveModal);
-    if (el.propTimeMode)  el.propTimeMode.addEventListener('change', updateSelected);
-    if (el.propExclusive) el.propExclusive.addEventListener('change', updateSelected);
-    el.propLead.addEventListener('input', updateSelected);
-    el.propLag.addEventListener('input', updateSelected);
-    if (el.propDescriptors) el.propDescriptors.addEventListener('input', updateSelected);
-    if (el.propPopupDescriptors) el.propPopupDescriptors.addEventListener('input', updateSelected);
+    on(el.btnOpenExclusiveModal, 'click', openExclusiveModal);
+    on(el.btnExportTemplateFile, 'click', () => exportTemplateToFile(null));
+    on(el.btnImportTemplateFile, 'click', importTemplateFromFile);
+    if (el.btnImportSessionFile)  on(el.btnImportSessionFile, 'click', importSessionFromFile);
+    if (el.btnBackupAll)  on(el.btnBackupAll, 'click', backupAll);
+    on(el.btnRestoreAll, 'click', restoreAll);
+    if (el.btnOpenLineModal)  on(el.btnOpenLineModal, 'click', openLineModal);
+    on(el.btnCloseLineModal, 'click', closeLineModal);
+    on(el.propLineExclusive, 'change', updateSelected);
+    on(el.tabLog, 'click', () => setLiveTab('log'));
+    on(el.tabToi, 'click', () => setLiveTab('toi'));
+    on(el.btnExportToi, 'click', exportToiCSV);
+    on(el.btnCloseExclusiveModal, 'click', closeExclusiveModal);
+    if (el.propTimeMode)  on(el.propTimeMode, 'change', updateSelected);
+    on(el.propLead, 'input', updateSelected);
+    on(el.propLag, 'input', updateSelected);
+    on(el.propDescriptors, 'input', updateSelected);
+    on(el.propPopupDescriptors, 'input', updateSelected);
     
-    el.btnStartLink.addEventListener('click', startLinking);
-    el.btnDeleteElement.addEventListener('click', deleteSelected);
-    el.btnDeleteGlobal.addEventListener('click', deleteSelected);
-    el.btnHideInspector.addEventListener('click', () => selectElement(null));
+    on(el.btnStartLink, 'click', startLinking);
+    on(el.btnDeleteElement, 'click', deleteSelected);
+    on(el.btnDeleteGlobal, 'click', deleteSelected);
+    on(el.btnHideInspector, 'click', () => selectElement(null));
 
-    el.canvasContainer.addEventListener('mousedown', onCanvasDown);
+    on(el.canvasContainer, 'mousedown', onCanvasDown);
     document.addEventListener('mousemove', onGlobalMove);
     document.addEventListener('mouseup',   onGlobalUp);
-    el.canvasContainer.addEventListener('touchstart', onTouchStart, { passive: false });
+    on(el.canvasContainer, 'touchstart', onTouchStart, { passive: false });
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend',  onTouchEnd);
 
     document.addEventListener('click', e => {
-        if (!el.btnInsertMenu.contains(e.target) && !el.insertMenu.contains(e.target)) closeInsertMenu();
+        if (el.btnInsertMenu && el.insertMenu
+            && !el.btnInsertMenu.contains(e.target) && !el.insertMenu.contains(e.target)) closeInsertMenu();
+        if (el.btnMenu && el.mainMenu
+            && !el.btnMenu.contains(e.target) && !el.mainMenu.contains(e.target)) closeMainMenu();
     });
 
     // Recalcular el alto cuando rota el iPad o Safari muestra/oculta sus barras
@@ -631,7 +645,21 @@ function bindEvents() {
     });
 }
 
-function closeInsertMenu() { el.insertMenu.classList.add('hidden'); }
+// Si el HTML y el JS no son de la misma versión (caché a medias), faltarán
+// elementos. Antes eso tumbaba bindEvents en la primera excepción y la app
+// quedaba muerta al tacto; ahora se avisa y el resto sigue funcionando.
+function reportarFaltantes() {
+    const faltan = Object.keys(el).filter(k => !el[k]);
+    if (!faltan.length) return;
+    console.warn('Tag&View: faltan estos elementos en el HTML:', faltan.join(', '));
+    customAlert(
+        'La app cargó a medias: el navegador está mezclando una versión vieja con una nueva.\n\n' +
+        'Cerrala, volvé a abrirla y recargá dos veces.',
+        'Versión desincronizada');
+}
+
+function closeInsertMenu() { if (el.insertMenu) el.insertMenu.classList.add('hidden'); }
+function closeMainMenu()   { if (el.mainMenu) el.mainMenu.classList.add('hidden'); }
 
 // ─────────────────────────────────────────────
 // CANVAS POINTER
@@ -921,7 +949,6 @@ function selectElement(id) {
     
     if (el.propTimeMode)  el.propTimeMode.value = e.timeMode || 'fixed';
     if (el.exclusiveBadge) el.exclusiveBadge.textContent = (e.exclusiveIds || []).length;
-    if (el.propExclusive) el.propExclusive.checked = !!e.isExclusive;
     
     el.propLead.value  = e.lead ?? 0;
     el.propLag.value   = e.lag  ?? 1;
@@ -1057,7 +1084,6 @@ function updateSelected() {
     e.color  = el.propColor.value;
     
     if (el.propTimeMode)  e.timeMode = el.propTimeMode.value;
-    if (el.propExclusive) e.isExclusive = el.propExclusive.checked;
     if (el.propLineExclusive) e.lineExclusive = el.propLineExclusive.checked;
 
     e.lead   = parseInt(el.propLead.value)  || 0;

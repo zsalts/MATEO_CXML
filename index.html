@@ -20,18 +20,35 @@
 <body class="bg-white text-black font-sans flex flex-col overflow-hidden select-none">
 
     <!-- NAVBAR -->
-    <header class="bg-[#f2f2f7] flex items-center justify-between px-3 z-20 border-b border-gray-300"
+    <header class="bg-[#f2f2f7] flex items-center px-3 z-40 border-b border-gray-300 relative"
             style="height:52px; padding-top:env(safe-area-inset-top,0px);">
-        <nav class="page-nav">
-            <button id="navBotonera"   class="page-nav-btn nav-active">Botonera</button>
-            <button id="navPlantillas" class="page-nav-btn">Plantillas</button>
-            <button id="navXml"        class="page-nav-btn">XML</button>
-        </nav>
-        <div class="flex justify-center">
+
+        <!-- Menú de páginas -->
+        <div class="relative z-50">
+            <button id="btnMenu" class="flex items-center text-[#007aff] text-base font-medium py-1">
+                <span class="hamburger">☰</span>
+                <span id="menuPageName" class="ml-2">Botonera</span>
+            </button>
+            <div id="mainMenu" class="absolute top-full left-0 mt-2 w-52 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
+                <button class="menu-page ios-menu-row" data-page="botonera">
+                    <span class="menu-check">✓</span><span>Botonera</span>
+                </button>
+                <button class="menu-page ios-menu-row border-t border-gray-100" data-page="plantillas">
+                    <span class="menu-check">✓</span><span>Plantillas</span>
+                </button>
+                <button class="menu-page ios-menu-row border-t border-gray-100" data-page="xml">
+                    <span class="menu-check">✓</span><span>XML</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Título centrado de verdad: absoluto, sin depender del ancho de los costados -->
+        <div class="absolute inset-x-0 flex justify-center pointer-events-none">
             <div id="timerDisplay" class="font-mono text-xl font-bold hidden">00:00</div>
             <span id="titleLogo" class="font-bold text-lg">Tag&View</span>
         </div>
-        <div class="flex justify-end">
+
+        <div class="ml-auto flex justify-end relative z-50">
             <button id="btnExport" class="text-[#007aff] text-base hidden">Exportar XML</button>
         </div>
     </header>
