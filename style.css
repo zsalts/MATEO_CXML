@@ -390,3 +390,14 @@ body { touch-action: manipulation; }
 #lineMembersList {
     -webkit-overflow-scrolling: touch;
 }
+
+/* En Safari de iOS, 100vh cuenta también las barras del navegador, así que la
+   página queda más alta que el área visible y la barra inferior de la app se
+   va fuera de pantalla. --vh la fija al alto real, medido por JS: funciona en
+   cualquier versión de Safari, a diferencia de dvh (15.4+). */
+html { height: 100%; }
+body {
+    height: 100vh;                  /* respaldo */
+    height: var(--vh, 100vh);
+    min-height: 0;
+}

@@ -1,6 +1,6 @@
 // Service worker de Tag & View Pro.
 // Subí CACHE_VERSION cada vez que cambien index.html / app.js / style.css.
-const CACHE_VERSION = 'tagview-v2';
+const CACHE_VERSION = 'tagview-v3';
 
 const ASSETS = [
     './',

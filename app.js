@@ -391,6 +391,7 @@ async function readAppFile(kinds, etiqueta) {
 // INIT
 // ─────────────────────────────────────────────
 function init() {
+    setViewportHeight();
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     loadData();
@@ -417,6 +418,14 @@ function loadData() {
 function saveData() {
     lsSet('tv_elements', JSON.stringify(state.elements));
     lsSet('tv_links',    JSON.stringify(state.links));
+}
+
+// ─────────────────────────────────────────────
+// iPad: ALTO REAL DEL VIEWPORT
+// window.innerHeight sí descuenta las barras de Safari; 100vh no.
+// ─────────────────────────────────────────────
+function setViewportHeight() {
+    document.documentElement.style.setProperty('--vh', window.innerHeight + 'px');
 }
 
 // ─────────────────────────────────────────────
@@ -564,6 +573,11 @@ function bindEvents() {
     document.addEventListener('click', e => {
         if (!el.btnInsertMenu.contains(e.target) && !el.insertMenu.contains(e.target)) closeInsertMenu();
     });
+
+    // Recalcular el alto cuando rota el iPad o Safari muestra/oculta sus barras
+    window.addEventListener('resize', setViewportHeight);
+    window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 250));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', setViewportHeight);
 
     // iOS suelta el bloqueo de pantalla al pasar a segundo plano: lo repedimos al volver
     document.addEventListener('visibilitychange', () => {

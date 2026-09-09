@@ -599,6 +599,17 @@ body { touch-action: manipulation; }
     -webkit-overflow-scrolling: touch;
 }
 
+/* En Safari de iOS, 100vh cuenta también las barras del navegador, así que la
+   página queda más alta que el área visible y la barra inferior de la app se
+   va fuera de pantalla. --vh la fija al alto real, medido por JS: funciona en
+   cualquier versión de Safari, a diferencia de dvh (15.4+). */
+html { height: 100%; }
+body {
+    height: 100vh;                  /* respaldo */
+    height: var(--vh, 100vh);
+    min-height: 0;
+}
+
 </style>
     <meta name="theme-color" content="#1f2937">
     <meta name="mobile-web-app-capable" content="yes">
@@ -608,7 +619,8 @@ body { touch-action: manipulation; }
     <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAD50lEQVR42u3cMWsTYRjA8X4FwaGCi22qRTNIEURBEbUgDS5WKaJIlw6i0FEcdHAWQTcn3RwcWurQwVXo2k/QqaWfQHA7eWrAkhhThdxd7vkFfotb757/Xd7Le04cmzxTQFYTDgICAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACoBHmO0vF2sbmgeWVVQGQRwx872eUEQiAWomrfu9nd29fAOQw6CMABCAABCAABCAABCAABCAABCAABCAABCAABCAABCAABDDeAZyYvVKcXXjCiMVxFkCNxEnpvNkqHq5/pyRxvE9duiuAqq/4N16sG8gKxfGv8o6QNoA46IsfdgxhDcR5EEDJXPnrdycQQEniu6ehq58q1gQpA7Dgre/CWAAlMGz1JYASHnkatPqK8yMAAQhAAAIQgAA8AUqm7B/FUi6C/QDmB7HUAVx++t7A1dDcg1cCsA3C1V8AFsMWvwIQgeEXQClPhWyNqG7rQ9Uvx3gh5lAIsTiOXYnWB6P7nh/HN45zHV6GEQDeCRYAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAmjgf47bPl28fdkqdr5OFT+2c4m/Of72OAYCSBjAs8etdEM/SIQggEQBfH43bfB7xDERQIIA4mpn4EWQMoCb12YM+hCP7s0IoKkB+Ooz3LdP0wJoagAG/GjiTimAhgUQt3bD7WuQAPBYVAAIQAD4CmQRjEWwx6B4DOqHMPwQZiuErRC2QtgMZ/gFYDu0x54C8EKMF2IE4JVIBCAABCAABCAABCAABCAABCAABCAABCAABCAABCAABDAuAUxenStaz68Xs69vFee/LBYXtu4zRuKcxbmLcxjnUgD/MPjtj7cNUcPEOT1KCKkDOHnnomFpuDjHAjD8IhDAb8fPtX3PT7Y+iHMugK5YKBmMXOKcC6DL1T/nXUAA3ac+BiKnPz0VSheAxa/FsAAMgwAEgACSLoINQ04WwV22PuTcGiEAT4I8ARLAL7Fz0GDkEOfaVgjbIWyDEEB/BO4Ezb7y/234vQ9w6NGohXGzFrzDtkELYMAdIQ4c42vYFV8AIAAQAAgAAQgAAQgAAQgAAQgAAQgAAQgAAQgAAQgAAQiAxlnb2Owb/t29fQGQw/LKal8A8W8CII35ztLBnSCMcvgFQHoCQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAA4L/8BKuvJWtTlVM1AAAAAElFTkSuQmCC">
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAD50lEQVR42u3cMWsTYRjA8X4FwaGCi22qRTNIEURBEbUgDS5WKaJIlw6i0FEcdHAWQTcn3RwcWurQwVXo2k/QqaWfQHA7eWrAkhhThdxd7vkFfotb757/Xd7Le04cmzxTQFYTDgICAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACoBHmO0vF2sbmgeWVVQGQRwx872eUEQiAWomrfu9nd29fAOQw6CMABCAABCAABCAABCAABCAABCAABCAABCAABCAABCAABDDeAZyYvVKcXXjCiMVxFkCNxEnpvNkqHq5/pyRxvE9duiuAqq/4N16sG8gKxfGv8o6QNoA46IsfdgxhDcR5EEDJXPnrdycQQEniu6ehq58q1gQpA7Dgre/CWAAlMGz1JYASHnkatPqK8yMAAQhAAAIQgAA8AUqm7B/FUi6C/QDmB7HUAVx++t7A1dDcg1cCsA3C1V8AFsMWvwIQgeEXQClPhWyNqG7rQ9Uvx3gh5lAIsTiOXYnWB6P7nh/HN45zHV6GEQDeCRYAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAhAAAmjgf47bPl28fdkqdr5OFT+2c4m/Of72OAYCSBjAs8etdEM/SIQggEQBfH43bfB7xDERQIIA4mpn4EWQMoCb12YM+hCP7s0IoKkB+Ooz3LdP0wJoagAG/GjiTimAhgUQt3bD7WuQAPBYVAAIQAD4CmQRjEWwx6B4DOqHMPwQZiuErRC2QtgMZ/gFYDu0x54C8EKMF2IE4JVIBCAABCAABCAABCAABCAABCAABCAABCAABCAABCAABDAuAUxenStaz68Xs69vFee/LBYXtu4zRuKcxbmLcxjnUgD/MPjtj7cNUcPEOT1KCKkDOHnnomFpuDjHAjD8IhDAb8fPtX3PT7Y+iHMugK5YKBmMXOKcC6DL1T/nXUAA3ac+BiKnPz0VSheAxa/FsAAMgwAEgACSLoINQ04WwV22PuTcGiEAT4I8ARLAL7Fz0GDkEOfaVgjbIWyDEEB/BO4Ezb7y/234vQ9w6NGohXGzFrzDtkELYMAdIQ4c42vYFV8AIAAQAAgAAQgAAQgAAQgAAQgAAQgAAQgAAQgAAQgAAQiAxlnb2Owb/t29fQGQw/LKal8A8W8CII35ztLBnSCMcvgFQHoCQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAA4L/8BKuvJWtTlVM1AAAAAElFTkSuQmCC">
 </head>
-<body class="bg-white text-black font-sans h-screen flex flex-col overflow-hidden select-none">
+<!-- sin h-screen: el alto lo fija style.css con --vh, por el 100vh de iOS -->
+<body class="bg-white text-black font-sans flex flex-col overflow-hidden select-none">
 
     <!-- NAVBAR -->
     <header class="bg-[#f2f2f7] flex items-center justify-between px-4 z-20 border-b border-gray-300"
@@ -1322,6 +1334,7 @@ async function readAppFile(kinds, etiqueta) {
 // INIT
 // ─────────────────────────────────────────────
 function init() {
+    setViewportHeight();
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     loadData();
@@ -1348,6 +1361,14 @@ function loadData() {
 function saveData() {
     lsSet('tv_elements', JSON.stringify(state.elements));
     lsSet('tv_links',    JSON.stringify(state.links));
+}
+
+// ─────────────────────────────────────────────
+// iPad: ALTO REAL DEL VIEWPORT
+// window.innerHeight sí descuenta las barras de Safari; 100vh no.
+// ─────────────────────────────────────────────
+function setViewportHeight() {
+    document.documentElement.style.setProperty('--vh', window.innerHeight + 'px');
 }
 
 // ─────────────────────────────────────────────
@@ -1495,6 +1516,11 @@ function bindEvents() {
     document.addEventListener('click', e => {
         if (!el.btnInsertMenu.contains(e.target) && !el.insertMenu.contains(e.target)) closeInsertMenu();
     });
+
+    // Recalcular el alto cuando rota el iPad o Safari muestra/oculta sus barras
+    window.addEventListener('resize', setViewportHeight);
+    window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 250));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', setViewportHeight);
 
     // iOS suelta el bloqueo de pantalla al pasar a segundo plano: lo repedimos al volver
     document.addEventListener('visibilitychange', () => {
