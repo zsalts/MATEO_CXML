@@ -1,0 +1,392 @@
+body {
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ===== CANVAS GRID ===== */
+.bg-grid {
+    background-color: #ffffff;
+    background-image:
+        linear-gradient(to right, #e0e8f8 1px, transparent 1px),
+        linear-gradient(to bottom, #e0e8f8 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* ===== INSPECTOR CELLS ===== */
+.inspector-section-label {
+    background: #f2f2f7;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 6px 16px 4px;
+    border-top: 1px solid #d1d5db;
+    margin-top: 8px;
+}
+.inspector-cell {
+    background: white;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* ===== INSERT MENU ROWS ===== */
+.ios-menu-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 500;
+    color: black;
+    background: white;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.ios-menu-row:active { background: #f3f4f6; }
+.swatch {
+    width: 28px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid #888;
+    margin-right: 12px;
+    flex-shrink: 0;
+    position: relative;
+}
+/* Small dot overlay for popup_label swatch */
+.popup-dot::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border: 1.5px solid black;
+    border-radius: 50%;
+}
+
+/* ===== CANVAS ELEMENTS ===== */
+.canvas-element {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: move;
+    user-select: none;
+    overflow: hidden;
+}
+
+/* Event – blue gradient */
+.canvas-element[data-eltype="event"] {
+    background: linear-gradient(180deg, #5cb0f5 0%, #3a8fd6 100%);
+    border: 1.5px solid #2a5b84;
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+}
+/* Popup label – yellow gradient with dot */
+.canvas-element[data-eltype="popup_label"] {
+    background: linear-gradient(180deg, #ffe55a 0%, #f8d022 100%);
+    border: 1.5px solid #c49a00;
+    color: #000;
+    position: relative;
+}
+.canvas-element[data-eltype="popup_label"]::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 7px;
+    height: 7px;
+    background: white;
+    border: 1.5px solid #333;
+    border-radius: 50%;
+}
+/* Descriptor – plain yellow */
+.canvas-element[data-eltype="descriptor"] {
+    background: #fff9c4;
+    border: 1.5px solid #e0c800;
+    color: #000;
+    border-radius: 6px;
+}
+/* Counter */
+.canvas-element[data-eltype="counter"] {
+    background: #f5f5f7;
+    border: 1.5px solid #aaa;
+    color: #000;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Helvetica Neue', monospace;
+}
+/* Contenedor – caja blanca con borde gris redondeado (igual a la foto) */
+.canvas-element[data-eltype="container"],
+.canvas-element.is-container {
+    background: rgba(255,255,255,0.85);
+    border: 1.5px solid #bbb !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    cursor: move;
+    z-index: 1 !important;
+}
+
+/* Custom color override (uses --btn-color CSS variable) */
+.canvas-element.has-color {
+    background: var(--btn-color) !important;
+    border-color: color-mix(in srgb, var(--btn-color) 70%, black) !important;
+}
+
+/* LIVE mode press effect */
+.canvas-element.mode-live {
+    cursor: pointer;
+    transition: transform 0.08s, filter 0.08s;
+}
+.canvas-element.mode-live:active {
+    transform: scale(0.96);
+    filter: brightness(0.88);
+}
+
+/* Selected highlight */
+.canvas-element.selected {
+    outline: 3px solid #007aff;
+    outline-offset: 2px;
+    z-index: 100 !important;
+}
+
+/* ===== RESIZE HANDLES ===== */
+.resize-handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border: 2px solid #007aff;
+    border-radius: 50%;
+    display: none;
+    z-index: 200;
+}
+.canvas-element.selected .resize-handle { display: block; }
+.resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
+.resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
+.resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+
+/* ===== SVG ARROWS ===== */
+.link-arrow {
+    stroke: #34c759;
+    stroke-width: 2.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+}
+.link-arrow.is-temp {
+    stroke: #007aff;
+    stroke-dasharray: 5,4;
+}
+
+/* ===== MODAL ===== */
+#descriptorModal {
+    /* iOS action sheet feel */
+}
+#descriptorGrid button:active {
+    background: #f3f4f6;
+}
+
+/* Event list rows */
+.event-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.5fr;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+    align-items: start;
+}
+.event-row:nth-child(even) {
+    background: #fafafa;
+}
+.event-row .ev-name {
+    font-weight: 600;
+    color: #1a1a1a;
+}
+.event-row .ev-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.ev-tag-chip {
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 1px 5px;
+}
+.event-row .ev-time {
+    color: #6b7280;
+    font-size: 11px;
+    text-align: right;
+    font-family: monospace;
+}
+
+/* ===== ANIMATE SLIDE UP ===== */
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+#descriptorModal > div:first-child {
+    animation: slideUp 0.18s ease;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.7); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+    animation: popIn 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Estado de grabación activa (Manual / Toggle) */
+.canvas-element.is-recording {
+    outline: 3px solid #ef4444 !important;
+    animation: pulseRecording 1s infinite alternate !important;
+}
+@keyframes pulseRecording {
+    0% { filter: brightness(1); }
+    100% { filter: brightness(1.2) drop-shadow(0 0 10px rgba(239, 68, 68, 0.9)); }
+}
+
+/* ═══════════════════════════════════════════
+   TIME ON ICE (ToI)
+   ═══════════════════════════════════════════ */
+
+/* Botón de línea */
+.canvas-element[data-eltype="line"] {
+    background: linear-gradient(180deg, #7b83e8 0%, #4c51bf 100%);
+    border: 1.5px solid #363b8f;
+    color: #fff;
+    border-radius: 8px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+}
+/* Línea con todos sus jugadores en hielo */
+.canvas-element.is-line-active {
+    outline: 3px solid #34c759 !important;
+    box-shadow: 0 0 12px rgba(52,199,89,0.65);
+}
+.canvas-element .line-sub {
+    font-size: 10px;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* Reloj del turno actual (solo mientras el jugador está en hielo) */
+.canvas-element .el-name { line-height: 1.15; }
+.canvas-element .shift-clock {
+    display: none;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(220,38,38,0.9);
+    border-radius: 3px;
+    padding: 0 5px;
+    margin-top: 2px;
+    text-shadow: none;
+}
+.canvas-element.is-recording .shift-clock { display: block; }
+
+/* Acumulado del jugador */
+.canvas-element .toi-total {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.75;
+    margin-top: 1px;
+}
+
+/* Control segmentado del panel live */
+.seg-control {
+    display: flex;
+    background: #e3e3e8;
+    border-radius: 8px;
+    padding: 2px;
+    min-width: 0;
+}
+.seg-btn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #3c3c43;
+    white-space: nowrap;
+    transition: background 0.12s;
+}
+.seg-btn.seg-active {
+    background: #fff;
+    color: #000;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* Filas de la tabla ToI */
+.toi-row {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr 1.1fr;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+    align-items: center;
+}
+.toi-row:nth-child(even) { background: #fafafa; }
+.toi-row .toi-name {
+    font-weight: 600;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.toi-row .toi-shifts,
+.toi-row .toi-total-cell {
+    text-align: right;
+    font-family: monospace;
+    font-size: 12px;
+    color: #374151;
+}
+.toi-row.on-ice { background: #fef2f2; }
+.toi-row.on-ice .toi-name,
+.toi-row.on-ice .toi-total-cell { color: #dc2626; }
+.toi-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #dc2626;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════
+   iPad
+   ═══════════════════════════════════════════ */
+
+/* iOS ignora user-scalable=no desde iOS 10: esto evita que el doble toque
+   haga zoom mientras se taggea rápido, sin perder el pinch para acercar. */
+body { touch-action: manipulation; }
+
+/* Objetivos táctiles cómodos en los controles chicos */
+.seg-btn { min-height: 30px; }
+#btnClearEvents,
+#btnExportToi { min-height: 34px; }
+
+/* El scroll de paneles y modales, con inercia nativa */
+#inspectorPanel,
+#eventList,
+#toiList,
+#templatesList,
+#sessionsList,
+#exclusiveEventsList,
+#lineMembersList {
+    -webkit-overflow-scrolling: touch;
+}
