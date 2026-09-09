@@ -124,6 +124,7 @@ const el = {
     btnInsertMenu:  D('btnInsertMenu'),
     insertMenu:     D('insertMenu'),
     btnStartCoding: D('btnStartCoding'),
+    btnStartCodingMenu: D('btnStartCodingMenu'),
     btnDeleteGlobal:D('btnDeleteGlobal'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
@@ -568,6 +569,7 @@ function bindEvents() {
         b.addEventListener('click', () => setPage(b.dataset.page));
     });
     on(el.btnStartCoding, 'click',() => setMode('live'));
+    on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
 
     on(el.btnInsertMenu, 'click', () => el.insertMenu.classList.toggle('hidden'));
@@ -625,12 +627,13 @@ function bindEvents() {
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend',  onTouchEnd);
 
-    document.addEventListener('click', e => {
-        if (el.btnInsertMenu && el.insertMenu
-            && !el.btnInsertMenu.contains(e.target) && !el.insertMenu.contains(e.target)) closeInsertMenu();
-        if (el.btnMenu && el.mainMenu
-            && !el.btnMenu.contains(e.target) && !el.mainMenu.contains(e.target)) closeMainMenu();
-    });
+    // En modo Formularios, el touchstart del lienzo puede llamar preventDefault,
+    // y eso cancela el click en iOS: los menús se quedaban abiertos al tocar el
+    // medio de la pantalla. Por eso escuchamos también touchstart.
+    document.addEventListener('click', e => cerrarMenusSiEsAfuera(e.target));
+    document.addEventListener('touchstart', e => {
+        if (e.touches && e.touches.length) cerrarMenusSiEsAfuera(e.touches[0].target || e.target);
+    }, { passive: true, capture: true });
 
     // Recalcular el alto cuando rota el iPad o Safari muestra/oculta sus barras
     window.addEventListener('resize', setViewportHeight);
@@ -660,6 +663,15 @@ function reportarFaltantes() {
 
 function closeInsertMenu() { if (el.insertMenu) el.insertMenu.classList.add('hidden'); }
 function closeMainMenu()   { if (el.mainMenu) el.mainMenu.classList.add('hidden'); }
+
+// ¿El toque cayó fuera de los dos menús? Entonces se cierran.
+function cerrarMenusSiEsAfuera(target) {
+    if (!target) return;
+    const dentro = (btn, menu) =>
+        (btn && btn.contains(target)) || (menu && menu.contains(target));
+    if (!dentro(el.btnInsertMenu, el.insertMenu)) closeInsertMenu();
+    if (!dentro(el.btnMenu, el.mainMenu)) closeMainMenu();
+}
 
 // ─────────────────────────────────────────────
 // CANVAS POINTER
