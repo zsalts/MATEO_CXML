@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 const state = {
     mode: 'setup',
+    page: 'botonera',          // 'botonera' | 'plantillas' | 'xml'
     elements: [],
     links: [],
     selectedId: null,
@@ -51,7 +52,12 @@ const el = {
     canvasContainer: D('canvasContainer'),
     svgArrows:       D('svgArrows'),
 
-    btnToggleMode: D('btnToggleMode'),
+    navBotonera:   D('navBotonera'),
+    navPlantillas: D('navPlantillas'),
+    navXml:        D('navXml'),
+    pageBotonera:  D('pageBotonera'),
+    pagePlantillas:D('pagePlantillas'),
+    pageXml:       D('pageXml'),
     titleLogo:     D('titleLogo'),
     timerDisplay:  D('timerDisplay'),
     btnExport:     D('btnExport'),
@@ -63,18 +69,12 @@ const el = {
     propType:              D('propType'),
     propColor:             D('propColor'),
     propTimeMode:          D('propTimeMode'),
-    btnOpenTemplates:      D('btnOpenTemplates'),
-    templatesModal:        D('templatesModal'),
     templatesList:         D('templatesList'),
     btnSaveCurrentTemplate:D('btnSaveCurrentTemplate'),
     btnNewTemplate:        D('btnNewTemplate'),
-    btnCloseTemplatesModal:D('btnCloseTemplatesModal'),
 
-    btnOpenSessions:       D('btnOpenSessions'),
-    sessionsModal:         D('sessionsModal'),
     sessionsList:          D('sessionsList'),
     btnSaveCurrentSession: D('btnSaveCurrentSession'),
-    btnCloseSessionsModal: D('btnCloseSessionsModal'),
     btnExportTemplateFile: D('btnExportTemplateFile'),
     btnImportTemplateFile: D('btnImportTemplateFile'),
     btnImportSessionFile:  D('btnImportSessionFile'),
@@ -398,6 +398,7 @@ function init() {
     buildSvgDefs();
     bindEvents();
     setMode('setup');
+    setPage('botonera');
 }
 
 function buildSvgDefs() {
@@ -450,6 +451,43 @@ function releaseWakeLock() {
 }
 
 // ─────────────────────────────────────────────
+// PÁGINAS
+// La app son tres pantallas completas en vez de modales: la botonera, las
+// plantillas y las codificaciones/XML. En un iPad un modal queda chico para
+// listas largas.
+// ─────────────────────────────────────────────
+function setPage(page) {
+    state.page = page;
+
+    const paginas = {
+        botonera:   el.pageBotonera,
+        plantillas: el.pagePlantillas,
+        xml:        el.pageXml
+    };
+    const navs = {
+        botonera:   el.navBotonera,
+        plantillas: el.navPlantillas,
+        xml:        el.navXml
+    };
+
+    Object.keys(paginas).forEach(k => {
+        const activa = (k === page);
+        if (paginas[k]) {
+            paginas[k].classList.toggle('hidden', !activa);
+            paginas[k].classList.toggle('flex', activa);
+        }
+        if (navs[k]) navs[k].classList.toggle('nav-active', activa);
+    });
+
+    // El menú Insertar y el Inspector son de la botonera
+    closeInsertMenu();
+    if (page !== 'botonera') el.inspectorPanel.classList.add('hidden');
+
+    if (page === 'plantillas') renderTemplatesList();
+    if (page === 'xml')        renderSessionsList();
+}
+
+// ─────────────────────────────────────────────
 // MODE
 // ─────────────────────────────────────────────
 function setMode(mode) {
@@ -468,7 +506,6 @@ function setMode(mode) {
     closeInsertMenu();
 
     if (mode === 'setup') {
-        el.btnToggleMode.textContent = 'Formularios';
         el.titleLogo.classList.remove('hidden');
         el.timerDisplay.classList.add('hidden');
         el.btnExport.classList.add('hidden');
@@ -484,7 +521,6 @@ function setMode(mode) {
             exportXML();
         }
     } else {
-        el.btnToggleMode.textContent = '← Volver';
         // El cronómetro vive en la barra de herramientas, justo debajo del
         // encabezado: mostrarlo también acá lo duplicaba.
         el.titleLogo.classList.remove('hidden');
@@ -510,7 +546,9 @@ function setMode(mode) {
 // BIND
 // ─────────────────────────────────────────────
 function bindEvents() {
-    el.btnToggleMode.addEventListener('click', () => setMode(state.mode === 'setup' ? 'live' : 'setup'));
+    el.navBotonera.addEventListener('click',   () => setPage('botonera'));
+    el.navPlantillas.addEventListener('click', () => setPage('plantillas'));
+    el.navXml.addEventListener('click',        () => setPage('xml'));
     el.btnStartCoding.addEventListener('click',() => setMode('live'));
     el.btnStopCoding.addEventListener('click', () => setMode('setup'));
 
@@ -531,13 +569,11 @@ function bindEvents() {
     el.propName.addEventListener('input', updateSelected);
     el.propType.addEventListener('change', updateSelected);
     el.propColor.addEventListener('input', updateSelected);
-    if (el.btnOpenTemplates) el.btnOpenTemplates.addEventListener('click', openTemplatesModal);
-    if (el.btnCloseTemplatesModal) el.btnCloseTemplatesModal.addEventListener('click', () => el.templatesModal.classList.add('hidden'));
+
     if (el.btnSaveCurrentTemplate) el.btnSaveCurrentTemplate.addEventListener('click', saveCurrentTemplate);
     if (el.btnNewTemplate) el.btnNewTemplate.addEventListener('click', createNewTemplate);
 
-    if (el.btnOpenSessions) el.btnOpenSessions.addEventListener('click', openSessionsModal);
-    if (el.btnCloseSessionsModal) el.btnCloseSessionsModal.addEventListener('click', () => el.sessionsModal.classList.add('hidden'));
+
     if (el.btnSaveCurrentSession) el.btnSaveCurrentSession.addEventListener('click', saveCurrentSession);
 
     if (el.btnOpenExclusiveModal) el.btnOpenExclusiveModal.addEventListener('click', openExclusiveModal);
@@ -1661,11 +1697,7 @@ function saveTemplates(arr) {
     lsSet('tv_templates', JSON.stringify(arr));
 }
 
-function openTemplatesModal() {
-    renderTemplatesList();
-    el.templatesModal.classList.remove('hidden');
-    el.templatesModal.classList.add('flex');
-}
+function openTemplatesModal() { setPage('plantillas'); }
 
 function renderTemplatesList() {
     const templates = getSavedTemplates();
@@ -1696,7 +1728,7 @@ function renderTemplatesList() {
             state.links    = JSON.parse(JSON.stringify(t.links || []));
             saveData();
             renderAll();
-            el.templatesModal.classList.add('hidden');
+            setPage('botonera');
         });
 
         row.querySelector('.btn-file-tmpl').addEventListener('click', () => exportTemplateToFile(t));
@@ -1741,7 +1773,7 @@ async function createNewTemplate() {
         selectElement(null);
         saveData();
         renderAll();
-        el.templatesModal.classList.add('hidden');
+        setPage('botonera');
     }
 }
 
@@ -1795,7 +1827,7 @@ async function importTemplateFromFile() {
     });
     saveTemplates(templates);
     renderTemplatesList();
-    el.templatesModal.classList.add('hidden');
+    setPage('botonera');   // la plantilla importada ya está cargada en el lienzo
 }
 
 async function exportSessionToFile(sess) {
@@ -1872,11 +1904,7 @@ function saveSessions(arr) {
     lsSet('tv_sessions', JSON.stringify(arr));
 }
 
-function openSessionsModal() {
-    renderSessionsList();
-    el.sessionsModal.classList.remove('hidden');
-    el.sessionsModal.classList.add('flex');
-}
+function openSessionsModal() { setPage('xml'); }
 
 function renderSessionsList() {
     const sessions = getSavedSessions();
@@ -1911,7 +1939,7 @@ function renderSessionsList() {
             state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
             renderLivePanel();
             renderElements();
-            el.sessionsModal.classList.add('hidden');
+            setPage('botonera');
         });
 
         row.querySelector('.btn-export-sess').addEventListener('click', () => {
