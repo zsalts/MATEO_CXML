@@ -312,27 +312,138 @@ function safeFileName(name, ext) {
     return base + ext;
 }
 
+const ES_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+
 async function saveBlobToFiles(filename, blob) {
     const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-    // En iPad esto abre la hoja de Compartir, con "Guardar en Archivos"
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    // En iPad esto abre la hoja de Compartir, con "Guardar en Archivos".
+    // navigator.share solo existe en contexto seguro (https): desde http:// o
+    // desde el archivo único en file:// no está, y hay que ir al plan B.
+    if ((navigator.maxTouchPoints || 0) > 0 &&
+        navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
             await navigator.share({ files: [file], title: filename });
             return true;
         } catch (err) {
             if (err && err.name === 'AbortError') return false;   // lo canceló el usuario
-            // cualquier otro fallo: caemos a la descarga de abajo
+            // cualquier otro fallo: caemos al plan B de abajo
         }
     }
 
+    // Fuera de iOS, el click sintético descarga sin preguntar nada.
+    if (!ES_IOS) return descargaDirecta(file, filename);
+
+    // En iPad un a.click() hecho por código no muestra nada: ni descarga ni
+    // error. Safari pide un toque de verdad sobre un enlace de verdad, y en la
+    // app instalada en pantalla de inicio ni siquiera eso alcanza siempre.
+    // Por eso mostramos el enlace y que lo toque la persona.
+    return dialogoGuardarArchivo(file, filename);
+}
+
+function descargaDirecta(file, filename) {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);          // Safari ignora los enlaces sueltos
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    // Safari pregunta antes de bajar el archivo: si revocamos la URL enseguida,
+    // para cuando la persona toca "Descargar" ya no hay nada que descargar.
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 120000);
     return true;
+}
+
+// Plan B del iPad: una tarjeta con el enlace, para que el archivo salga de un
+// toque real. Va con estilos en línea a propósito — tailwind.css solo trae las
+// clases que el resto de la app ya usa.
+function dialogoGuardarArchivo(file, filename) {
+    return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const kb = Math.max(1, Math.round(file.size / 1024));
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+            'display:flex;align-items:center;justify-content:center;padding:24px;' +
+            '-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#fff;border-radius:18px;padding:22px;width:100%;max-width:360px;' +
+            'box-shadow:0 12px 44px rgba(0,0,0,.35);text-align:center;' +
+            'font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;';
+
+        const titulo = document.createElement('div');
+        titulo.textContent = 'Guardar archivo';
+        titulo.style.cssText = 'font-size:15px;font-weight:700;color:#111;margin-bottom:4px;';
+
+        const detalle = document.createElement('div');
+        detalle.textContent = filename + ' · ' + kb + ' KB';
+        detalle.style.cssText = 'font-size:11px;color:#8a8a8e;margin-bottom:14px;word-break:break-all;';
+
+        const ayuda = document.createElement('div');
+        ayuda.textContent = 'Tocá Guardar y elegí "Guardar en Archivos".';
+        ayuda.style.cssText = 'font-size:12px;color:#555;line-height:1.45;margin-bottom:16px;';
+
+        const botones = document.createElement('div');
+        botones.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+        const estiloBoton = 'display:block;width:100%;padding:11px 12px;border-radius:12px;' +
+            'font-size:13px;font-weight:600;text-decoration:none;border:0;cursor:pointer;' +
+            '-webkit-appearance:none;appearance:none;box-sizing:border-box;';
+
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = filename;
+        enlace.rel = 'noopener';
+        enlace.textContent = 'Guardar';
+        enlace.style.cssText = estiloBoton + 'background:#007aff;color:#fff;';
+
+        botones.appendChild(enlace);
+
+        // Si hay hoja de Compartir, ofrecerla: disparada desde el toque conserva
+        // el gesto que iOS exige.
+        if (navigator.share) {
+            const btnCompartir = document.createElement('button');
+            btnCompartir.type = 'button';
+            btnCompartir.textContent = 'Compartir…';
+            btnCompartir.style.cssText = estiloBoton + 'background:#f2f2f7;color:#111;';
+            btnCompartir.onclick = () => {
+                const intento = (navigator.canShare && navigator.canShare({ files: [file] }))
+                    ? navigator.share({ files: [file], title: filename })
+                    : Promise.reject(new Error('sin soporte de archivos'));
+                intento.then(cerrar).catch(() => {});
+            };
+            botones.appendChild(btnCompartir);
+        }
+
+        const btnCerrar = document.createElement('button');
+        btnCerrar.type = 'button';
+        btnCerrar.textContent = 'Listo';
+        btnCerrar.style.cssText = estiloBoton + 'background:transparent;color:#8a8a8e;';
+        btnCerrar.onclick = () => cerrar();
+        botones.appendChild(btnCerrar);
+
+        card.appendChild(titulo);
+        card.appendChild(detalle);
+        card.appendChild(ayuda);
+        card.appendChild(botones);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        let cerrado = false;
+        function cerrar() {
+            if (cerrado) return;
+            cerrado = true;
+            overlay.remove();
+            // Margen largo: Safari sigue leyendo la URL mientras muestra su
+            // propio cartel de descarga.
+            setTimeout(() => URL.revokeObjectURL(url), 120000);
+            resolve(true);
+        }
+    });
 }
 
 function saveToFiles(filename, text, mime) {
@@ -1784,9 +1895,13 @@ function xmlEsc(v) {
 }
 
 function exportXML() {
-    exportCustomXML(state.events,
-        `Tagging_${new Date().toISOString().slice(0,10)}`,
-        state.sessionStartedAt);
+    try {
+        exportCustomXML(state.events,
+            `Tagging_${new Date().toISOString().slice(0,10)}`,
+            state.sessionStartedAt);
+    } catch (err) {
+        customAlert('No se pudo generar el XML: ' + ((err && err.message) || err), 'Exportar XML');
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -2149,7 +2264,11 @@ function exportCustomXML(eventsList, title, inicio) {
     xml += '</file>\n';
 
     const nombre = String(title || 'Tagging').replace(/[^a-z0-9_\- ]/gi, '_') + '.xml';
-    saveBlobToFiles(nombre, blobUtf16(xml));
+    // Si el guardado falla, que se vea: antes moría en silencio y parecía que
+    // el botón no hacía nada.
+    saveBlobToFiles(nombre, blobUtf16(xml)).catch(err => {
+        customAlert('No se pudo guardar el XML: ' + ((err && err.message) || err), 'Exportar XML');
+    });
 }
 
 init();
