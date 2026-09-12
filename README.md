@@ -63,8 +63,15 @@ Si solo tocás `style.css`, no hace falta.
 
 ## Al modificar el código
 
-Subí el número de `CACHE_VERSION` en `sw.js`. Si no, los dispositivos que ya
-tienen la app instalada siguen sirviendo la versión vieja desde el caché.
+Subí el número en los dos lugares, siempre juntos:
+
+- `CACHE_VERSION` en `sw.js` (`tagview-v12`). Si no, los dispositivos que ya
+  tienen la app instalada siguen sirviendo la versión vieja desde el caché.
+- `APP_VERSION` en `app.js` (`v12`). Es lo que la app muestra al lado del logo:
+  abrís la app y ves qué versión quedó servida de verdad. Si dice la vieja, el
+  caché no se renovó todavía.
+
+`build-ipad.py` corta si los dos números no coinciden.
 
 ## Archivos
 

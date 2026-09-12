@@ -44,6 +44,11 @@ const state = {
 const DEFAULT_W = 120;
 const DEFAULT_H = 52;
 
+// Se muestra al lado del logo para saber de un vistazo qué versión quedó
+// servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
+// corta si se desfasan.
+const APP_VERSION = 'v12';
+
 // ─────────────────────────────────────────────
 // DOM REFS
 // ─────────────────────────────────────────────
@@ -60,6 +65,7 @@ const el = {
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
     titleLogo:     D('titleLogo'),
+    appVersion:    D('appVersion'),
     timerDisplay:  D('timerDisplay'),
     btnExport:     D('btnExport'),
 
@@ -508,6 +514,7 @@ async function readAppFile(kinds, etiqueta) {
 // ─────────────────────────────────────────────
 function init() {
     setViewportHeight();
+    if (el.appVersion) el.appVersion.textContent = APP_VERSION;
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     loadData();

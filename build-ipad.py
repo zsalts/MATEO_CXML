@@ -30,11 +30,25 @@ def blindar(js):
     return js.replace('</script', '<\\/script')
 
 
+def version(texto, patron, archivo):
+    m = re.search(patron, texto)
+    if not m:
+        sys.exit('No encontré el número de versión en %s.' % archivo)
+    return m.group(1)
+
+
 def main():
     html = leer('index.html')
     css = leer('style.css')
     app = leer('app.js')
     tailwind = leer('tailwind.css')
+
+    # El número que muestra la app tiene que ser el mismo que versiona el caché:
+    # si se desfasan, en pantalla dice una versión y el service worker sirve otra.
+    v_app = version(app, r"APP_VERSION\s*=\s*'([^']+)'", 'app.js')
+    v_sw = version(leer('sw.js'), r"CACHE_VERSION\s*=\s*'tagview-([^']+)'", 'sw.js')
+    if v_app != v_sw:
+        sys.exit('Versiones desfasadas: app.js dice %s y sw.js dice %s.' % (v_app, v_sw))
 
     # Favicon embebido para que no pida un archivo externo
     icono = base64.b64encode(open(os.path.join(RAIZ, 'icon-192.png'), 'rb').read()).decode()
@@ -69,7 +83,7 @@ def main():
 
     io.open(os.path.join(RAIZ, SALIDA), 'w', encoding='utf-8').write(html)
     kb = len(html.encode('utf-8')) / 1024
-    print('%s  —  %.0f KB, autocontenido' % (SALIDA, kb))
+    print('%s  —  %.0f KB, autocontenido, %s' % (SALIDA, kb, v_app))
 
 
 if __name__ == '__main__':

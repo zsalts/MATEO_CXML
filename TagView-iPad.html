@@ -730,7 +730,7 @@ body {
         <!-- Título centrado de verdad: absoluto, sin depender del ancho de los costados -->
         <div class="absolute inset-x-0 flex justify-center pointer-events-none">
             <div id="timerDisplay" class="font-mono text-xl font-bold hidden">00:00</div>
-            <span id="titleLogo" class="font-bold text-lg">Tag&View</span>
+            <span id="titleLogo" class="font-bold text-lg">Tag&View<span id="appVersion" class="font-mono font-normal text-xs text-gray-400" style="margin-left:6px;"></span></span>
         </div>
 
         <div class="ml-auto flex justify-end relative z-50">
@@ -1085,6 +1085,11 @@ const state = {
 const DEFAULT_W = 120;
 const DEFAULT_H = 52;
 
+// Se muestra al lado del logo para saber de un vistazo qué versión quedó
+// servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
+// corta si se desfasan.
+const APP_VERSION = 'v12';
+
 // ─────────────────────────────────────────────
 // DOM REFS
 // ─────────────────────────────────────────────
@@ -1101,6 +1106,7 @@ const el = {
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
     titleLogo:     D('titleLogo'),
+    appVersion:    D('appVersion'),
     timerDisplay:  D('timerDisplay'),
     btnExport:     D('btnExport'),
 
@@ -1549,6 +1555,7 @@ async function readAppFile(kinds, etiqueta) {
 // ─────────────────────────────────────────────
 function init() {
     setViewportHeight();
+    if (el.appVersion) el.appVersion.textContent = APP_VERSION;
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     loadData();
