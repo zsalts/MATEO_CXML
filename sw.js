@@ -2,7 +2,7 @@
 // Subí CACHE_VERSION cada vez que cambien index.html / app.js / style.css,
 // y subí igual APP_VERSION en app.js: es el número que la app muestra al lado
 // del logo, así de un vistazo sabés qué versión quedó servida.
-const CACHE_VERSION = 'tagview-v13';
+const CACHE_VERSION = 'tagview-v14';
 
 const ASSETS = [
     './',

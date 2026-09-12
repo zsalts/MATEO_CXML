@@ -1088,7 +1088,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1409,8 +1409,21 @@ async function saveBlobToFiles(filename, blob) {
     return dialogoGuardarArchivo(file, filename, compartible);
 }
 
+// Safari elige entre descargar y mostrar según el tipo MIME, y el atributo
+// download no le gana a esa decisión: todo lo que sabe renderizar — text/xml,
+// application/json, text/plain — lo abre en la pestaña, y lo que se ve es un
+// blob: con el archivo adentro en vez de una descarga. Con un tipo que no sabe
+// mostrar no le queda otra que bajarlo. El nombre lo sigue poniendo download,
+// así que el archivo llega a Archivos con su extensión de siempre.
+function urlDescargable(blob) {
+    const opaco = blob.type === 'application/octet-stream'
+        ? blob
+        : new Blob([blob], { type: 'application/octet-stream' });
+    return URL.createObjectURL(opaco);
+}
+
 function descargaDirecta(file, filename) {
-    const url = URL.createObjectURL(file);
+    const url = urlDescargable(file);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -1429,7 +1442,7 @@ function descargaDirecta(file, filename) {
 // clases que el resto de la app ya usa.
 function dialogoGuardarArchivo(file, filename, compartible) {
     return new Promise(resolve => {
-        const url = URL.createObjectURL(file);
+        const url = urlDescargable(file);
         const kb = Math.max(1, Math.round(file.size / 1024));
 
         const overlay = document.createElement('div');
@@ -1451,9 +1464,7 @@ function dialogoGuardarArchivo(file, filename, compartible) {
         detalle.style.cssText = 'font-size:11px;color:#8a8a8e;margin-bottom:14px;word-break:break-all;';
 
         const ayuda = document.createElement('div');
-        ayuda.textContent = compartible
-            ? 'Tocá Guardar en Archivos y elegí la carpeta.'
-            : 'Safari no deja guardar este archivo desde acá: se abre en una pestaña y lo guardás con el botón Compartir de Safari.';
+        ayuda.textContent = 'Safari va a preguntar antes de bajarlo. Queda en Archivos → Descargas.';
         ayuda.style.cssText = 'font-size:12px;color:#555;line-height:1.45;margin-bottom:16px;';
 
         const botones = document.createElement('div');
@@ -1465,14 +1476,23 @@ function dialogoGuardarArchivo(file, filename, compartible) {
         const PRIMARIO   = 'background:#007aff;color:#fff;';
         const SECUNDARIO = 'background:#f2f2f7;color:#111;';
 
-        // La hoja de Compartir es la única vía que guarda de verdad en iPad, así
-        // que va primera cuando está disponible. Disparada desde el toque,
-        // conserva el gesto que iOS exige.
+        // Con la URL opaca de urlDescargable, Safari ya no puede mostrar el
+        // archivo y lo descarga. Va primero: es el camino más corto.
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = filename;
+        enlace.rel = 'noopener';
+        enlace.textContent = 'Descargar';
+        enlace.style.cssText = estiloBoton + PRIMARIO;
+        botones.appendChild(enlace);
+
+        // Alternativa: la hoja de Compartir, que además deja elegir la carpeta.
+        // Disparada desde el toque, conserva el gesto que iOS exige.
         if (compartible) {
             const btnCompartir = document.createElement('button');
             btnCompartir.type = 'button';
-            btnCompartir.textContent = 'Guardar en Archivos';
-            btnCompartir.style.cssText = estiloBoton + PRIMARIO;
+            btnCompartir.textContent = 'Guardar en Archivos…';
+            btnCompartir.style.cssText = estiloBoton + SECUNDARIO;
             btnCompartir.onclick = () => {
                 navigator.share({ files: [compartible], title: filename })
                     .then(cerrar)
@@ -1481,23 +1501,12 @@ function dialogoGuardarArchivo(file, filename, compartible) {
                         // Antes esto se perdía en un catch vacío y el botón
                         // parecía no hacer nada.
                         ayuda.textContent = 'No se pudo compartir: ' +
-                            ((err && err.message) || err) + '. Probá con Abrir en una pestaña.';
+                            ((err && err.message) || err) + '. Usá Descargar.';
                         ayuda.style.color = '#b91c1c';
                     });
             };
             botones.appendChild(btnCompartir);
         }
-
-        // Plan C: un blob: con download. En iPad no baja el archivo — Safari
-        // navega y lo muestra —, pero desde ahí se puede usar su botón
-        // Compartir. Por eso queda de segundo y con el nombre que corresponde.
-        const enlace = document.createElement('a');
-        enlace.href = url;
-        enlace.download = filename;
-        enlace.rel = 'noopener';
-        enlace.textContent = compartible ? 'Abrir en una pestaña' : 'Abrir el archivo';
-        enlace.style.cssText = estiloBoton + (compartible ? SECUNDARIO : PRIMARIO);
-        botones.appendChild(enlace);
 
         const btnCerrar = document.createElement('button');
         btnCerrar.type = 'button';
