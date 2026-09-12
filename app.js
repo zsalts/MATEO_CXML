@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v16';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -134,7 +134,11 @@ const el = {
     btnDeleteGlobal:D('btnDeleteGlobal'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
-    btnStopCoding:  D('btnStopCoding')
+    btnStopCoding:  D('btnStopCoding'),
+
+    nubeBar:        D('nubeBar'),
+    nubeEstado:     D('nubeEstado'),
+    btnNube:        D('btnNube')
 };
 
 // ─────────────────────────────────────────────
@@ -498,6 +502,236 @@ function saveToFiles(filename, text, mime) {
     return saveBlobToFiles(filename, new Blob([text], { type: mime || 'application/json' }));
 }
 
+// ─────────────────────────────────────────────
+// NUBE (Supabase Storage)
+// El XML se sigue guardando en el iPad: esto es una copia que sube cuando hay
+// red, para bajarla después desde la compu con descargas.html. En una cancha
+// sin wifi el archivo queda en la cola y sube solo cuando vuelve la señal, así
+// que la codificación nunca depende de la conexión.
+// Se habla por HTTP pelado a propósito: el proyecto no usa npm ni CDN, y el
+// SDK de Supabase no le agrega nada a estas cuatro llamadas.
+// ─────────────────────────────────────────────
+const NUBE = window.NUBE || { url: '', anonKey: '', bucket: 'codificaciones' };
+
+const nubeActiva = () => !!(NUBE.url && NUBE.anonKey);
+
+function nubeSesion() {
+    const raw = lsGet('tv_nube_sesion');
+    try { return raw ? JSON.parse(raw) : null; } catch (err) { return null; }
+}
+function guardarNubeSesion(s) { lsSet('tv_nube_sesion', s ? JSON.stringify(s) : ''); }
+
+function guardarTokens(data) {
+    guardarNubeSesion({
+        access:  data.access_token,
+        refresh: data.refresh_token,
+        // Un minuto de margen: no queremos descubrir que venció a mitad de una subida.
+        vence:   Date.now() + ((data.expires_in || 3600) - 60) * 1000,
+        email:   (data.user && data.user.email) || ''
+    });
+}
+
+async function nubeFetch(ruta, opciones) {
+    const r = await fetch(NUBE.url + ruta, opciones);
+    if (r.ok) return r;
+    // Supabase contesta el error en JSON, pero no siempre: si no, va el texto.
+    let detalle = '';
+    try {
+        const cuerpo = await r.json();
+        detalle = cuerpo.error_description || cuerpo.msg || cuerpo.message || cuerpo.error || '';
+    } catch (err) { detalle = (await r.text().catch(() => '')).slice(0, 120); }
+    throw new Error(detalle || ('HTTP ' + r.status));
+}
+
+async function nubeEntrar(email, password) {
+    const r = await nubeFetch('/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: { apikey: NUBE.anonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+    });
+    guardarTokens(await r.json());
+}
+
+function nubeSalir() { guardarNubeSesion(null); renderEstadoNube(); }
+
+// Devuelve un access_token válido, renovándolo si hizo falta.
+async function nubeToken() {
+    const s = nubeSesion();
+    if (!s || !s.refresh) throw new Error('Todavía no entraste a la nube');
+    if (Date.now() < s.vence) return s.access;
+
+    try {
+        const r = await nubeFetch('/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: { apikey: NUBE.anonKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: s.refresh })
+        });
+        const data = await r.json();
+        guardarTokens(data);
+        return data.access_token;
+    } catch (err) {
+        // El refresh vencido no se arregla reintentando: hay que volver a entrar.
+        guardarNubeSesion(null);
+        throw new Error('La sesión de la nube venció, entrá de nuevo');
+    }
+}
+
+async function nubeSubir(nombre, blob) {
+    const token = await nubeToken();
+    await nubeFetch('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(nombre), {
+        method: 'POST',
+        headers: {
+            apikey: NUBE.anonKey,
+            Authorization: 'Bearer ' + token,
+            'Content-Type': 'text/xml',
+            'x-upsert': 'true'          // re-exportar el mismo partido lo pisa, no lo duplica
+        },
+        body: blob
+    });
+}
+
+// ── Cola de subida ──
+// El XML va entero al localStorage. Es texto y pesa poco, y así sobrevive a
+// que cierres la app antes de que haya señal.
+function colaNube() {
+    const raw = lsGet('tv_nube_cola');
+    try { return raw ? JSON.parse(raw) : []; } catch (err) { return []; }
+}
+function guardarCola(cola) { lsSet('tv_nube_cola', JSON.stringify(cola)); }
+
+function encolarXml(nombre, xml) {
+    if (!nubeActiva()) return;
+    const cola = colaNube();
+    cola.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        nombre: nombre, xml: xml, error: ''
+    });
+    guardarCola(cola);
+    renderEstadoNube();
+    sincronizarNube();
+}
+
+let _sincronizando = false;
+
+async function sincronizarNube(avisar) {
+    if (!nubeActiva() || _sincronizando) return;
+    if (!colaNube().length) { renderEstadoNube(); return; }
+
+    if (!nubeSesion()) {
+        if (avisar) dialogoEntrarNube();
+        else renderEstadoNube();
+        return;
+    }
+
+    _sincronizando = true;
+    renderEstadoNube();
+    try {
+        for (const item of colaNube()) {
+            try {
+                await nubeSubir(item.nombre, blobUtf16(item.xml));
+                guardarCola(colaNube().filter(x => x.id !== item.id));
+            } catch (err) {
+                const motivo = (err && err.message) || String(err);
+                guardarCola(colaNube().map(x => x.id === item.id ? { ...x, error: motivo } : x));
+                if (avisar) customAlert('No se pudo subir "' + item.nombre + '": ' + motivo, 'Nube');
+                // Si falló uno, los que siguen van a fallar por lo mismo.
+                break;
+            }
+            renderEstadoNube();
+        }
+    } finally {
+        _sincronizando = false;
+        renderEstadoNube();
+    }
+}
+
+function renderEstadoNube() {
+    if (!el.nubeBar) return;
+    if (!nubeActiva()) { el.nubeBar.classList.add('hidden'); return; }
+    el.nubeBar.classList.remove('hidden');
+
+    const cola = colaNube();
+    const sesion = nubeSesion();
+    const conError = cola.find(x => x.error);
+
+    let texto, color = 'text-gray-500';
+    if (_sincronizando)      { texto = 'Subiendo…'; }
+    else if (!cola.length)   { texto = sesion ? 'Nube: todo subido' : 'Nube: sin nada pendiente'; }
+    else if (!sesion)        { texto = cola.length + ' sin subir · entrá a la nube'; color = 'text-[#007aff]'; }
+    else if (conError)       { texto = cola.length + ' sin subir · ' + conError.error; color = 'text-red-500'; }
+    else                     { texto = cola.length + ' sin subir'; color = 'text-[#007aff]'; }
+
+    el.nubeEstado.className = 'text-xs ' + color;
+    el.nubeEstado.textContent = texto;
+    el.btnNube.textContent = sesion ? 'Sincronizar' : 'Entrar';
+}
+
+// Card de login. Va aparte de customPrompt porque la contraseña necesita un
+// campo que no la muestre en pantalla.
+function dialogoEntrarNube() {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+        'display:flex;align-items:center;justify-content:center;padding:24px;';
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:18px;padding:22px;width:100%;max-width:340px;' +
+        'box-shadow:0 12px 44px rgba(0,0,0,.35);' +
+        'font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;';
+
+    const estiloCampo = 'width:100%;padding:10px 12px;border:1px solid #d1d1d6;border-radius:10px;' +
+        'font-size:14px;margin-bottom:8px;box-sizing:border-box;-webkit-appearance:none;';
+    const estiloBoton = 'display:block;width:100%;padding:11px 12px;border-radius:12px;font-size:13px;' +
+        'font-weight:600;border:0;cursor:pointer;-webkit-appearance:none;box-sizing:border-box;';
+
+    card.innerHTML = '<div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px;text-align:center;">Entrar a la nube</div>' +
+        '<div style="font-size:11px;color:#8a8a8e;margin-bottom:14px;text-align:center;">Una sola vez por dispositivo.</div>';
+
+    const email = document.createElement('input');
+    email.type = 'email'; email.placeholder = 'Correo';
+    email.autocomplete = 'username'; email.style.cssText = estiloCampo;
+
+    const pass = document.createElement('input');
+    pass.type = 'password'; pass.placeholder = 'Contraseña';
+    pass.autocomplete = 'current-password'; pass.style.cssText = estiloCampo;
+
+    const aviso = document.createElement('div');
+    aviso.style.cssText = 'font-size:11px;color:#b91c1c;min-height:14px;margin-bottom:10px;line-height:1.4;';
+
+    const btnEntrar = document.createElement('button');
+    btnEntrar.type = 'button'; btnEntrar.textContent = 'Entrar';
+    btnEntrar.style.cssText = estiloBoton + 'background:#007aff;color:#fff;margin-bottom:8px;';
+
+    const btnCerrar = document.createElement('button');
+    btnCerrar.type = 'button'; btnCerrar.textContent = 'Ahora no';
+    btnCerrar.style.cssText = estiloBoton + 'background:transparent;color:#8a8a8e;';
+
+    btnEntrar.onclick = async () => {
+        aviso.textContent = '';
+        btnEntrar.disabled = true;
+        btnEntrar.textContent = 'Entrando…';
+        try {
+            await nubeEntrar(email.value.trim(), pass.value);
+            overlay.remove();
+            renderEstadoNube();
+            sincronizarNube(true);
+        } catch (err) {
+            aviso.textContent = (err && err.message) || String(err);
+            btnEntrar.disabled = false;
+            btnEntrar.textContent = 'Entrar';
+        }
+    };
+    btnCerrar.onclick = () => overlay.remove();
+
+    card.appendChild(email);
+    card.appendChild(pass);
+    card.appendChild(aviso);
+    card.appendChild(btnEntrar);
+    card.appendChild(btnCerrar);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    email.focus();
+}
+
 // Abre el selector de Archivos y devuelve { name, text } o null si se canceló
 function pickTextFile(accept) {
     return new Promise(resolve => {
@@ -564,6 +798,8 @@ function init() {
     bindEvents();
     setMode('setup');
     setPage('botonera');
+    renderEstadoNube();
+    sincronizarNube(false);     // lo que haya quedado de la vez pasada
     reportarFaltantes();
 }
 
@@ -731,6 +967,10 @@ function bindEvents() {
     on(el.btnStartCoding, 'click',() => setMode('live'));
     on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
+
+    on(el.btnNube, 'click', () => nubeSesion() ? sincronizarNube(true) : dialogoEntrarNube());
+    // Volvió la señal: lo que quedó en la cola se va solo.
+    window.addEventListener('online', () => sincronizarNube(false));
 
     on(el.btnInsertMenu, 'click', () => el.insertMenu.classList.toggle('hidden'));
     document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -2313,6 +2553,11 @@ function exportCustomXML(eventsList, title, inicio) {
     xml += '</file>\n';
 
     const nombre = String(title || 'Tagging').replace(/[^a-z0-9_\- ]/gi, '_') + '.xml';
+
+    // La copia a la nube va primero y no bloquea: si no hay señal queda en la
+    // cola, y el guardado local sigue su camino igual.
+    encolarXml(nombre, xml);
+
     // Si el guardado falla, que se vea: antes moría en silencio y parecía que
     // el botón no hacía nada.
     saveBlobToFiles(nombre, blobUtf16(xml)).catch(err => {

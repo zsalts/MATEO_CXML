@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag & View — Descargas</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; background: #f2f2f7; color: #111;
+            font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        }
+        .envoltorio { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+        h1 { font-size: 20px; margin: 0 0 2px; }
+        .bajada { color: #8a8a8e; font-size: 13px; margin: 0 0 24px; }
+        .tarjeta { background: #fff; border: 1px solid #e2e2e7; border-radius: 14px; padding: 18px; }
+        label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+        input {
+            width: 100%; padding: 9px 11px; border: 1px solid #d1d1d6; border-radius: 9px;
+            font-size: 14px; margin-bottom: 12px; font-family: inherit;
+        }
+        button {
+            font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 10px;
+            padding: 9px 16px; cursor: pointer; background: #007aff; color: #fff;
+        }
+        button:disabled { opacity: .5; cursor: default; }
+        button.tenue { background: #f2f2f7; color: #111; }
+        .fila {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 11px 0; border-top: 1px solid #f0f0f2;
+        }
+        .fila:first-child { border-top: 0; }
+        .nombre { font-weight: 600; word-break: break-all; }
+        .meta { color: #8a8a8e; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .error { color: #b91c1c; font-size: 12px; min-height: 16px; }
+        .vacio { color: #8a8a8e; text-align: center; padding: 28px 0; }
+        .encabezado { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .oculto { display: none; }
+    </style>
+</head>
+<body>
+    <div class="envoltorio">
+        <h1>Codificaciones</h1>
+        <p class="bajada">Los XML que el iPad subió a la nube. Descargalos e importalos en Sportscode.</p>
+
+        <!-- Sin configurar -->
+        <div id="sinConfig" class="tarjeta oculto">
+            <strong>Falta configurar la nube.</strong>
+            <p class="bajada" style="margin:8px 0 0;">
+                Completá <code>nube-config.js</code> con la url y la clave anon de tu proyecto de Supabase.
+            </p>
+        </div>
+
+        <!-- Login -->
+        <div id="panelLogin" class="tarjeta oculto">
+            <label for="email">Correo</label>
+            <input id="email" type="email" autocomplete="username">
+            <label for="password">Contraseña</label>
+            <input id="password" type="password" autocomplete="current-password">
+            <div id="errorLogin" class="error"></div>
+            <button id="btnEntrar" type="button">Entrar</button>
+        </div>
+
+        <!-- Listado -->
+        <div id="panelLista" class="tarjeta oculto">
+            <div class="encabezado">
+                <span id="cuenta" class="meta"></span>
+                <span>
+                    <button id="btnRefrescar" class="tenue" type="button">Actualizar</button>
+                    <button id="btnSalir" class="tenue" type="button">Salir</button>
+                </span>
+            </div>
+            <div id="errorLista" class="error"></div>
+            <div id="lista"></div>
+        </div>
+    </div>
+
+    <script src="nube-config.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        var NUBE = window.NUBE || {};
+        var D = function (id) { return document.getElementById(id); };
+
+        if (!NUBE.url || !NUBE.anonKey) { D('sinConfig').classList.remove('oculto'); return; }
+
+        // La sesión vive acá y no en la del iPad: son navegadores distintos.
+        // En ventana privada localStorage puede tirar excepción al leerlo, así
+        // que va todo envuelto: sin él la página anda igual, solo pide entrar
+        // cada vez.
+        var CLAVE = 'tv_nube_sesion';
+        var enMemoria = null;
+
+        function sesion() {
+            try {
+                var raw = localStorage.getItem(CLAVE);
+                if (raw) return JSON.parse(raw);
+            } catch (e) { /* sin almacenamiento */ }
+            return enMemoria;
+        }
+        function guardarSesion(s) {
+            enMemoria = s;
+            try {
+                if (s) localStorage.setItem(CLAVE, JSON.stringify(s));
+                else   localStorage.removeItem(CLAVE);
+            } catch (e) { /* sin almacenamiento */ }
+        }
+        function guardarTokens(data) {
+            guardarSesion({
+                access:  data.access_token,
+                refresh: data.refresh_token,
+                vence:   Date.now() + ((data.expires_in || 3600) - 60) * 1000,
+                email:   (data.user && data.user.email) || ''
+            });
+        }
+
+        function pedir(ruta, opciones) {
+            return fetch(NUBE.url + ruta, opciones).then(function (r) {
+                if (r.ok) return r;
+                return r.json().then(
+                    function (c) { throw new Error(c.error_description || c.msg || c.message || c.error || ('HTTP ' + r.status)); },
+                    function ()  { throw new Error('HTTP ' + r.status); }
+                );
+            });
+        }
+
+        function token() {
+            var s = sesion();
+            if (!s || !s.refresh) return Promise.reject(new Error('Entrá primero'));
+            if (Date.now() < s.vence) return Promise.resolve(s.access);
+            return pedir('/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                headers: { apikey: NUBE.anonKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: s.refresh })
+            }).then(function (r) { return r.json(); })
+              .then(function (data) { guardarTokens(data); return data.access_token; })
+              .catch(function () {
+                  guardarSesion(null);
+                  throw new Error('La sesión venció, entrá de nuevo');
+              });
+        }
+
+        function listar() {
+            return token().then(function (t) {
+                return pedir('/storage/v1/object/list/' + NUBE.bucket, {
+                    method: 'POST',
+                    headers: {
+                        apikey: NUBE.anonKey,
+                        Authorization: 'Bearer ' + t,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prefix: '', limit: 200, offset: 0,
+                        sortBy: { column: 'created_at', order: 'desc' }
+                    })
+                });
+            }).then(function (r) { return r.json(); });
+        }
+
+        function bajar(nombre) {
+            return token().then(function (t) {
+                return pedir('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(nombre), {
+                    headers: { apikey: NUBE.anonKey, Authorization: 'Bearer ' + t }
+                });
+            }).then(function (r) { return r.blob(); })
+              .then(function (blob) {
+                  // Mismo truco que en la app: con un tipo que el navegador sabe
+                  // mostrar, Safari abre el archivo en vez de bajarlo.
+                  var url = URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' }));
+                  var a = document.createElement('a');
+                  a.href = url; a.download = nombre;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+              });
+        }
+
+        function kb(bytes) {
+            if (!bytes && bytes !== 0) return '';
+            return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+        }
+        function cuando(iso) {
+            if (!iso) return '';
+            var d = new Date(iso);
+            return isNaN(d) ? '' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        }
+
+        function pintarLista(archivos) {
+            var lista = D('lista');
+            lista.innerHTML = '';
+
+            // El list de Storage devuelve también las carpetas: no son archivos.
+            var xmls = (archivos || []).filter(function (a) { return a.id; });
+
+            D('cuenta').textContent = (sesion().email || '') +
+                ' · ' + xmls.length + (xmls.length === 1 ? ' archivo' : ' archivos');
+
+            if (!xmls.length) {
+                lista.innerHTML = '<div class="vacio">Todavía no subió ninguna codificación.</div>';
+                return;
+            }
+
+            xmls.forEach(function (a) {
+                var fila = document.createElement('div');
+                fila.className = 'fila';
+
+                var izq = document.createElement('div');
+                izq.innerHTML = '<div class="nombre"></div><div class="meta"></div>';
+                izq.querySelector('.nombre').textContent = a.name;
+                izq.querySelector('.meta').textContent =
+                    [cuando(a.created_at), kb(a.metadata && a.metadata.size)].filter(Boolean).join(' · ');
+
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = 'Descargar';
+                btn.onclick = function () {
+                    btn.disabled = true;
+                    var previo = btn.textContent;
+                    btn.textContent = 'Bajando…';
+                    bajar(a.name)
+                        .catch(function (err) { D('errorLista').textContent = err.message; })
+                        .then(function () { btn.disabled = false; btn.textContent = previo; });
+                };
+
+                fila.appendChild(izq);
+                fila.appendChild(btn);
+                lista.appendChild(fila);
+            });
+        }
+
+        function mostrar(cual) {
+            D('panelLogin').classList.toggle('oculto', cual !== 'login');
+            D('panelLista').classList.toggle('oculto', cual !== 'lista');
+        }
+
+        function refrescar() {
+            D('errorLista').textContent = '';
+            listar().then(pintarLista).catch(function (err) {
+                D('errorLista').textContent = err.message;
+                if (!sesion()) mostrar('login');
+            });
+        }
+
+        D('btnEntrar').onclick = function () {
+            var btn = D('btnEntrar');
+            D('errorLogin').textContent = '';
+            btn.disabled = true; btn.textContent = 'Entrando…';
+            pedir('/auth/v1/token?grant_type=password', {
+                method: 'POST',
+                headers: { apikey: NUBE.anonKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: D('email').value.trim(), password: D('password').value })
+            }).then(function (r) { return r.json(); })
+              .then(function (data) {
+                  guardarTokens(data);
+                  D('password').value = '';
+                  mostrar('lista');
+                  refrescar();
+              })
+              .catch(function (err) { D('errorLogin').textContent = err.message; })
+              .then(function () { btn.disabled = false; btn.textContent = 'Entrar'; });
+        };
+
+        D('password').addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') D('btnEntrar').click();
+        });
+
+        D('btnRefrescar').onclick = refrescar;
+        D('btnSalir').onclick = function () {
+            guardarSesion(null);
+            mostrar('login');
+        };
+
+        if (sesion()) { mostrar('lista'); refrescar(); } else { mostrar('login'); }
+    })();
+    </script>
+</body>
+</html>

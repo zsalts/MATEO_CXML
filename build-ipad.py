@@ -59,6 +59,10 @@ def main():
          '<style>\n%s\n</style>' % tailwind),
         ('<link rel="stylesheet" href="style.css">',
          '<style>\n%s\n</style>' % css),
+        # Sin red no hay nube, pero la config tiene que existir igual: app.js la
+        # lee al arrancar y con la url vacía simplemente no sube nada.
+        ('<script src="nube-config.js"></script>',
+         '<script>%s</script>' % blindar(leer('nube-config.js'))),
         ('<script src="app.js"></script>',
          '<script>%s</script>' % blindar(app)),
         # El manifest y los iconos sueltos no existen en el archivo único

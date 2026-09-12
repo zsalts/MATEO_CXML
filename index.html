@@ -338,6 +338,12 @@
             <p class="text-base font-bold text-black">Codificaciones guardadas</p>
         </div>
 
+        <!-- Estado de la nube. Oculto mientras nube-config.js esté sin completar. -->
+        <div id="nubeBar" class="hidden px-4 py-2 bg-white border-b border-gray-300 flex items-center justify-between">
+            <span id="nubeEstado" class="text-xs text-gray-500"></span>
+            <button id="btnNube" class="text-[#007aff] text-xs font-medium flex-shrink-0" style="margin-left:12px;">Sincronizar</button>
+        </div>
+
         <div class="p-3 bg-white border-b border-gray-300 flex flex-col space-y-2">
             <button id="btnSaveCurrentSession" class="w-full py-2.5 bg-[#2ca038] text-white font-bold rounded-xl text-sm shadow">
                 + Guardar la codificación actual
@@ -393,6 +399,7 @@
         </div>
     </div>
 
+    <script src="nube-config.js"></script>
     <script src="app.js"></script>
     <script>
         // Solo disponible sobre https:// o localhost. Con file:// se ignora sin romper nada.
