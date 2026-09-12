@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -532,7 +532,17 @@ function guardarTokens(data) {
 }
 
 async function nubeFetch(ruta, opciones) {
-    const r = await fetch(NUBE.url + ruta, opciones);
+    let r;
+    try {
+        r = await fetch(NUBE.url + ruta, opciones);
+    } catch (err) {
+        // Quedarse sin red no es lo mismo que que el servidor nos rechace, y no
+        // se trata igual: esto se reintenta, no invalida la sesión. Va marcado
+        // para que quien lo reciba sepa distinguirlo.
+        const sinRed = new Error('Sin conexión');
+        sinRed.red = true;
+        throw sinRed;
+    }
     if (r.ok) return r;
     // Supabase contesta el error en JSON, pero no siempre: si no, va el texto.
     let detalle = '';
@@ -570,7 +580,12 @@ async function nubeToken() {
         guardarTokens(data);
         return data.access_token;
     } catch (err) {
-        // El refresh vencido no se arregla reintentando: hay que volver a entrar.
+        // Sin red la sesión sigue siendo buena: se reintenta cuando vuelva.
+        // Borrarla acá era lo que obligaba a entrar de nuevo después de cada
+        // partido sin wifi.
+        if (err && err.red) throw err;
+        // Esto sí es el servidor rechazando el refresh, y no se arregla
+        // reintentando: hay que volver a entrar.
         guardarNubeSesion(null);
         throw new Error('La sesión de la nube venció, entrá de nuevo');
     }

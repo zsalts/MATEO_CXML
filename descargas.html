@@ -118,7 +118,12 @@
         }
 
         function pedir(ruta, opciones) {
-            return fetch(NUBE.url + ruta, opciones).then(function (r) {
+            return fetch(NUBE.url + ruta, opciones).catch(function () {
+                // Sin red: se marca aparte porque no invalida la sesión.
+                var e = new Error('Sin conexión');
+                e.red = true;
+                throw e;
+            }).then(function (r) {
                 if (r.ok) return r;
                 return r.json().then(
                     function (c) { throw new Error(c.error_description || c.msg || c.message || c.error || ('HTTP ' + r.status)); },
@@ -137,7 +142,9 @@
                 body: JSON.stringify({ refresh_token: s.refresh })
             }).then(function (r) { return r.json(); })
               .then(function (data) { guardarTokens(data); return data.access_token; })
-              .catch(function () {
+              .catch(function (err) {
+                  // Sin red la sesión sigue valiendo: no la borramos.
+                  if (err && err.red) throw err;
                   guardarSesion(null);
                   throw new Error('La sesión venció, entrá de nuevo');
               });
