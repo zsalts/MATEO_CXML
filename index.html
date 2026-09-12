@@ -325,9 +325,10 @@
             <!-- Estado del respaldo automático. Oculto si la nube no está configurada. -->
             <div id="nubeBarPlantillas" class="hidden px-3 pt-2 flex items-center justify-between">
                 <span id="nubeEstadoPlantillas" class="text-xs text-gray-500"></span>
-                <button id="btnRestoreNube" class="text-[#007aff] text-xs font-medium flex-shrink-0" style="margin-left:12px;">
-                    Restaurar de la nube
-                </button>
+                <span class="flex-shrink-0" style="margin-left:12px;">
+                    <button id="btnSubirNube" class="text-[#007aff] text-xs font-medium">Subir a la nube</button>
+                    <button id="btnRestoreNube" class="text-[#007aff] text-xs font-medium" style="margin-left:16px;">Traer de la nube</button>
+                </span>
             </div>
             <div class="p-3 flex space-x-2">
                 <button id="btnBackupAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
@@ -413,8 +414,27 @@
     <script>
         // Solo disponible sobre https:// o localhost. Con file:// se ignora sin romper nada.
         if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+            // El service worker sirve desde su caché sin preguntar al servidor.
+            // Cuando sube una versión nueva, la instala pero la página que ya
+            // está abierta sigue mostrando la vieja: hacía falta una segunda
+            // recarga que nadie sabe que tiene que hacer, y se veía un número
+            // de versión viejo en un dispositivo y el nuevo en otro.
+            // Con skipWaiting + clients.claim, el que instala toma el control
+            // enseguida y avisa acá: recargamos solos, una sola vez.
+            var habiaControlador = !!navigator.serviceWorker.controller;
+            var recargando = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+                // La primera visita no tiene nada viejo en pantalla que reemplazar.
+                if (!habiaControlador || recargando) return;
+                recargando = true;
+                location.reload();
+            });
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js').then(function (reg) {
+                    // Buscar versión nueva en cada apertura, sin esperar a que
+                    // al navegador se le ocurra revisar.
+                    reg.update();
+                }).catch(function () {});
             });
         }
     </script>

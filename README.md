@@ -142,6 +142,11 @@ Subí el número en los dos lugares, siempre juntos:
 
 `build-ipad.py` corta si los dos números no coinciden.
 
+Desde v20 la app se actualiza sola: busca una versión nueva en cada apertura y,
+cuando el service worker nuevo toma el control, recarga una vez. Antes había que
+recargar dos veces a mano, y era fácil terminar con un dispositivo mostrando una
+versión y otro mostrando otra.
+
 ## Archivos
 
 | | |

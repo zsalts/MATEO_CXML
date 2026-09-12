@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v21';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -142,6 +142,7 @@ const el = {
 
     nubeBarPlantillas:    D('nubeBarPlantillas'),
     nubeEstadoPlantillas: D('nubeEstadoPlantillas'),
+    btnSubirNube:         D('btnSubirNube'),
     btnRestoreNube:       D('btnRestoreNube')
 };
 
@@ -636,7 +637,7 @@ function colaNube() {
 }
 function guardarCola(cola) { lsSet('tv_nube_cola', JSON.stringify(cola)); }
 
-function encolarArchivo(nombre, texto, formato) {
+function encolarArchivo(nombre, texto, formato, sinArrancar) {
     if (!nubeActiva()) return;
     let cola = colaNube();
     // El respaldo es "el último vale": si todavía hay uno sin subir, no tiene
@@ -649,7 +650,9 @@ function encolarArchivo(nombre, texto, formato) {
     });
     guardarCola(cola);
     renderEstadoNube();
-    sincronizarNube();
+    // El botón "Subir a la nube" arranca la subida él mismo, para poder contar
+    // cómo salió: si la largamos acá, el aviso queda en manos de esta llamada.
+    if (!sinArrancar) sincronizarNube();
 }
 
 // ── Respaldo automático de plantillas y sesiones ──
@@ -726,10 +729,21 @@ async function restaurarDesdeNube() {
     await aplicarRespaldo(data, 'de la nube');
 }
 
-let _sincronizando = false;
+let _sincronizaEnCurso = null;
 
-async function sincronizarNube(avisar) {
-    if (!nubeActiva() || _sincronizando) return;
+// Si ya hay una subida andando, devuelve esa en vez de arrancar otra. Antes
+// cortaba en seco: quien la esperaba creía que había terminado y avisaba de más.
+function sincronizarNube(avisar) {
+    if (_sincronizaEnCurso) return _sincronizaEnCurso;
+    _sincronizaEnCurso = (async () => {
+        try { await subirLaCola(avisar); }
+        finally { _sincronizaEnCurso = null; renderEstadoNube(); }
+    })();
+    return _sincronizaEnCurso;
+}
+
+async function subirLaCola(avisar) {
+    if (!nubeActiva()) return;
     if (!colaNube().length) { renderEstadoNube(); return; }
 
     if (!nubeSesion()) {
@@ -738,37 +752,58 @@ async function sincronizarNube(avisar) {
         return;
     }
 
-    _sincronizando = true;
     renderEstadoNube();
-    try {
-        // Siempre el primero de la cola tal como está ahora, no una foto del
-        // arranque: exportar un XML encola también el respaldo, y con una foto
-        // ese segundo archivo se quedaba esperando al próximo arranque.
-        for (;;) {
-            const pendientes = colaNube();
-            if (!pendientes.length) break;
-            const item = pendientes[0];
 
-            try {
-                await nubeSubir(item);
-            } catch (err) {
-                const motivo = (err && err.message) || String(err);
-                guardarCola(colaNube().map(x => x.id === item.id ? { ...x, error: motivo } : x));
-                if (avisar) customAlert('No se pudo subir "' + item.nombre + '": ' + motivo, 'Nube');
-                // Si falló uno, los que siguen van a fallar por lo mismo.
-                break;
-            }
+    // Siempre el primero de la cola tal como está ahora, no una foto del
+    // arranque: exportar un XML encola también el respaldo, y con una foto
+    // ese segundo archivo se quedaba esperando al próximo arranque.
+    for (;;) {
+        const pendientes = colaNube();
+        if (!pendientes.length) break;
+        const item = pendientes[0];
 
-            guardarCola(colaNube().filter(x => x.id !== item.id));
-            // Red de seguridad contra el bucle infinito: lo que importa es que
-            // este item salió, no que la cola haya achicado — mientras subía
-            // puede haber entrado otro, y ahí el largo no baja.
-            if (colaNube().some(x => x.id === item.id)) break;
-            renderEstadoNube();
+        try {
+            await nubeSubir(item);
+        } catch (err) {
+            const motivo = (err && err.message) || String(err);
+            guardarCola(colaNube().map(x => x.id === item.id ? { ...x, error: motivo } : x));
+            if (avisar) customAlert('No se pudo subir "' + item.nombre + '": ' + motivo, 'Nube');
+            // Si falló uno, los que siguen van a fallar por lo mismo.
+            break;
         }
-    } finally {
-        _sincronizando = false;
+
+        guardarCola(colaNube().filter(x => x.id !== item.id));
+        // Red de seguridad contra el bucle infinito: lo que importa es que
+        // este item salió, no que la cola haya achicado — mientras subía
+        // puede haber entrado otro, y ahí el largo no baja.
+        if (colaNube().some(x => x.id === item.id)) break;
         renderEstadoNube();
+    }
+}
+
+// El botón "Subir a la nube": no espera la demora del respaldo automático ni
+// el próximo arranque. Arma la copia al toque, la manda y avisa cómo fue.
+async function subirAhoraALaNube() {
+    if (!nubeActiva()) { customAlert('La nube no está configurada.', 'Subir a la nube'); return; }
+    if (!nubeSesion()) { dialogoEntrarNube(); return; }
+
+    clearTimeout(_respaldoDemorado);
+    const payload = armarRespaldo();
+    marcarRespaldo(payload.date);
+    encolarArchivo(ARCHIVO_RESPALDO, JSON.stringify(payload), 'json', true);
+
+    // En silencio: el aviso lo damos acá, mirando cómo quedó la cola. Así sale
+    // uno solo y correcto, sin importar quién arrancó la subida.
+    await sincronizarNube(false);
+
+    const pendiente = colaNube()[0];
+    if (!pendiente) {
+        customAlert(`Subido: ${getSavedTemplates().length} plantillas y ${getSavedSessions().length} codificaciones.`,
+                    'Subir a la nube');
+    } else {
+        customAlert('No se pudo subir: ' + (pendiente.error || 'quedó pendiente') +
+                    '.\n\nNo se perdió nada: queda en la cola y se reintenta solo cuando haya señal.',
+                    'Subir a la nube');
     }
 }
 
@@ -783,7 +818,7 @@ function renderEstadoNube() {
     const conError = cola.find(x => x.error);
 
     let texto, color = 'text-gray-500';
-    if (_sincronizando)      { texto = 'Subiendo…'; }
+    if (_sincronizaEnCurso)  { texto = 'Subiendo…'; }
     else if (!cola.length)   { texto = sesion ? 'Nube: todo subido' : 'Nube: sin nada pendiente'; }
     else if (!sesion)        { texto = cola.length + ' sin subir · entrá a la nube'; color = 'text-[#007aff]'; }
     else if (conError)       { texto = cola.length + ' sin subir · ' + conError.error; color = 'text-red-500'; }
@@ -793,7 +828,8 @@ function renderEstadoNube() {
         n.className = 'text-xs ' + color;
         n.textContent = texto;
     });
-    if (el.btnNube) el.btnNube.textContent = sesion ? 'Sincronizar' : 'Entrar';
+    if (el.btnNube)      el.btnNube.textContent = sesion ? 'Subir a la nube' : 'Entrar';
+    if (el.btnSubirNube) el.btnSubirNube.textContent = sesion ? 'Subir a la nube' : 'Entrar';
 }
 
 // Card de login. Va aparte de customPrompt porque la contraseña necesita un
@@ -1102,7 +1138,8 @@ function bindEvents() {
     on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
 
-    on(el.btnNube, 'click', () => nubeSesion() ? sincronizarNube(true) : dialogoEntrarNube());
+    on(el.btnNube, 'click', subirAhoraALaNube);
+    on(el.btnSubirNube, 'click', subirAhoraALaNube);
     on(el.btnRestoreNube, 'click', restaurarDesdeNube);
     // Volvió la señal: lo que quedó en la cola se va solo.
     window.addEventListener('online', () => sincronizarNube(false));
