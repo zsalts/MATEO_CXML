@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v19';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -138,7 +138,11 @@ const el = {
 
     nubeBar:        D('nubeBar'),
     nubeEstado:     D('nubeEstado'),
-    btnNube:        D('btnNube')
+    btnNube:        D('btnNube'),
+
+    nubeBarPlantillas:    D('nubeBarPlantillas'),
+    nubeEstadoPlantillas: D('nubeEstadoPlantillas'),
+    btnRestoreNube:       D('btnRestoreNube')
 };
 
 // ─────────────────────────────────────────────
@@ -591,18 +595,36 @@ async function nubeToken() {
     }
 }
 
-async function nubeSubir(nombre, blob) {
+// El XML va en UTF-16 porque así lo quiere Sportscode; los respaldos son JSON
+// común. Lo demás de la subida es idéntico.
+function cuerpoDeItem(item) {
+    const texto = item.texto !== undefined ? item.texto : item.xml;   // cola vieja
+    return item.formato === 'json'
+        ? { blob: new Blob([texto], { type: 'application/json' }), tipo: 'application/json' }
+        : { blob: blobUtf16(texto), tipo: 'text/xml' };
+}
+
+async function nubeSubir(item) {
     const token = await nubeToken();
-    await nubeFetch('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(nombre), {
+    const cuerpo = cuerpoDeItem(item);
+    await nubeFetch('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(item.nombre), {
         method: 'POST',
         headers: {
             apikey: NUBE.anonKey,
             Authorization: 'Bearer ' + token,
-            'Content-Type': 'text/xml',
+            'Content-Type': cuerpo.tipo,
             'x-upsert': 'true'          // re-exportar el mismo partido lo pisa, no lo duplica
         },
-        body: blob
+        body: cuerpo.blob
     });
+}
+
+async function nubeBajar(nombre) {
+    const token = await nubeToken();
+    const r = await nubeFetch('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(nombre), {
+        headers: { apikey: NUBE.anonKey, Authorization: 'Bearer ' + token }
+    });
+    return r.text();
 }
 
 // ── Cola de subida ──
@@ -614,16 +636,94 @@ function colaNube() {
 }
 function guardarCola(cola) { lsSet('tv_nube_cola', JSON.stringify(cola)); }
 
-function encolarXml(nombre, xml) {
+function encolarArchivo(nombre, texto, formato) {
     if (!nubeActiva()) return;
-    const cola = colaNube();
+    let cola = colaNube();
+    // El respaldo es "el último vale": si todavía hay uno sin subir, no tiene
+    // sentido apilar otro del mismo archivo. Los XML sí se acumulan: cada uno
+    // es un partido distinto.
+    if (formato === 'json') cola = cola.filter(x => x.nombre !== nombre);
     cola.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-        nombre: nombre, xml: xml, error: ''
+        nombre: nombre, texto: texto, formato: formato || 'xml', error: ''
     });
     guardarCola(cola);
     renderEstadoNube();
     sincronizarNube();
+}
+
+// ── Respaldo automático de plantillas y sesiones ──
+// Actualizar la app no borra nada, pero Safari sí puede: a los 7 días sin
+// abrirla le limpia el almacenamiento, y un "borrar datos de sitios" se lleva
+// todo. Esto deja una copia siempre al día en la nube, de la que se puede
+// volver desde cualquier dispositivo.
+const ARCHIVO_RESPALDO = 'respaldo.json';
+
+// Fecha del contenido que este dispositivo tiene ahora mismo. Sirve para saber
+// si lo que hay en la nube es de otro lado y más nuevo: armás la botonera en la
+// PC, abrís el iPad, y el iPad se da cuenta.
+function fechaRespaldoLocal()  { return lsGet('tv_nube_fecha') || ''; }
+function marcarRespaldo(fecha) { lsSet('tv_nube_fecha', fecha || ''); }
+
+let _respaldoDemorado = null;
+let _aplicandoRespaldo = false;
+
+function respaldarEnNube() {
+    // Al aplicar un respaldo que vino de la nube no hay nada nuevo que subir:
+    // sin esto, traer los cambios de la PC devolvería el mismo contenido con
+    // fecha nueva y el otro dispositivo creería que hay novedades.
+    if (!nubeActiva() || _aplicandoRespaldo) return;
+    // Restaurar toca plantillas y sesiones una detrás de otra: sin esta espera
+    // se armarían dos respaldos para el mismo cambio.
+    clearTimeout(_respaldoDemorado);
+    _respaldoDemorado = setTimeout(() => {
+        const payload = armarRespaldo();
+        marcarRespaldo(payload.date);
+        encolarArchivo(ARCHIVO_RESPALDO, JSON.stringify(payload), 'json');
+    }, 1500);
+}
+
+// Al abrir la app: ¿hay en la nube algo más nuevo que lo de acá? Si sí, se
+// ofrece traerlo. Calla la boca si no hay nada, no hay sesión o no hay red:
+// esto no puede molestar a alguien que solo quiere codificar.
+async function revisarRespaldoRemoto() {
+    if (!nubeActiva() || !nubeSesion()) return;
+    let data;
+    try {
+        data = JSON.parse(await nubeBajar(ARCHIVO_RESPALDO));
+    } catch (err) {
+        return;
+    }
+    // Las fechas son ISO, así que alcanza con compararlas como texto.
+    if (!data || !data.date || data.date <= fechaRespaldoLocal()) return;
+    await aplicarRespaldo(data, 'de otro dispositivo');
+}
+
+function armarRespaldo() {
+    return {
+        app: 'tagview', kind: 'backup', version: 1,
+        date: new Date().toISOString(),
+        current:   { elements: state.elements, links: state.links },
+        templates: getSavedTemplates(),
+        sessions:  getSavedSessions()
+    };
+}
+
+async function restaurarDesdeNube() {
+    if (!nubeActiva())  { customAlert('La nube no está configurada.', 'Restaurar de la nube'); return; }
+    if (!nubeSesion())  { dialogoEntrarNube(); return; }
+
+    let data;
+    try {
+        data = JSON.parse(await nubeBajar(ARCHIVO_RESPALDO));
+    } catch (err) {
+        const motivo = (err && err.message) || String(err);
+        customAlert(/not.?found|NoSuchKey|404/i.test(motivo)
+            ? 'Todavía no hay ningún respaldo en la nube.'
+            : 'No se pudo traer el respaldo: ' + motivo, 'Restaurar de la nube');
+        return;
+    }
+    await aplicarRespaldo(data, 'de la nube');
 }
 
 let _sincronizando = false;
@@ -641,10 +741,16 @@ async function sincronizarNube(avisar) {
     _sincronizando = true;
     renderEstadoNube();
     try {
-        for (const item of colaNube()) {
+        // Siempre el primero de la cola tal como está ahora, no una foto del
+        // arranque: exportar un XML encola también el respaldo, y con una foto
+        // ese segundo archivo se quedaba esperando al próximo arranque.
+        for (;;) {
+            const pendientes = colaNube();
+            if (!pendientes.length) break;
+            const item = pendientes[0];
+
             try {
-                await nubeSubir(item.nombre, blobUtf16(item.xml));
-                guardarCola(colaNube().filter(x => x.id !== item.id));
+                await nubeSubir(item);
             } catch (err) {
                 const motivo = (err && err.message) || String(err);
                 guardarCola(colaNube().map(x => x.id === item.id ? { ...x, error: motivo } : x));
@@ -652,6 +758,12 @@ async function sincronizarNube(avisar) {
                 // Si falló uno, los que siguen van a fallar por lo mismo.
                 break;
             }
+
+            guardarCola(colaNube().filter(x => x.id !== item.id));
+            // Red de seguridad contra el bucle infinito: lo que importa es que
+            // este item salió, no que la cola haya achicado — mientras subía
+            // puede haber entrado otro, y ahí el largo no baja.
+            if (colaNube().some(x => x.id === item.id)) break;
             renderEstadoNube();
         }
     } finally {
@@ -661,9 +773,10 @@ async function sincronizarNube(avisar) {
 }
 
 function renderEstadoNube() {
-    if (!el.nubeBar) return;
-    if (!nubeActiva()) { el.nubeBar.classList.add('hidden'); return; }
-    el.nubeBar.classList.remove('hidden');
+    const barras = [el.nubeBar, el.nubeBarPlantillas].filter(Boolean);
+    if (!barras.length) return;
+    if (!nubeActiva()) { barras.forEach(b => b.classList.add('hidden')); return; }
+    barras.forEach(b => b.classList.remove('hidden'));
 
     const cola = colaNube();
     const sesion = nubeSesion();
@@ -676,9 +789,11 @@ function renderEstadoNube() {
     else if (conError)       { texto = cola.length + ' sin subir · ' + conError.error; color = 'text-red-500'; }
     else                     { texto = cola.length + ' sin subir'; color = 'text-[#007aff]'; }
 
-    el.nubeEstado.className = 'text-xs ' + color;
-    el.nubeEstado.textContent = texto;
-    el.btnNube.textContent = sesion ? 'Sincronizar' : 'Entrar';
+    [el.nubeEstado, el.nubeEstadoPlantillas].filter(Boolean).forEach(n => {
+        n.className = 'text-xs ' + color;
+        n.textContent = texto;
+    });
+    if (el.btnNube) el.btnNube.textContent = sesion ? 'Sincronizar' : 'Entrar';
 }
 
 // Card de login. Va aparte de customPrompt porque la contraseña necesita un
@@ -728,7 +843,9 @@ function dialogoEntrarNube() {
             await nubeEntrar(email.value.trim(), pass.value);
             overlay.remove();
             renderEstadoNube();
-            sincronizarNube(true);
+            // Entrar por primera vez en un dispositivo es justo el momento de
+            // traer lo que ya hay, antes de mandar nada.
+            revisarRespaldoRemoto().then(() => sincronizarNube(true));
         } catch (err) {
             aviso.textContent = (err && err.message) || String(err);
             btnEntrar.disabled = false;
@@ -814,7 +931,9 @@ function init() {
     setMode('setup');
     setPage('botonera');
     renderEstadoNube();
-    sincronizarNube(false);     // lo que haya quedado de la vez pasada
+    // Mirar la nube ANTES de subir lo pendiente. Al revés, un respaldo local
+    // que quedó en la cola pisaría lo que hiciste en la PC sin preguntar.
+    revisarRespaldoRemoto().then(() => sincronizarNube(false));
     reportarFaltantes();
 }
 
@@ -984,6 +1103,7 @@ function bindEvents() {
     on(el.btnStopCoding, 'click', () => setMode('setup'));
 
     on(el.btnNube, 'click', () => nubeSesion() ? sincronizarNube(true) : dialogoEntrarNube());
+    on(el.btnRestoreNube, 'click', restaurarDesdeNube);
     // Volvió la señal: lo que quedó en la cola se va solo.
     window.addEventListener('online', () => sincronizarNube(false));
 
@@ -2215,8 +2335,11 @@ function getSavedTemplates() {
     const raw = lsGet('tv_templates');
     return raw ? JSON.parse(raw) : [];
 }
+// Guardar, borrar, importar y restaurar pasan todas por acá, así que es el
+// único lugar donde hace falta pedir el respaldo: ninguna vía se escapa.
 function saveTemplates(arr) {
     lsSet('tv_templates', JSON.stringify(arr));
+    respaldarEnNube();
 }
 
 function openTemplatesModal() { setPage('plantillas'); }
@@ -2382,35 +2505,52 @@ async function importSessionFromFile() {
 
 // Copia de seguridad completa: lienzo actual + todas las plantillas + todas las sesiones
 async function backupAll() {
-    const payload = {
-        app: 'tagview', kind: 'backup', version: 1,
-        date: new Date().toISOString(),
-        current:   { elements: state.elements, links: state.links },
-        templates: getSavedTemplates(),
-        sessions:  getSavedSessions()
-    };
-    await saveToFiles(`TagView_copia_${FILE_STAMP()}.json`, JSON.stringify(payload, null, 2));
+    await saveToFiles(`TagView_copia_${FILE_STAMP()}.json`,
+                      JSON.stringify(armarRespaldo(), null, 2));
 }
 
 async function restoreAll() {
     const data = await readAppFile(['backup'], 'una copia de seguridad');
     if (!data) return;
+    await aplicarRespaldo(data, 'del archivo');
+}
 
+// Lo usan la restauración desde Archivos y la de la nube: el paso peligroso
+// —pisar todo lo guardado— tiene que ser uno solo y preguntar siempre.
+async function aplicarRespaldo(data, origen) {
     const nT = (data.templates || []).length, nS = (data.sessions || []).length;
+    const fecha = data.date ? new Date(data.date) : null;
+    const cuando = fecha && !isNaN(fecha)
+        ? ` del ${fecha.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`
+        : '';
+
     const ok = await customConfirm(
-        `La copia trae ${nT} plantillas y ${nS} sesiones.\n\nEsto reemplaza todo lo que tengas guardado ahora. ¿Seguir?`,
+        `La copia ${origen}${cuando} trae ${nT} plantillas y ${nS} sesiones.\n\n` +
+        'Esto reemplaza todo lo que tengas guardado ahora. ¿Seguir?',
         'Restaurar copia', true);
     if (!ok) return;
 
-    saveTemplates(data.templates || []);
-    saveSessions(data.sessions || []);
-    if (data.current) {
-        state.elements = JSON.parse(JSON.stringify(data.current.elements || []));
-        state.links    = JSON.parse(JSON.stringify(data.current.links || []));
-        selectElement(null);
-        saveData();
-        renderAll();
+    // Lo que entra es exactamente lo que ya está en la nube: no hay que
+    // devolverlo. La marca queda con la fecha del respaldo aplicado.
+    _aplicandoRespaldo = true;
+    try {
+        saveTemplates(data.templates || []);
+        saveSessions(data.sessions || []);
+        if (data.current) {
+            state.elements = JSON.parse(JSON.stringify(data.current.elements || []));
+            state.links    = JSON.parse(JSON.stringify(data.current.links || []));
+            selectElement(null);
+            saveData();
+            renderAll();
+        }
+    } finally {
+        _aplicandoRespaldo = false;
     }
+    if (data.date) marcarRespaldo(data.date);
+    // Si había un respaldo local esperando en la cola, quedó viejo: elegiste
+    // esta copia. Subirlo igual sería pisar lo que acabás de traer.
+    guardarCola(colaNube().filter(x => x.nombre !== ARCHIVO_RESPALDO));
+    renderEstadoNube();
     renderTemplatesList();
     customAlert(`Restaurado: ${nT} plantillas y ${nS} sesiones.`, 'Copia restaurada');
 }
@@ -2424,6 +2564,7 @@ function getSavedSessions() {
 }
 function saveSessions(arr) {
     lsSet('tv_sessions', JSON.stringify(arr));
+    respaldarEnNube();
 }
 
 function openSessionsModal() { setPage('xml'); }
@@ -2571,7 +2712,7 @@ function exportCustomXML(eventsList, title, inicio) {
 
     // La copia a la nube va primero y no bloquea: si no hay señal queda en la
     // cola, y el guardado local sigue su camino igual.
-    encolarXml(nombre, xml);
+    encolarArchivo(nombre, xml, 'xml');
 
     // Si el guardado falla, que se vea: antes moría en silencio y parecía que
     // el botón no hacía nada.

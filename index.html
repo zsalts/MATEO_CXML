@@ -321,13 +321,22 @@
 
         <div id="templatesList" class="flex-1 overflow-y-auto divide-y divide-gray-100 bg-white"></div>
 
-        <div class="p-3 border-t border-gray-300 flex space-x-2 bg-[#f2f2f7]">
-            <button id="btnBackupAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
-                Copia de seguridad
-            </button>
-            <button id="btnRestoreAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
-                Restaurar copia
-            </button>
+        <div class="border-t border-gray-300 bg-[#f2f2f7]">
+            <!-- Estado del respaldo automático. Oculto si la nube no está configurada. -->
+            <div id="nubeBarPlantillas" class="hidden px-3 pt-2 flex items-center justify-between">
+                <span id="nubeEstadoPlantillas" class="text-xs text-gray-500"></span>
+                <button id="btnRestoreNube" class="text-[#007aff] text-xs font-medium flex-shrink-0" style="margin-left:12px;">
+                    Restaurar de la nube
+                </button>
+            </div>
+            <div class="p-3 flex space-x-2">
+                <button id="btnBackupAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
+                    Copia de seguridad
+                </button>
+                <button id="btnRestoreAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
+                    Restaurar copia
+                </button>
+            </div>
         </div>
     </div>
 

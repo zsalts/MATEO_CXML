@@ -30,7 +30,8 @@ activaste — ver más abajo. Las plantillas y las sesiones no se suben.
 
 Como el navegador puede limpiar su almacenamiento, conviene exportar la sesión
 después de cada partido (**Historial ▾ → ⤓**) y hacer una copia completa cada
-tanto (**Plantillas ▾ → Copia de seguridad**).
+tanto (**Plantillas ▾ → Copia de seguridad**). Con la nube activada eso último
+pasa solo, en cada cambio.
 
 ## Instalar en el iPad
 
@@ -43,9 +44,40 @@ subdirectorio (`https://usuario.github.io/xml/`).
 
 ## Nube (opcional)
 
-Sirve para no pelear con la descarga en el iPad: al exportar un XML, la app
-sube una copia a Supabase Storage, y después la bajás desde la compu abriendo
-`descargas.html`.
+Hace dos cosas:
+
+- **Los XML.** Al exportar uno, la app sube una copia a Supabase Storage y la
+  bajás desde la compu abriendo `descargas.html`. Así no hay que pelear con la
+  descarga en el iPad.
+- **Las plantillas y las codificaciones.** Cada vez que guardás, borrás o
+  importás una, se sube un `respaldo.json` con todo. Se recupera desde
+  **Plantillas → Restaurar de la nube**, en el iPad o en otro dispositivo.
+
+### Armar la botonera en la PC
+
+La app es una web: abrís la misma dirección en el navegador de la PC, entrás a
+la nube con el mismo usuario, y armás el panel con mouse y teclado. Cuando
+después abrís el iPad, detecta que en la nube hay algo más nuevo y ofrece
+traerlo.
+
+Funciona en las dos direcciones, pero **no es una sincronización de verdad**:
+hay un solo `respaldo.json` y el último que guarda pisa al anterior. Mientras
+uses un dispositivo por vez no hay problema. Si editás en los dos sin abrir el
+otro en el medio, uno de los dos cambios se pierde.
+
+Dos cosas evitan los accidentes más comunes:
+
+- Al abrir la app se mira la nube **antes** de subir lo que haya quedado
+  pendiente. Al revés, un respaldo viejo que se quedó sin señal pisaría lo que
+  hiciste en la PC sin preguntar.
+- Si aceptás traer la copia de la nube, el respaldo local que estaba en la cola
+  se descarta: ya elegiste cuál vale.
+
+Aclaración por si preocupa: **actualizar la app no borra nada.** Subir una
+versión nueva cambia la caché del service worker, que no tiene relación con el
+`localStorage` donde viven las plantillas. Lo que sí las puede borrar es
+Safari: siete días sin abrir la app, un "borrar historial y datos de sitios", o
+cambiar de iPad. Para eso está el respaldo.
 
 Es **opcional y aditivo**. Con `nube-config.js` sin completar, la app funciona
 exactamente como antes y no sube nada. El XML se sigue guardando en el
