@@ -2203,6 +2203,9 @@ function setPage(page) {
     closeMainMenu();
     closeInsertMenu();
     if (page !== 'botonera') el.inspectorPanel.classList.add('hidden');
+    // Una plantilla cargada desde otra página se dibujó con el lienzo oculto,
+    // sin poder medir. Para Safari sin ResizeObserver, se recalcula al volver.
+    if (page === 'botonera') reajustarLienzo();
 
     if (page === 'plantillas') renderTemplatesList();
     if (page === 'xml')        renderSessionsList();
@@ -2372,6 +2375,11 @@ function bindEvents() {
     // Girar el iPad o cambiar el tamaño de la ventana cambia cuánto entra.
     window.addEventListener('resize', reajustarLienzo);
     window.addEventListener('orientationchange', () => setTimeout(reajustarLienzo, 300));
+    // Lo que de verdad importa es el tamaño del lienzo, y cambia sin que la
+    // ventana cambie: al volver de Plantillas (estaba oculto y no se podía
+    // medir, así que el panel quedaba sin achicar), al abrir el registro en
+    // vivo. ResizeObserver avisa en todos esos casos.
+    if (window.ResizeObserver) new ResizeObserver(reajustarLienzo).observe(el.canvasContainer);
     window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 250));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', setViewportHeight);
 
