@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v21';
+const APP_VERSION = 'v23';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -132,6 +132,8 @@ const el = {
     btnStartCoding: D('btnStartCoding'),
     btnStartCodingMenu: D('btnStartCodingMenu'),
     btnDeleteGlobal:D('btnDeleteGlobal'),
+    btnDuplicateGlobal:  D('btnDuplicateGlobal'),
+    btnDuplicateElement: D('btnDuplicateElement'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1190,6 +1192,19 @@ function bindEvents() {
     on(el.btnStartLink, 'click', startLinking);
     on(el.btnDeleteElement, 'click', deleteSelected);
     on(el.btnDeleteGlobal, 'click', deleteSelected);
+    on(el.btnDuplicateGlobal, 'click', duplicateSelected);
+    on(el.btnDuplicateElement, 'click', duplicateSelected);
+    // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
+    // toma para agregar la página a favoritos.
+    document.addEventListener('keydown', ev => {
+        if (!(ev.ctrlKey || ev.metaKey) || (ev.key !== 'd' && ev.key !== 'D')) return;
+        const t = ev.target;
+        // Escribiendo un nombre, Ctrl+D es del campo de texto, no nuestro.
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+        if (state.mode !== 'setup' || (!state.selectedIds.length && !state.selectedId)) return;
+        ev.preventDefault();
+        duplicateSelected();
+    });
     on(el.btnHideInspector, 'click', () => selectElement(null));
 
     on(el.canvasContainer, 'mousedown', onCanvasDown);
@@ -1289,6 +1304,11 @@ function onTouchMove(e) {
 function onTouchEnd()     { onGlobalUp(); }
 
 function handleDown(cx, cy, target, shiftKey) {
+    // El botón flotante "Duplicar" está en el lienzo pero no es un elemento: sin
+    // esto el toque cuenta como tocar el vacío, deselecciona, y el botón
+    // desaparece antes de llegar a recibir el click.
+    if (target.closest && target.closest('.dup-float')) return;
+
     const pos = canvasPos(cx, cy);
 
     if (target.classList.contains('resize-handle')) {
@@ -1497,6 +1517,65 @@ function deleteSelected() {
     saveData(); renderAll();
 }
 
+// Duplica lo seleccionado, uno o varios. Las copias aparecen corridas un
+// casillero y quedan seleccionadas, listas para arrastrar o renombrar.
+function duplicateSelected() {
+    if (state.mode !== 'setup') return;
+    const ids = state.selectedIds.length > 0 ? state.selectedIds : (state.selectedId ? [state.selectedId] : []);
+    const originales = state.elements.filter(e => ids.includes(e.id));
+    if (!originales.length) return;
+
+    // IDs enteros: el lienzo los lee con parseInt. Date.now() solo no alcanza,
+    // varias copias caen en el mismo milisegundo.
+    let siguiente = Math.max(Date.now(), ...state.elements.map(e => Number(e.id) || 0)) + 1;
+    const nuevoId = new Map();
+    originales.forEach(o => nuevoId.set(o.id, siguiente++));
+    // Lo que apunta adentro del grupo copiado pasa a apuntar a la copia; lo de
+    // afuera queda igual. Así duplicar un evento con sus etiquetas trae un
+    // juego nuevo que no se mezcla con el original.
+    const remapear = id => nuevoId.has(id) ? nuevoId.get(id) : id;
+
+    const copias = originales.map(o => {
+        const c = JSON.parse(JSON.stringify(o));
+        c.id = nuevoId.get(o.id);
+        c.x = o.x + 20;
+        c.y = o.y + 20;
+        // Mismo nombre = mismo código en el XML, y los dos botones se fundirían
+        // en uno en Sportscode. El contador muestra un número, ese no se toca.
+        if (c.name && c.type !== 'counter') c.name = c.name + ' copia';
+        c.exclusiveIds  = (o.exclusiveIds  || []).map(remapear);
+        c.lineMemberIds = (o.lineMemberIds || []).map(remapear);
+        return c;
+    });
+
+    // Los excluyentes van de a dos: si la copia excluye a un botón de afuera,
+    // ese botón también tiene que excluir a la copia, igual que hace el modal.
+    copias.forEach(c => c.exclusiveIds.forEach(xid => {
+        const otro = state.elements.find(e => e.id === xid);
+        if (!otro) return;
+        if (!otro.exclusiveIds) otro.exclusiveIds = [];
+        if (!otro.exclusiveIds.includes(c.id)) otro.exclusiveIds.push(c.id);
+    }));
+
+    // Los enlaces que SALEN de un botón copiado se copian: son parte de cómo se
+    // comporta. Los que llegan desde afuera no, porque cambiarían lo que hace
+    // un botón que no tocaste.
+    const sello = Date.now();
+    const enlaces = state.links
+        .filter(l => nuevoId.has(l.fromId))
+        .map((l, i) => ({ ...l, id: 'lnk_' + sello + '_' + i,
+                          fromId: nuevoId.get(l.fromId), toId: remapear(l.toId) }));
+
+    state.elements.push(...copias);
+    state.links.push(...enlaces);
+    state.selectedIds = copias.map(c => c.id);
+    state.selectedId  = state.selectedIds[0];
+    saveData();
+    renderAll();
+    updateSelectionClasses();
+    updateInspectorForSelection();
+}
+
 // ─────────────────────────────────────────────
 // INSPECTOR
 // ─────────────────────────────────────────────
@@ -1687,6 +1766,7 @@ function updateSelected() {
 function startLinking() {
     if (!state.selectedId) return;
     state.isLinking = true; state.linkStartId = state.selectedId;
+    posicionarDuplicarFlotante();   // mientras enlazás, el flotante estorba: se va
     customAlert('Tocá otro elemento para crear el enlace.', 'Crear Enlace');
 }
 
@@ -1704,6 +1784,7 @@ function updateSelectionClasses() {
         const id = parseInt(nodo.dataset.id);
         nodo.classList.toggle('selected', id === state.selectedId);
     });
+    posicionarDuplicarFlotante();
 }
 
 function updateElementPositions() {
@@ -1715,6 +1796,40 @@ function updateElementPositions() {
         nodo.style.width  = e.w + 'px';
         nodo.style.height = e.h + 'px';
     });
+    posicionarDuplicarFlotante();   // que acompañe al botón mientras lo arrastrás
+}
+
+// Botón flotante "Duplicar" arriba del evento o la etiqueta seleccionada, para
+// no tener que ir hasta la barra o el Inspector. Va suelto en el lienzo y no
+// adentro del botón: .canvas-element tiene overflow: hidden y lo cortaría.
+const TIPOS_CON_DUPLICAR_FLOTANTE = ['event', 'descriptor', 'popup_label'];
+
+function posicionarDuplicarFlotante() {
+    const viejo = el.canvas.querySelector('.dup-float');
+    const e = (state.mode === 'setup' && !state.isLinking && state.selectedId)
+        ? state.elements.find(x => x.id === state.selectedId)
+        : null;
+    if (!e || !TIPOS_CON_DUPLICAR_FLOTANTE.includes(e.type)) {
+        if (viejo) viejo.remove();
+        return;
+    }
+
+    const btn = viejo || crearDuplicarFlotante();
+    const n = state.selectedIds.length;
+    btn.textContent = n > 1 ? `Duplicar (${n})` : 'Duplicar';
+    btn.style.left = (e.x + e.w / 2) + 'px';
+    // Pegado arriba. Si el botón está contra el borde de arriba del lienzo, va
+    // abajo: arriba quedaría afuera y no se podría tocar.
+    btn.style.top  = (e.y >= 40 ? e.y - 36 : e.y + e.h + 10) + 'px';
+}
+
+function crearDuplicarFlotante() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dup-float';
+    btn.addEventListener('click', ev => { ev.stopPropagation(); duplicateSelected(); });
+    el.canvas.appendChild(btn);
+    return btn;
 }
 
 function defaultColor(type) {
@@ -1818,6 +1933,7 @@ function renderElements() {
         });
     }
 
+    posicionarDuplicarFlotante();   // innerHTML = '' se lo llevó: se vuelve a poner
     updateLiveClocks();
 }
 

@@ -137,8 +137,11 @@
                 ▶ Iniciar Codificación
             </button>
 
-            <!-- Eliminar -->
-            <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
+            <!-- Duplicar / Eliminar: los dos sirven también con varios seleccionados -->
+            <div>
+                <button id="btnDuplicateGlobal" class="text-[#007aff] text-sm" style="margin-right:18px;">Duplicar</button>
+                <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
+            </div>
         </div>
     </div>
 
@@ -259,6 +262,9 @@
                 <div class="inspector-section-label">ACCIONES</div>
                 <div class="inspector-cell">
                     <button id="btnStartLink" class="text-[#007aff] text-base font-normal w-full text-left">Crear enlace →</button>
+                </div>
+                <div class="inspector-cell border-t border-gray-200">
+                    <button id="btnDuplicateElement" class="text-[#007aff] text-base font-normal w-full text-left">Duplicar</button>
                 </div>
                 <div class="inspector-cell border-t border-gray-200">
                     <button id="btnDeleteElement" class="text-red-500 text-base font-normal w-full text-left">Eliminar elemento</button>
