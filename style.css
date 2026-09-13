@@ -201,6 +201,11 @@ body {
 .acciones-flotantes button + button { border-left: 1px solid rgba(255,255,255,.18); }
 .acciones-flotantes .af-eliminar { color: #ff6b6b; }
 .acciones-flotantes button:active { background: #3a3a3c; }
+
+/* Los carteles escriben el mensaje con textContent y usan \n para separar
+   párrafos y listas. Sin esto el navegador los junta en una sola línea
+   corrida, y un "¿reemplazar estas plantillas?" se vuelve ilegible. */
+#customDialogMessage { white-space: pre-line; }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }

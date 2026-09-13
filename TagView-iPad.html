@@ -446,6 +446,11 @@ body {
 .acciones-flotantes button + button { border-left: 1px solid rgba(255,255,255,.18); }
 .acciones-flotantes .af-eliminar { color: #ff6b6b; }
 .acciones-flotantes button:active { background: #3a3a3c; }
+
+/* Los carteles escriben el mensaje con textContent y usan \n para separar
+   párrafos y listas. Sin esto el navegador los junta en una sola línea
+   corrida, y un "¿reemplazar estas plantillas?" se vuelve ilegible. */
+#customDialogMessage { white-space: pre-line; }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
@@ -1154,7 +1159,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v24';
+const APP_VERSION = 'v25';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1291,7 +1296,10 @@ function customAlert(message, title = 'Notificación') {
     });
 }
 
-function customConfirm(message, title = 'Confirmar', isDestructive = false) {
+// textoConfirmar: el rótulo del botón. Por defecto un cartel destructivo decía
+// "Eliminar" siempre, también al restaurar una copia: la gente leía "Eliminar",
+// tocaba Cancelar, y las plantillas de la PC nunca llegaban al iPad.
+function customConfirm(message, title = 'Confirmar', isDestructive = false, textoConfirmar = '') {
     return new Promise(resolve => {
         const dialog = D('customDialogModal');
         const titleEl = D('customDialogTitle');
@@ -1308,7 +1316,7 @@ function customConfirm(message, title = 'Confirmar', isDestructive = false) {
         cancelBtn.classList.remove('hidden');
 
         cancelBtn.textContent = 'Cancelar';
-        confirmBtn.textContent = isDestructive ? 'Eliminar' : 'Aceptar';
+        confirmBtn.textContent = textoConfirmar || (isDestructive ? 'Eliminar' : 'Aceptar');
         confirmBtn.className = isDestructive 
             ? 'flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-xs hover:bg-red-600 active:scale-95 transition shadow-sm'
             : 'flex-1 py-2.5 rounded-xl bg-[#007aff] text-white font-semibold text-xs hover:bg-blue-600 active:scale-95 transition shadow-sm';
@@ -1730,7 +1738,11 @@ async function nubeSubir(item) {
 async function nubeBajar(nombre) {
     const token = await nubeToken();
     const r = await nubeFetch('/storage/v1/object/' + NUBE.bucket + '/' + encodeURIComponent(nombre), {
-        headers: { apikey: NUBE.anonKey, Authorization: 'Bearer ' + token }
+        headers: { apikey: NUBE.anonKey, Authorization: 'Bearer ' + token },
+        // respaldo.json se pisa siempre con el mismo nombre: sin esto el
+        // navegador puede devolver la versión que ya tenía guardada, y el iPad
+        // cree que la nube no tiene nada nuevo aunque la PC acabe de subir.
+        cache: 'no-store'
     });
     return r.text();
 }
@@ -1806,12 +1818,37 @@ async function revisarRespaldoRemoto() {
     }
     // Las fechas son ISO, así que alcanza con compararlas como texto.
     if (!data || !data.date || data.date <= fechaRespaldoLocal()) return;
-    await aplicarRespaldo(data, 'de otro dispositivo');
+    await aplicarRespaldo(data, 'de la nube');
+}
+
+// La app instalada en el iPad queda abierta en segundo plano días enteros.
+// Antes solo miraba la nube al arrancar, así que lo armado en la PC no
+// aparecía nunca: ahora mira también cada vez que volvés a la app.
+let _ultimaRevisionNube = 0;
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    // Nunca en medio de un partido: un cartel ahí es lo último que querés.
+    if (state.mode !== 'setup') return;
+    if (Date.now() - _ultimaRevisionNube < 60000) return;
+    _ultimaRevisionNube = Date.now();
+    revisarRespaldoRemoto().then(() => sincronizarNube(false));
+});
+
+// Para que el aviso diga de dónde salió la copia. Sin eso, "¿reemplazar?"
+// no deja distinguir lo de la PC de una copia vieja del mismo iPad.
+function nombreDispositivo() {
+    const ua = navigator.userAgent || '';
+    if (ES_IOS)               return /iPhone/.test(ua) ? 'el iPhone' : 'el iPad';
+    if (/Android/.test(ua))   return 'un Android';
+    if (/Macintosh/.test(ua)) return 'la Mac';
+    if (/Windows/.test(ua))   return 'la PC';
+    return 'otro dispositivo';
 }
 
 function armarRespaldo() {
     return {
         app: 'tagview', kind: 'backup', version: 1,
+        dispositivo: nombreDispositivo(),
         date: new Date().toISOString(),
         current:   { elements: state.elements, links: state.links },
         templates: getSavedTemplates(),
@@ -2259,7 +2296,7 @@ function bindEvents() {
     on(el.btnPlayPause, 'click', toggleTimer);
     on(el.btnExport, 'click', exportXML);
     on(el.btnClearEvents, 'click', async () => {
-        if (await customConfirm('¿Borrar todos los eventos y el tiempo acumulado?', 'Limpiar Eventos', true)) {
+        if (await customConfirm('¿Borrar todos los eventos y el tiempo acumulado?', 'Limpiar Eventos', true, 'Borrar')) {
             state.events = []; state.counters = {}; state.toi = {}; state.openEvents = [];
             renderLivePanel(); renderElements();
         }
@@ -3676,7 +3713,7 @@ async function saveCurrentTemplate() {
 }
 
 async function createNewTemplate() {
-    if (await customConfirm('¿Crear un lienzo en blanco? Se limpiará la pantalla actual.', 'Nuevo Lienzo', true)) {
+    if (await customConfirm('¿Crear un lienzo en blanco? Se limpiará la pantalla actual.', 'Nuevo Lienzo', true, 'Limpiar')) {
         state.elements = [];
         state.links    = [];
         selectElement(null);
@@ -3788,10 +3825,21 @@ async function aplicarRespaldo(data, origen) {
         ? ` del ${fecha.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`
         : '';
 
+    // Nombrar las plantillas y el dispositivo es lo que deja reconocer la copia
+    // correcta antes de pisar nada: "hecha en la PC · Hockey 5v5, Fútbol".
+    const donde = data.dispositivo ? `, hecha en ${data.dispositivo}` : '';
+    const nombres = (data.templates || []).map(t => t.name).filter(Boolean);
+    const lista = nombres.length
+        ? ':\n' + nombres.slice(0, 6).map(n => '• ' + n).join('\n') +
+          (nombres.length > 6 ? `\n• y ${nombres.length - 6} más` : '')
+        : '.';
+    const acaHay = getSavedTemplates().length;
+    const cant = (n, palabra) => `${n} ${palabra}${n === 1 ? '' : 's'}`;
+
     const ok = await customConfirm(
-        `La copia ${origen}${cuando} trae ${nT} plantillas y ${nS} sesiones.\n\n` +
-        'Esto reemplaza todo lo que tengas guardado ahora. ¿Seguir?',
-        'Restaurar copia', true);
+        `La copia ${origen}${donde}${cuando} trae ${cant(nT, 'plantilla')} y ${cant(nS, 'sesión').replace('sesións', 'sesiones')}${lista}\n\n` +
+        `Reemplaza lo que tenés en este dispositivo (${cant(acaHay, 'plantilla')}). ¿Seguir?`,
+        'Restaurar copia', true, 'Reemplazar');
     if (!ok) return;
 
     // Lo que entra es exactamente lo que ya está en la nube: no hay que
