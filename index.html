@@ -98,8 +98,9 @@
     <div id="setupBar" class="bg-[#f2f2f7] border-b border-gray-300 z-30 relative">
         <div class="flex items-center justify-between px-4 py-2">
 
-            <!-- Insertar -->
-            <div class="relative">
+            <!-- Insertar (flex-1, igual que el espaciador de la derecha: así
+                 "Iniciar Codificación" queda centrado de verdad) -->
+            <div class="relative flex-1">
                 <button id="btnInsertMenu" class="text-[#007aff] text-base font-normal">Insertar ▼</button>
                 <div id="insertMenu" class="absolute top-full left-0 mt-2 w-56 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
                     <button class="tool-btn ios-menu-row" data-type="event">
@@ -137,11 +138,9 @@
                 ▶ Iniciar Codificación
             </button>
 
-            <!-- Duplicar / Eliminar: los dos sirven también con varios seleccionados -->
-            <div>
-                <button id="btnDuplicateGlobal" class="text-[#007aff] text-sm" style="margin-right:18px;">Duplicar</button>
-                <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
-            </div>
+            <!-- Duplicar y Eliminar ya no van acá: salen flotando arriba del
+                 elemento seleccionado. Este espaciador equilibra a Insertar. -->
+            <div class="flex-1"></div>
         </div>
     </div>
 

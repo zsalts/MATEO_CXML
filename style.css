@@ -174,26 +174,33 @@ body {
 }
 .canvas-element.selected .resize-handle { display: block; }
 
-/* Botón flotante "Duplicar" encima del evento o la etiqueta seleccionada.
-   Va suelto en el lienzo, no adentro del botón: .canvas-element tiene
-   overflow: hidden y lo cortaría. */
-.dup-float {
+/* Duplicar / Eliminar flotando encima del elemento seleccionado. Sueltos en
+   el lienzo, no adentro del botón: .canvas-element tiene overflow: hidden y
+   los cortaría. */
+.acciones-flotantes {
     position: absolute;
     z-index: 150;
     transform: translateX(-50%);
-    padding: 5px 13px;
-    border: 0;
+    display: flex;
     border-radius: 999px;
     background: #1c1c1e;
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    overflow: hidden;
+    white-space: nowrap;
+}
+.acciones-flotantes button {
+    padding: 6px 14px;
+    border: 0;
+    background: transparent;
     color: #fff;
     font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0,0,0,.25);
     cursor: pointer;
     -webkit-appearance: none;
     touch-action: manipulation;
 }
-.dup-float:active { background: #3a3a3c; }
+.acciones-flotantes button + button { border-left: 1px solid rgba(255,255,255,.18); }
+.acciones-flotantes .af-eliminar { color: #ff6b6b; }
+.acciones-flotantes button:active { background: #3a3a3c; }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }

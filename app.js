@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -131,8 +131,6 @@ const el = {
     insertMenu:     D('insertMenu'),
     btnStartCoding: D('btnStartCoding'),
     btnStartCodingMenu: D('btnStartCodingMenu'),
-    btnDeleteGlobal:D('btnDeleteGlobal'),
-    btnDuplicateGlobal:  D('btnDuplicateGlobal'),
     btnDuplicateElement: D('btnDuplicateElement'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
@@ -1191,8 +1189,6 @@ function bindEvents() {
     
     on(el.btnStartLink, 'click', startLinking);
     on(el.btnDeleteElement, 'click', deleteSelected);
-    on(el.btnDeleteGlobal, 'click', deleteSelected);
-    on(el.btnDuplicateGlobal, 'click', duplicateSelected);
     on(el.btnDuplicateElement, 'click', duplicateSelected);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
@@ -1304,10 +1300,10 @@ function onTouchMove(e) {
 function onTouchEnd()     { onGlobalUp(); }
 
 function handleDown(cx, cy, target, shiftKey) {
-    // El botón flotante "Duplicar" está en el lienzo pero no es un elemento: sin
-    // esto el toque cuenta como tocar el vacío, deselecciona, y el botón
-    // desaparece antes de llegar a recibir el click.
-    if (target.closest && target.closest('.dup-float')) return;
+    // Los botones flotantes Duplicar / Eliminar están en el lienzo pero no son
+    // elementos: sin esto el toque cuenta como tocar el vacío, deselecciona, y
+    // los botones desaparecen antes de llegar a recibir el click.
+    if (target.closest && target.closest('.acciones-flotantes')) return;
 
     const pos = canvasPos(cx, cy);
 
@@ -1766,7 +1762,7 @@ function updateSelected() {
 function startLinking() {
     if (!state.selectedId) return;
     state.isLinking = true; state.linkStartId = state.selectedId;
-    posicionarDuplicarFlotante();   // mientras enlazás, el flotante estorba: se va
+    posicionarAccionesFlotantes();   // mientras enlazás, el flotante estorba: se va
     customAlert('Tocá otro elemento para crear el enlace.', 'Crear Enlace');
 }
 
@@ -1784,7 +1780,7 @@ function updateSelectionClasses() {
         const id = parseInt(nodo.dataset.id);
         nodo.classList.toggle('selected', id === state.selectedId);
     });
-    posicionarDuplicarFlotante();
+    posicionarAccionesFlotantes();
 }
 
 function updateElementPositions() {
@@ -1796,40 +1792,48 @@ function updateElementPositions() {
         nodo.style.width  = e.w + 'px';
         nodo.style.height = e.h + 'px';
     });
-    posicionarDuplicarFlotante();   // que acompañe al botón mientras lo arrastrás
+    posicionarAccionesFlotantes();   // que acompañe al botón mientras lo arrastrás
 }
 
-// Botón flotante "Duplicar" arriba del evento o la etiqueta seleccionada, para
-// no tener que ir hasta la barra o el Inspector. Va suelto en el lienzo y no
-// adentro del botón: .canvas-element tiene overflow: hidden y lo cortaría.
-const TIPOS_CON_DUPLICAR_FLOTANTE = ['event', 'descriptor', 'popup_label'];
-
-function posicionarDuplicarFlotante() {
-    const viejo = el.canvas.querySelector('.dup-float');
+// "Duplicar" y "Eliminar" flotando arriba del elemento seleccionado, donde
+// está el dedo. Son el único lugar de la pantalla con estas acciones para una
+// multi-selección (el Inspector se oculta con varios), así que aparecen en
+// todos los tipos de elemento: si no, un grupo de contadores no se podría
+// borrar. Van sueltos en el lienzo y no adentro del botón: .canvas-element
+// tiene overflow: hidden y los cortaría.
+function posicionarAccionesFlotantes() {
+    const viejo = el.canvas.querySelector('.acciones-flotantes');
     const e = (state.mode === 'setup' && !state.isLinking && state.selectedId)
         ? state.elements.find(x => x.id === state.selectedId)
         : null;
-    if (!e || !TIPOS_CON_DUPLICAR_FLOTANTE.includes(e.type)) {
+    if (!e) {
         if (viejo) viejo.remove();
         return;
     }
 
-    const btn = viejo || crearDuplicarFlotante();
+    const barra = viejo || crearAccionesFlotantes();
     const n = state.selectedIds.length;
-    btn.textContent = n > 1 ? `Duplicar (${n})` : 'Duplicar';
-    btn.style.left = (e.x + e.w / 2) + 'px';
-    // Pegado arriba. Si el botón está contra el borde de arriba del lienzo, va
-    // abajo: arriba quedaría afuera y no se podría tocar.
-    btn.style.top  = (e.y >= 40 ? e.y - 36 : e.y + e.h + 10) + 'px';
+    // Con varios seleccionados, los dos actúan sobre todos: que se lea.
+    barra.querySelector('.af-duplicar').textContent = n > 1 ? `Duplicar (${n})` : 'Duplicar';
+    barra.querySelector('.af-eliminar').textContent = n > 1 ? `Eliminar (${n})` : 'Eliminar';
+
+    // Pegado arriba. Contra el borde de arriba del lienzo va abajo: arriba
+    // quedaría afuera y no se podría tocar.
+    barra.style.top = (e.y >= 40 ? e.y - 38 : e.y + e.h + 10) + 'px';
+    // Centrado sobre el botón, pero sin salirse por la izquierda: con un botón
+    // pegado al borde, media barra quedaría cortada.
+    barra.style.left = Math.max(e.x + e.w / 2, barra.offsetWidth / 2 + 4) + 'px';
 }
 
-function crearDuplicarFlotante() {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'dup-float';
-    btn.addEventListener('click', ev => { ev.stopPropagation(); duplicateSelected(); });
-    el.canvas.appendChild(btn);
-    return btn;
+function crearAccionesFlotantes() {
+    const barra = document.createElement('div');
+    barra.className = 'acciones-flotantes';
+    barra.innerHTML = '<button type="button" class="af-duplicar">Duplicar</button>' +
+                      '<button type="button" class="af-eliminar">Eliminar</button>';
+    barra.querySelector('.af-duplicar').addEventListener('click', ev => { ev.stopPropagation(); duplicateSelected(); });
+    barra.querySelector('.af-eliminar').addEventListener('click', ev => { ev.stopPropagation(); deleteSelected(); });
+    el.canvas.appendChild(barra);
+    return barra;
 }
 
 function defaultColor(type) {
@@ -1933,7 +1937,7 @@ function renderElements() {
         });
     }
 
-    posicionarDuplicarFlotante();   // innerHTML = '' se lo llevó: se vuelve a poner
+    posicionarAccionesFlotantes();   // innerHTML = '' se lo llevó: se vuelve a poner
     updateLiveClocks();
 }
 
