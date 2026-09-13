@@ -138,9 +138,12 @@
                 ▶ Iniciar Codificación
             </button>
 
-            <!-- Duplicar y Eliminar ya no van acá: salen flotando arriba del
-                 elemento seleccionado. Este espaciador equilibra a Insertar. -->
-            <div class="flex-1"></div>
+            <!-- Duplicar y Eliminar salen flotando arriba del elemento
+                 seleccionado. Este lado (flex-1, igual que Insertar) mantiene
+                 "Iniciar Codificación" centrado, y lleva el ajuste de pantalla. -->
+            <div class="flex-1" style="text-align:right;">
+                <button id="btnAjustar" class="text-[#007aff] text-sm hidden">Tamaño real</button>
+            </div>
         </div>
     </div>
 

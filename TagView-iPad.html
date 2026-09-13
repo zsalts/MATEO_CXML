@@ -817,9 +817,12 @@ body {
                 ▶ Iniciar Codificación
             </button>
 
-            <!-- Duplicar y Eliminar ya no van acá: salen flotando arriba del
-                 elemento seleccionado. Este espaciador equilibra a Insertar. -->
-            <div class="flex-1"></div>
+            <!-- Duplicar y Eliminar salen flotando arriba del elemento
+                 seleccionado. Este lado (flex-1, igual que Insertar) mantiene
+                 "Iniciar Codificación" centrado, y lleva el ajuste de pantalla. -->
+            <div class="flex-1" style="text-align:right;">
+                <button id="btnAjustar" class="text-[#007aff] text-sm hidden">Tamaño real</button>
+            </div>
         </div>
     </div>
 
@@ -1159,7 +1162,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v25';
+const APP_VERSION = 'v26';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1244,6 +1247,7 @@ const el = {
     btnStartCoding: D('btnStartCoding'),
     btnStartCodingMenu: D('btnStartCodingMenu'),
     btnDuplicateElement: D('btnDuplicateElement'),
+    btnAjustar:          D('btnAjustar'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -2334,6 +2338,7 @@ function bindEvents() {
     on(el.btnStartLink, 'click', startLinking);
     on(el.btnDeleteElement, 'click', deleteSelected);
     on(el.btnDuplicateElement, 'click', duplicateSelected);
+    on(el.btnAjustar, 'click', alternarAjuste);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -2364,6 +2369,9 @@ function bindEvents() {
 
     // Recalcular el alto cuando rota el iPad o Safari muestra/oculta sus barras
     window.addEventListener('resize', setViewportHeight);
+    // Girar el iPad o cambiar el tamaño de la ventana cambia cuánto entra.
+    window.addEventListener('resize', reajustarLienzo);
+    window.addEventListener('orientationchange', () => setTimeout(reajustarLienzo, 300));
     window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 250));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', setViewportHeight);
 
@@ -2405,7 +2413,10 @@ function cerrarMenusSiEsAfuera(target) {
 // ─────────────────────────────────────────────
 function canvasPos(cx, cy) {
     const r = el.canvas.getBoundingClientRect();
-    return { x: cx - r.left, y: cy - r.top };
+    // El lienzo puede estar achicado para entrar en la pantalla: el toque llega
+    // en píxeles de pantalla y el lienzo trabaja en coordenadas reales. Sin
+    // dividir, cada toque caería corrido respecto de lo que se ve.
+    return { x: (cx - r.left) / escalaLienzo, y: (cy - r.top) / escalaLienzo };
 }
 function onCanvasDown(e)  { if (state.mode !== 'setup') return; handleDown(e.clientX, e.clientY, e.target, e.shiftKey); }
 function onGlobalMove(e)  { if (state.mode !== 'setup') return; handleMove(e.clientX, e.clientY); }
@@ -2607,8 +2618,9 @@ function snap(v) { return Math.round(v/20)*20; }
 // CREATE / DELETE
 // ─────────────────────────────────────────────
 function createElement(type) {
-    const cx = el.canvasContainer.scrollLeft + 60;
-    const cy = el.canvasContainer.scrollTop  + 60;
+    // El scroll viene en píxeles de pantalla; el lienzo, en coordenadas reales.
+    const cx = el.canvasContainer.scrollLeft / escalaLienzo + 60;
+    const cy = el.canvasContainer.scrollTop  / escalaLienzo + 60;
 
     const defaults = {
         event:       { name:'Evento',              w:DEFAULT_W, h:DEFAULT_H },
@@ -2961,12 +2973,20 @@ function posicionarAccionesFlotantes() {
     barra.querySelector('.af-duplicar').textContent = n > 1 ? `Duplicar (${n})` : 'Duplicar';
     barra.querySelector('.af-eliminar').textContent = n > 1 ? `Eliminar (${n})` : 'Eliminar';
 
+    // Con el lienzo achicado, la barrita se achicaría con él y quedaría chica
+    // para un dedo: se contraescala. Por eso las distancias van divididas por
+    // la escala: están pensadas en píxeles de pantalla.
+    const k = escalaLienzo;
+    const alto = barra.offsetHeight;
     // Pegado arriba. Contra el borde de arriba del lienzo va abajo: arriba
     // quedaría afuera y no se podría tocar.
-    barra.style.top = (e.y >= 40 ? e.y - 38 : e.y + e.h + 10) + 'px';
+    const arriba = e.y >= (alto + 14) / k;
+    barra.style.transformOrigin = arriba ? 'center bottom' : 'center top';
+    barra.style.transform = `translateX(-50%) scale(${1 / k})`;
+    barra.style.top = (arriba ? e.y - 10 / k - alto : e.y + e.h + 10 / k) + 'px';
     // Centrado sobre el botón, pero sin salirse por la izquierda: con un botón
     // pegado al borde, media barra quedaría cortada.
-    barra.style.left = Math.max(e.x + e.w / 2, barra.offsetWidth / 2 + 4) + 'px';
+    barra.style.left = Math.max(e.x + e.w / 2, (barra.offsetWidth / 2 + 4) / k) + 'px';
 }
 
 function crearAccionesFlotantes() {
@@ -2990,7 +3010,70 @@ function brightness(hex) {
     return (r*299+g*587+b*114)/1000;
 }
 
+// ─────────────────────────────────────────────
+// AJUSTAR A LA PANTALLA
+// Una botonera armada en la compu no entra en el iPad: lo de la derecha y lo
+// de abajo quedaba afuera, y había que desplazarse en pleno partido. Con esto
+// el panel entero se achica para caber, con la misma disposición.
+// Las coordenadas guardadas no cambian nunca: la escala es solo cómo se ve.
+// Así la misma plantilla sirve igual en la compu y en el iPad.
+// ─────────────────────────────────────────────
+let escalaLienzo = 1;
+
+const ajustarActivo = () => lsGet('tv_ajustar') !== '0';
+
+// Cuánto hay que achicar para que entre todo. null si el lienzo no está a la
+// vista (otra página): ahí no se puede medir, y se recalcula al volver.
+function escalaParaEntrar() {
+    if (!state.elements.length) return 1;
+    // El Inspector se abre y se cierra al tocar botones: si restara ancho, el
+    // panel cambiaría de tamaño cada vez que seleccionás algo.
+    const inspector = (state.mode === 'setup' && !el.inspectorPanel.classList.contains('hidden'))
+        ? el.inspectorPanel.offsetWidth : 0;
+    const ancho = el.canvasContainer.clientWidth + inspector;
+    const alto  = el.canvasContainer.clientHeight;
+    if (!ancho || !alto) return null;
+
+    const MARGEN = 24;
+    const derecha = Math.max(...state.elements.map(e => e.x + e.w)) + MARGEN;
+    const abajo   = Math.max(...state.elements.map(e => e.y + e.h)) + MARGEN;
+    // Solo achica: donde ya entra, se ve a tamaño real. Y con piso, para que
+    // un panel enorme no deje botones imposibles de tocar.
+    return Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
+}
+
+function aplicarEscalaLienzo() {
+    const necesaria = escalaParaEntrar();
+    if (necesaria === null) return;
+    escalaLienzo = ajustarActivo() ? necesaria : 1;
+
+    // Flechas y botones con la misma escala y el mismo origen, o los enlaces
+    // dejarían de apuntar a sus botones.
+    [el.canvas, el.svgArrows].forEach(nodo => {
+        nodo.style.transformOrigin = '0 0';
+        nodo.style.transform = escalaLienzo === 1 ? '' : `scale(${escalaLienzo})`;
+    });
+
+    if (el.btnAjustar) {
+        // Si el panel ya entra, el botón no haría nada: mejor no mostrarlo.
+        el.btnAjustar.classList.toggle('hidden', necesaria >= 1);
+        el.btnAjustar.textContent = ajustarActivo() ? 'Tamaño real' : 'Ajustar a pantalla';
+    }
+}
+
+function alternarAjuste() {
+    lsSet('tv_ajustar', ajustarActivo() ? '0' : '1');
+    aplicarEscalaLienzo();
+    posicionarAccionesFlotantes();
+}
+
+function reajustarLienzo() {
+    aplicarEscalaLienzo();
+    posicionarAccionesFlotantes();
+}
+
 function renderElements() {
+    aplicarEscalaLienzo();
     el.canvas.innerHTML = '';
 
     const containers = state.elements.filter(e => e.type === 'container');
