@@ -47,7 +47,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -133,6 +133,7 @@ const el = {
     btnStartCodingMenu: D('btnStartCodingMenu'),
     btnDuplicateElement: D('btnDuplicateElement'),
     btnAjustar:          D('btnAjustar'),
+    propSubPlantilla:    D('propSubPlantilla'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1106,6 +1107,9 @@ function setMode(mode) {
     state.isLinking  = false;
     state.activePopupElementIds = [];
     state.tempPopupButtons = [];
+    // Terminar la codificación con una plantilla de detalle abierta: se cierra.
+    state.detalle = null;
+    mostrarBarraDetalle();
 
     // Al salir de live, cerrar cualquier turno abierto (acumulando su ToI)
     if (state.openEvents && state.openEvents.length > 0) {
@@ -1227,6 +1231,7 @@ function bindEvents() {
     on(el.btnDeleteElement, 'click', deleteSelected);
     on(el.btnDuplicateElement, 'click', duplicateSelected);
     on(el.btnAjustar, 'click', alternarAjuste);
+    on(el.propSubPlantilla, 'change', updateSelected);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1662,6 +1667,7 @@ function selectElement(id) {
     el.propLead.value  = (e.lead === undefined || e.lead === null) ? 0 : e.lead;
     el.propLag.value   = (e.lag  === undefined || e.lag  === null) ? 1 : e.lag;
     if (el.propDescriptors) el.propDescriptors.value = (e.popups || []).join(', ');
+    llenarSelectorDetalle(e);
     if (el.lineBadge) el.lineBadge.textContent = (e.lineMemberIds || []).length;
     if (el.propLineExclusive) el.propLineExclusive.checked = e.lineExclusive !== false;
     if (el.propPopupDescriptors) el.propPopupDescriptors.value = (e.popups || []).join(', ');
@@ -1803,6 +1809,9 @@ function updateSelected() {
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     }
+    if (e.type === 'event' && el.propSubPlantilla) {
+        e.subPlantillaId = el.propSubPlantilla.value || null;
+    }
     
     syncSections(e.type);
     saveData(); renderElements();
@@ -1918,7 +1927,9 @@ const ajustarActivo = () => lsGet('tv_ajustar') !== '0';
 // Cuánto hay que achicar para que entre todo. null si el lienzo no está a la
 // vista (otra página): ahí no se puede medir, y se recalcula al volver.
 function escalaParaEntrar() {
-    if (!state.elements.length) return 1;
+    // Lo que está en pantalla: la plantilla de detalle, si hay una abierta.
+    const lista = (state.mode === 'live' && state.detalle) ? state.detalle.elements : state.elements;
+    if (!lista.length) return 1;
     // El Inspector se abre y se cierra al tocar botones: si restara ancho, el
     // panel cambiaría de tamaño cada vez que seleccionás algo.
     const inspector = (state.mode === 'setup' && !el.inspectorPanel.classList.contains('hidden'))
@@ -1928,8 +1939,8 @@ function escalaParaEntrar() {
     if (!ancho || !alto) return null;
 
     const MARGEN = 24;
-    const derecha = Math.max(...state.elements.map(e => e.x + e.w)) + MARGEN;
-    const abajo   = Math.max(...state.elements.map(e => e.y + e.h)) + MARGEN;
+    const derecha = Math.max(...lista.map(e => e.x + e.w)) + MARGEN;
+    const abajo   = Math.max(...lista.map(e => e.y + e.h)) + MARGEN;
     // Solo achica: donde ya entra, se ve a tamaño real. Y con piso, para que
     // un panel enorme no deje botones imposibles de tocar.
     return Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
@@ -1963,20 +1974,28 @@ function alternarAjuste() {
 function reajustarLienzo() {
     aplicarEscalaLienzo();
     posicionarAccionesFlotantes();
+    mostrarBarraDetalle();   // girar el iPad cambia el centro del lienzo
 }
 
 function renderElements() {
     aplicarEscalaLienzo();
     el.canvas.innerHTML = '';
 
-    const containers = state.elements.filter(e => e.type === 'container');
-    const others     = state.elements.filter(e => e.type !== 'container');
+    // Con una plantilla de detalle abierta se dibuja esa en lugar de la principal.
+    const enDetalle = state.mode === 'live' && !!state.detalle;
+    const fuente = enDetalle ? state.detalle.elements : state.elements;
 
-    const visible = state.mode === 'live'
+    const containers = fuente.filter(e => e.type === 'container');
+    const others     = fuente.filter(e => e.type !== 'container');
+
+    // En el detalle se ve todo: cada botón es una opción para elegir.
+    const visible = (state.mode === 'live' && !enDetalle)
         ? others.filter(e => e.type !== 'popup_label' || state.activePopupElementIds.includes(e.id))
         : others;
 
-    const openButtonIds = (state.openEvents || []).map(o => o.buttonId);
+    // En el detalle no se marca nada como grabando: los ids de otra plantilla
+    // pueden coincidir con los de la principal y se encenderían sin motivo.
+    const openButtonIds = enDetalle ? [] : (state.openEvents || []).map(o => o.buttonId);
     const isLineActive = e => e.type === 'line'
         && (e.lineMemberIds || []).length > 0
         && (e.lineMemberIds || []).every(id => openButtonIds.includes(id));
@@ -2004,6 +2023,9 @@ function renderElements() {
 
         if (isContainer) {
             div.innerHTML = '';
+        } else if (enDetalle) {
+            // En el detalle solo importa el nombre: es lo que se va a etiquetar.
+            div.innerHTML = `<span>${e.name}</span>`;
         } else if (state.mode === 'live' && e.type === 'counter') {
             div.innerHTML = `<span>${state.counters[e.id] || 0}</span>`;
         } else if (state.mode === 'live' && e.type === 'event') {
@@ -2014,6 +2036,10 @@ function renderElements() {
         } else if (e.type === 'line') {
             div.innerHTML = `<span class="el-name">${e.name}</span>`
                           + `<span class="line-sub">${(e.lineMemberIds || []).length} jug.</span>`;
+        } else if (state.mode === 'setup' && e.type === 'event' && plantillaDeDetalle(e)) {
+            // Marca en el editor: este evento abre otra plantilla en vivo.
+            div.innerHTML = `<span class="el-name">${e.name}</span>`
+                          + `<span class="line-sub">↗ ${plantillaDeDetalle(e).name}</span>`;
         } else {
             div.innerHTML = `<span>${e.name}</span>`;
         }
@@ -2028,7 +2054,9 @@ function renderElements() {
         }
 
         if (state.mode === 'live' && !isContainer) {
-            if (e.type === 'popup_label') {
+            if (enDetalle) {
+                div.addEventListener('click', () => tocarEnDetalle(e.name));
+            } else if (e.type === 'popup_label') {
                 div.addEventListener('click', () => handlePopupLabelClick(e.name));
             } else if (e.type === 'line') {
                 div.addEventListener('click', () => handleLineClick(e));
@@ -2352,14 +2380,25 @@ function handleLiveClick(e) {
             });
         }
 
+        // 4. Plantilla de detalle: si el evento tiene una asignada, se abre en
+        //    lugar de las emergentes, y lo que se toque ahí va como etiqueta.
+        const detalle = plantillaDeDetalle(e);
+        if (detalle) {
+            state.activePopupElementIds = [];
+            state.tempPopupButtons = [];
+            abrirDetalle(e, detalle);
+        }
+
         if (isManual) {
             // Guardar en eventos abiertos activos
             state.openEvents.push(newEv);
             renderLivePanel();
             renderElements();
         } else {
-            // Si es tiempo fijo y no tiene popups → finalizar de inmediato
-            if (state.activePopupElementIds.length === 0 && state.tempPopupButtons.length === 0) {
+            // Tiempo fijo sin nada que elegir → finalizar de inmediato. Con
+            // plantilla de detalle NO: el evento espera la etiqueta, y si se
+            // cerrara acá, lo que tocás en el detalle no tendría a qué pegarse.
+            if (!detalle && state.activePopupElementIds.length === 0 && state.tempPopupButtons.length === 0) {
                 finalizeEvent();
             } else {
                 renderElements();
@@ -2438,6 +2477,115 @@ function finalizeEvent() {
     state.tempPopupButtons = [];
     renderLivePanel();
     renderElements();
+}
+
+// ─────────────────────────────────────────────
+// PLANTILLA DE DETALLE
+// Un evento puede abrir otra plantilla al tocarlo en vivo: tocás "Tiro", se
+// abre la botonera de detalle, tocás "Al arco", queda como etiqueta del Tiro
+// y la pantalla vuelve sola a la principal. Es la idea de las etiquetas
+// emergentes, pero con una botonera entera armada a gusto.
+// ─────────────────────────────────────────────
+function plantillaDeDetalle(e) {
+    if (!e || !e.subPlantillaId) return null;
+    // Comparado como texto: los ids son números, pero una copia importada o
+    // restaurada podría traerlos como string.
+    return getSavedTemplates().find(t => String(t.id) === String(e.subPlantillaId)) || null;
+}
+
+function abrirDetalle(eventoEl, plantilla) {
+    state.detalle = {
+        evento:    eventoEl.name,
+        plantilla: plantilla.name,
+        elements:  JSON.parse(JSON.stringify(plantilla.elements || [])),
+        // Para volver exactamente adonde estabas mirando en la principal.
+        scroll:    { x: el.canvasContainer.scrollLeft, y: el.canvasContainer.scrollTop }
+    };
+    el.canvasContainer.scrollLeft = 0;
+    el.canvasContainer.scrollTop  = 0;
+    mostrarBarraDetalle();
+}
+
+function salirDeDetalle() {
+    const d = state.detalle;
+    state.detalle = null;
+    mostrarBarraDetalle();
+    return d;
+}
+
+function volverScroll(d) {
+    if (!d) return;
+    el.canvasContainer.scrollLeft = d.scroll.x;
+    el.canvasContainer.scrollTop  = d.scroll.y;
+}
+
+// Botón tocado en la plantilla de detalle: etiqueta del evento, y de vuelta.
+function tocarEnDetalle(nombre) {
+    // Primero se sale: handlePopupLabelClick redibuja, y tiene que dibujar la
+    // principal, no otra vez el detalle.
+    const d = salirDeDetalle();
+    // Ya sabe dónde pegar la etiqueta: al evento pendiente (tiempo fijo, y lo
+    // cierra) o al que está grabando (manual).
+    handlePopupLabelClick(nombre);
+    renderLivePanel();
+    renderElements();
+    volverScroll(d);
+}
+
+// "Volver sin elegir": para un toque equivocado. El evento de tiempo fijo
+// igual queda registrado, sin etiqueta; el manual sigue grabando.
+function cancelarDetalle() {
+    const d = salirDeDetalle();
+    if (state.pendingEvent && state.pendingEvent.timeMode !== 'manual') finalizeEvent();
+    renderLivePanel();
+    renderElements();
+    volverScroll(d);
+}
+
+// Barra arriba del lienzo con qué se está detallando y la salida. Va fuera del
+// lienzo para no achicarse con él cuando se ajusta a la pantalla.
+function mostrarBarraDetalle() {
+    const zona = el.canvasContainer && el.canvasContainer.parentElement;
+    if (!zona) return;
+    let barra = zona.querySelector('.barra-detalle');
+    if (!state.detalle) {
+        if (barra) barra.remove();
+        return;
+    }
+    if (!barra) {
+        barra = document.createElement('div');
+        barra.className = 'barra-detalle';
+        barra.innerHTML = '<span class="bd-texto"></span>' +
+                          '<button type="button" class="bd-cancelar">Volver sin elegir</button>';
+        barra.querySelector('.bd-cancelar').addEventListener('click', cancelarDetalle);
+        zona.appendChild(barra);
+    }
+    barra.querySelector('.bd-texto').textContent = state.detalle.evento + ' › ' + state.detalle.plantilla;
+    // Centrada sobre el lienzo, no sobre toda la zona: en vivo el panel de
+    // registro ocupa la derecha, y centrada en el total le tapaba las pestañas.
+    barra.style.left = (el.canvasContainer.offsetLeft + el.canvasContainer.clientWidth / 2) + 'px';
+}
+
+// Opciones del Inspector: las plantillas guardadas. Se arma cada vez que
+// abrís el Inspector, porque las plantillas cambian (se guardan, se borran,
+// llegan de la nube).
+function llenarSelectorDetalle(e) {
+    const sel = el.propSubPlantilla;
+    if (!sel) return;
+    sel.innerHTML = '';
+    const ninguna = document.createElement('option');
+    ninguna.value = '';
+    ninguna.textContent = 'Ninguna';
+    sel.appendChild(ninguna);
+    getSavedTemplates().forEach(t => {
+        const o = document.createElement('option');
+        o.value = String(t.id);
+        o.textContent = t.name;
+        sel.appendChild(o);
+    });
+    const actual = e.subPlantillaId ? String(e.subPlantillaId) : '';
+    // Si la plantilla asignada se borró, se muestra Ninguna en vez de inventarla.
+    sel.value = [...sel.options].some(o => o.value === actual) ? actual : '';
 }
 
 // ─────────────────────────────────────────────

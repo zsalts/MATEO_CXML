@@ -206,6 +206,38 @@ body {
    párrafos y listas. Sin esto el navegador los junta en una sola línea
    corrida, y un "¿reemplazar estas plantillas?" se vuelve ilegible. */
 #customDialogMessage { white-space: pre-line; }
+
+/* Barra de la plantilla de detalle: qué evento se está detallando y la salida
+   sin elegir. Va fuera del lienzo para no achicarse con él. */
+.barra-detalle {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 6px 6px 14px;
+    border-radius: 999px;
+    background: #1c1c1e;
+    color: #fff;
+    font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,.28);
+    white-space: nowrap;
+}
+.barra-detalle .bd-cancelar {
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,.14);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+}
+.barra-detalle .bd-cancelar:active { background: rgba(255,255,255,.26); }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
