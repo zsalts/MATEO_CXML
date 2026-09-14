@@ -52,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -148,6 +148,8 @@ const el = {
     propPosesionSection: D('propPosesionSection'),
     propEquipoA:         D('propEquipoA'),
     propEquipoB:         D('propEquipoB'),
+    propEquipoEvento:    D('propEquipoEvento'),
+    propEquipoEventoSection: D('propEquipoEventoSection'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1265,6 +1267,7 @@ function bindEvents() {
     on(el.tabPos, 'click', () => setLiveTab('pos'));
     on(el.propEquipoA, 'input', updateSelected);
     on(el.propEquipoB, 'input', updateSelected);
+    on(el.propEquipoEvento, 'change', updateSelected);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1707,6 +1710,20 @@ function selectElement(id) {
     llenarSelectorDetalle(e);
     if (el.propEquipoA) el.propEquipoA.value = e.equipoA || 'Local';
     if (el.propEquipoB) el.propEquipoB.value = e.equipoB || 'Visitante';
+    if (el.propEquipoEvento) {
+        // Con los nombres de los equipos del botón de posesión, si hay uno.
+        const nombres = nombresEquipos();
+        el.propEquipoEvento.innerHTML = '';
+        [['', 'Ninguno'], ['A', nombres.A], ['B', nombres.B]].forEach(([valor, texto]) => {
+            const o = document.createElement('option');
+            o.value = valor;
+            o.textContent = texto;
+            el.propEquipoEvento.appendChild(o);
+        });
+        el.propEquipoEvento.value = (e.equipo === 'A' || e.equipo === 'B') ? e.equipo : '';
+        // Los botones de una pestaña de detalle son etiquetas, no eventos.
+        if (el.propEquipoEventoSection) el.propEquipoEventoSection.style.display = hojaDe(e) ? 'none' : '';
+    }
     if (el.lineBadge) el.lineBadge.textContent = (e.lineMemberIds || []).length;
     if (el.propLineExclusive) el.propLineExclusive.checked = e.lineExclusive !== false;
     if (el.propPopupDescriptors) el.propPopupDescriptors.value = (e.popups || []).join(', ');
@@ -1851,6 +1868,9 @@ function updateSelected() {
         e.popups = el.propPopupDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
+    }
+    if (e.type === 'event' && el.propEquipoEvento && !hojaDe(e)) {
+        e.equipo = el.propEquipoEvento.value || null;
     }
     if (e.type === 'possession' && el.propEquipoA && el.propEquipoB) {
         e.equipoA = el.propEquipoA.value.trim() || 'Local';
@@ -2059,6 +2079,8 @@ function renderElements() {
         div.className = `canvas-element mode-${state.mode}${e.id === state.selectedId ? ' selected' : ''}${isContainer ? ' is-container' : ''}${isRecording ? ' is-recording' : ''}${lineOn ? ' is-line-active' : ''}`;
         div.dataset.eltype = e.type;
         div.dataset.id     = e.id;
+        // Evento que suma posesión: franja del color de su equipo.
+        if (e.type === 'event' && (e.equipo === 'A' || e.equipo === 'B')) div.classList.add('equipo-' + e.equipo);
         div.style.left   = e.x + 'px';
         div.style.top    = e.y + 'px';
         div.style.width  = e.w + 'px';
@@ -2081,7 +2103,7 @@ function renderElements() {
         } else if (e.type === 'possession') {
             // Partido en dos: cada mitad es un equipo. En vivo muestra su %, y
             // la mitad del equipo que tiene la pelota se enciende.
-            const activo = (state.mode === 'live' && state.posesion[e.id]) ? state.posesion[e.id].equipo : null;
+            const activo = state.mode === 'live' ? equipoConPelota() : null;
             const lado = (eq, nombre) =>
                 `<div class="pos-lado pos-${eq}${activo === eq ? ' activo' : ''}" data-equipo="${eq}">` +
                     `<span class="pos-nombre">${nombre}</span>` +
@@ -2423,10 +2445,18 @@ function updateLiveClocks() {
     });
 
     // Posesión: el % y los tiempos corren con el reloj, sin redibujar nada.
-    const tiemposDe = {};
-    const tiempos = id => tiemposDe[id] || (tiemposDe[id] = tiemposPosesion(id));
+    // Es un reparto único de toda la botonera: se calcula una vez por tick.
+    let tPos = null;
+    const tiempos = () => tPos || (tPos = tiemposPosesion());
+    const lados = document.querySelectorAll('.pos-lado');
+    if (lados.length) {
+        // La mitad del equipo con la pelota se enciende, también cuando la
+        // posesión viene de los eventos y no de tocar el botón.
+        const conPelota = equipoConPelota();
+        lados.forEach(n => n.classList.toggle('activo', n.dataset.equipo === conPelota));
+    }
     document.querySelectorAll('[data-pos-for]').forEach(node => {
-        const t = tiempos(parseInt(node.dataset.posFor));
+        const t = tiempos();
         const eq = node.dataset.equipo;
         if (node.dataset.campo === 'tiempo') {
             node.textContent = fmt(t[eq]);
@@ -3002,47 +3032,113 @@ function cerrarTramoPosesion(e) {
     });
 }
 
-function tiemposPosesion(id) {
-    const tramos = { A: [], B: [] };
-    state.events.forEach(ev => {
-        if (ev.posesionDe === id && tramos[ev.equipo]) tramos[ev.equipo].push([ev.start, ev.end]);
+// La posesión sale de los eventos: cada botón de evento puede sumarle a un
+// equipo (Inspector → "Suma a la posesión de"), y los lados del botón de
+// posesión también cuentan. Todo entra en un mismo reparto.
+function equipoDeBoton(buttonId) {
+    const b = state.elements.find(x => x.id === buttonId);
+    return (b && b.type === 'event' && (b.equipo === 'A' || b.equipo === 'B')) ? b.equipo : null;
+}
+
+function nombresEquipos() {
+    const pos = state.elements.find(x => x.type === 'possession');
+    return { A: (pos && pos.equipoA) || 'Local', B: (pos && pos.equipoB) || 'Visitante' };
+}
+
+// Reparte el tiempo entre los dos equipos sin contar nada dos veces:
+//  - eventos del mismo equipo que se pisan cuentan una vez;
+//  - si se pisan eventos de los DOS equipos, ese rato es del que se marcó
+//    último: la pelota pasa a quien hizo algo. Así Local + Visitante nunca
+//    supera el tiempo real.
+// Recorre los cortes en orden con los tramos activos, en vez de comparar
+// todos contra todos: se recalcula en cada tick y no puede ponerse lento con
+// cientos de eventos en un iPad.
+function tramosDePosesion(eventos, ahora, conAbiertos) {
+    const marcas = [];
+    eventos.forEach(ev => {
+        const eq = ev.posesionDe ? ev.equipo : equipoDeBoton(ev.buttonId);
+        if ((eq === 'A' || eq === 'B') && ev.end != null && ev.end > ev.start) {
+            marcas.push({ a: Math.max(0, ev.start), b: ev.end, eq: eq });
+        }
     });
-    const abierto = state.posesion[id];
-    if (abierto) tramos[abierto.equipo].push([abierto.desde, state.time]);
-    // Con la misma regla que el tiempo en hielo: lo que se pisa cuenta una vez.
-    const a = unirTramos(tramos.A), b = unirTramos(tramos.B);
-    const t = { A: a.total, B: b.total, tramos: a.cantidad + b.cantidad };
+    if (conAbiertos) {
+        (state.openEvents || []).forEach(o => {
+            const eq = equipoDeBoton(o.buttonId);
+            if (eq && ahora > o.start) marcas.push({ a: Math.max(0, o.start), b: ahora, eq: eq });
+        });
+        Object.keys(state.posesion || {}).forEach(k => {
+            const p = state.posesion[k];
+            if (ahora > p.desde) marcas.push({ a: p.desde, b: ahora, eq: p.equipo });
+        });
+    }
+    if (!marcas.length) return [];
+
+    marcas.sort((x, y) => x.a - y.a);
+    const cortes = Array.from(new Set(marcas.reduce((l, m) => { l.push(m.a, m.b); return l; }, [])))
+        .sort((x, y) => x - y);
+
+    const segmentos = [];
+    let activos = [], p = 0;
+    for (let i = 0; i < cortes.length - 1; i++) {
+        const a = cortes[i], b = cortes[i + 1];
+        while (p < marcas.length && marcas[p].a <= a) activos.push(marcas[p++]);
+        activos = activos.filter(m => m.b > a);
+        if (!activos.length) continue;
+        let dueno = activos[0];
+        activos.forEach(m => { if (m.a > dueno.a) dueno = m; });
+        const ultimo = segmentos[segmentos.length - 1];
+        if (ultimo && ultimo.eq === dueno.eq && ultimo.b === a) ultimo.b = b;
+        else segmentos.push({ a: a, b: b, eq: dueno.eq });
+    }
+    return segmentos;
+}
+
+function tiemposPosesion() {
+    const seg = tramosDePosesion(state.events, state.time, true);
+    const t = { A: 0, B: 0, tramos: seg.length };
+    seg.forEach(s => { t[s.eq] += s.b - s.a; });
     const total = t.A + t.B;
     t.pctA = total > 0 ? Math.round(t.A / total * 100) : null;
     t.pctB = total > 0 ? 100 - t.pctA : null;
     return t;
 }
 
+// Quién tiene la pelota ahora mismo, según el reparto.
+function equipoConPelota() {
+    const ahora = state.time;
+    const seg = tramosDePosesion(state.events, ahora, true);
+    for (let i = seg.length - 1; i >= 0; i--) {
+        if (seg[i].a <= ahora && seg[i].b >= ahora) return seg[i].eq;
+    }
+    return null;
+}
+
 function renderPosesionPanel() {
     if (!el.posList) return;
-    const botones = elementosDeHoja(null).filter(e => e.type === 'possession');
     el.posList.innerHTML = '';
-    if (!botones.length) {
-        el.posList.innerHTML = '<div class="p-6 text-center text-sm text-gray-500">Esta botonera no tiene botón de posesión.<br>Agregalo con Insertar ▼ → Posesión.</div>';
+    // Alcanza con eventos que sumen a un equipo: el botón de posesión es opcional.
+    const hayPosesion = state.elements.some(e =>
+        e.type === 'possession' || (e.type === 'event' && (e.equipo === 'A' || e.equipo === 'B')));
+    if (!hayPosesion) {
+        el.posList.innerHTML = '<div class="p-6 text-center text-sm text-gray-500">Todavía nada suma posesión.<br>En el Inspector de cada evento elegí a qué equipo le suma, o agregá Insertar ▼ → Posesión.</div>';
         return;
     }
-    botones.forEach(e => {
-        const t = tiemposPosesion(e.id);
-        const fila = (eq) =>
-            `<div class="pos-panel-fila">` +
-                `<span class="pos-panel-punto pos-${eq}"></span>` +
-                `<span class="pos-panel-nombre">${nombreEquipo(e, eq)}</span>` +
-                `<span class="pos-panel-pct" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="pct"></span>` +
-                `<span class="pos-panel-tiempo" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="tiempo"></span>` +
-            `</div>`;
-        const bloque = document.createElement('div');
-        bloque.className = 'pos-panel';
-        bloque.innerHTML =
-            `<div class="pos-panel-barra"><div class="pos-A" data-pos-for="${e.id}" data-campo="barra"></div><div class="pos-B"></div></div>` +
-            fila('A') + fila('B') +
-            `<div class="pos-panel-pie">${t.tramos} ${t.tramos === 1 ? 'tramo' : 'tramos'} de posesión</div>`;
-        el.posList.appendChild(bloque);
-    });
+    const nombres = nombresEquipos();
+    const t = tiemposPosesion();
+    const fila = (eq) =>
+        `<div class="pos-panel-fila">` +
+            `<span class="pos-panel-punto pos-${eq}"></span>` +
+            `<span class="pos-panel-nombre">${nombres[eq]}</span>` +
+            `<span class="pos-panel-pct" data-pos-for="0" data-equipo="${eq}" data-campo="pct"></span>` +
+            `<span class="pos-panel-tiempo" data-pos-for="0" data-equipo="${eq}" data-campo="tiempo"></span>` +
+        `</div>`;
+    const bloque = document.createElement('div');
+    bloque.className = 'pos-panel';
+    bloque.innerHTML =
+        `<div class="pos-panel-barra"><div class="pos-A" data-pos-for="0" data-campo="barra"></div><div class="pos-B"></div></div>` +
+        fila('A') + fila('B') +
+        `<div class="pos-panel-pie">${t.tramos} ${t.tramos === 1 ? 'tramo' : 'tramos'} de posesión</div>`;
+    el.posList.appendChild(bloque);
     updateLiveClocks();
 }
 
@@ -3540,6 +3636,19 @@ async function saveCurrentSession() {
 
 function exportCustomXML(eventsList, title, inicio) {
     if (!eventsList || !eventsList.length) { customAlert('No hay eventos para exportar.', 'Exportar XML'); return; }
+
+    // Posesión: sus clips salen del reparto (eventos con equipo y lados del
+    // botón), con la misma regla de no contar dos veces. Los tramos tocados en
+    // el botón ya entran en ese reparto: se reemplazan para no ir repetidos.
+    const reparto = tramosDePosesion(eventsList, 0, false);
+    if (reparto.length) {
+        const nombres = nombresEquipos();
+        eventsList = eventsList.filter(ev => !ev.posesionDe).concat(reparto.map(s => ({
+            name: 'Posesión ' + nombres[s.eq],
+            start: s.a, end: s.b, equipo: s.eq,
+            buttonId: null, descriptors: [], line: null
+        })));
+    }
 
     // Los IDs se numeran por orden cronologico, pero el archivo va agrupado
     // por codigo: asi lo escribe Sportscode.
