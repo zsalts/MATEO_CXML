@@ -52,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -150,6 +150,13 @@ const el = {
     propEquipoB:         D('propEquipoB'),
     propEquipoEvento:    D('propEquipoEvento'),
     propEquipoEventoSection: D('propEquipoEventoSection'),
+    propTextoSection:    D('propTextoSection'),
+    propTamanoTexto:     D('propTamanoTexto'),
+    propEquiposSection:  D('propEquiposSection'),
+    propEqNombreA:       D('propEqNombreA'),
+    propEqColorA:        D('propEqColorA'),
+    propEqNombreB:       D('propEqNombreB'),
+    propEqColorB:        D('propEqColorB'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1268,6 +1275,11 @@ function bindEvents() {
     on(el.propEquipoA, 'input', updateSelected);
     on(el.propEquipoB, 'input', updateSelected);
     on(el.propEquipoEvento, 'change', updateSelected);
+    on(el.propTamanoTexto, 'change', updateSelected);
+    on(el.propEqNombreA, 'input', updateSelected);
+    on(el.propEqNombreB, 'input', updateSelected);
+    on(el.propEqColorA, 'input', updateSelected);
+    on(el.propEqColorB, 'input', updateSelected);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1553,6 +1565,17 @@ function snap(v) { return Math.round(v/20)*20; }
 // CREATE / DELETE
 // ─────────────────────────────────────────────
 function createElement(type) {
+    // Una sola tarjeta de equipos por botonera: dos no pueden decir cosas
+    // distintas. Si ya hay una, se lleva a esa en vez de crear otra.
+    if (type === 'teams') {
+        const ya = state.elements.find(x => x.type === 'teams');
+        if (ya) {
+            if (hojaDe(ya) !== (state.hojaActiva || null)) cambiarHoja(hojaDe(ya));
+            selectElement(ya.id);
+            customAlert('Esta botonera ya tiene su tarjeta de equipos: los nombres y colores se cambian ahí.', 'Equipos');
+            return;
+        }
+    }
     // El scroll viene en píxeles de pantalla; el lienzo, en coordenadas reales.
     const cx = el.canvasContainer.scrollLeft / escalaLienzo + 60;
     const cy = el.canvasContainer.scrollTop  / escalaLienzo + 60;
@@ -1564,7 +1587,9 @@ function createElement(type) {
         counter:     { name:'0',                   w:80,        h:60        },
         container:   { name:'',                    w:200,       h:180       },
         line:        { name:'Línea 1',             w:140,       h:52        },
-        possession:  { name:'Posesión',            w:260,       h:72        }
+        possession:  { name:'Posesión',            w:260,       h:72        },
+        text:        { name:'Texto',               w:180,       h:44        },
+        teams:       { name:'Equipos',             w:300,       h:56        }
     };
     const d = defaults[type] || defaults.event;
 
@@ -1583,7 +1608,18 @@ function createElement(type) {
         lineExclusive: true
     };
     if (state.hojaActiva) newEl.hoja = state.hojaActiva;   // nace en la pestaña que estás editando
-    if (type === 'possession') { newEl.equipoA = 'Local'; newEl.equipoB = 'Visitante'; }
+    if (type === 'possession' || type === 'teams') {
+        // Arranca con los nombres que ya use la botonera, si hay.
+        const nombres = nombresEquipos();
+        newEl.equipoA = nombres.A;
+        newEl.equipoB = nombres.B;
+    }
+    if (type === 'teams') {
+        const colores = coloresEquipos();
+        newEl.colorA = colores.A;
+        newEl.colorB = colores.B;
+    }
+    if (type === 'text') newEl.fontSize = 18;
     state.elements.push(newEl);
     saveData();
     selectElement(newEl.id);
@@ -1708,8 +1744,16 @@ function selectElement(id) {
     el.propLag.value   = (e.lag  === undefined || e.lag  === null) ? 1 : e.lag;
     if (el.propDescriptors) el.propDescriptors.value = (e.popups || []).join(', ');
     llenarSelectorDetalle(e);
-    if (el.propEquipoA) el.propEquipoA.value = e.equipoA || 'Local';
-    if (el.propEquipoB) el.propEquipoB.value = e.equipoB || 'Visitante';
+    // La posesión muestra los nombres de toda la botonera (tarjeta Equipos si hay).
+    if (el.propEquipoA) el.propEquipoA.value = nombresEquipos().A;
+    if (el.propEquipoB) el.propEquipoB.value = nombresEquipos().B;
+    if (e.type === 'teams' && el.propEqNombreA) {
+        el.propEqNombreA.value = e.equipoA || 'Local';
+        el.propEqNombreB.value = e.equipoB || 'Visitante';
+        el.propEqColorA.value  = e.colorA  || '#3a8fd6';
+        el.propEqColorB.value  = e.colorB  || '#dc2626';
+    }
+    if (el.propTamanoTexto) el.propTamanoTexto.value = String(parseInt(e.fontSize) || 18);
     if (el.propEquipoEvento) {
         // Con los nombres de los equipos del botón de posesión, si hay uno.
         const nombres = nombresEquipos();
@@ -1845,10 +1889,20 @@ function syncSections(type) {
     el.propPopupSection.style.display = (type === 'popup_label') ? 'block' : 'none';
     if (el.propLineSection) el.propLineSection.style.display = (type === 'line') ? 'block' : 'none';
     if (el.propPosesionSection) el.propPosesionSection.style.display = (type === 'possession') ? 'block' : 'none';
+    if (el.propTextoSection)    el.propTextoSection.style.display    = (type === 'text')       ? 'block' : 'none';
+    if (el.propEquiposSection)  el.propEquiposSection.style.display  = (type === 'teams')      ? 'block' : 'none';
     // Lead y Lag aplican tanto en modo fijo como manual → siempre visibles para tipo 'event'
     if (el.fixedTimesSubSection) {
         el.fixedTimesSubSection.style.display = (type === 'event') ? 'block' : 'none';
     }
+}
+
+// Ancho en píxeles de un texto con la tipografía del texto libre. Con un
+// canvas no hace falta dibujarlo en la página para medirlo.
+function medirTexto(texto, px) {
+    const ctx = medirTexto._ctx || (medirTexto._ctx = document.createElement('canvas').getContext('2d'));
+    ctx.font = `700 ${px}px -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
+    return ctx.measureText(texto).width;
 }
 
 function updateSelected() {
@@ -1875,6 +1929,26 @@ function updateSelected() {
     if (e.type === 'possession' && el.propEquipoA && el.propEquipoB) {
         e.equipoA = el.propEquipoA.value.trim() || 'Local';
         e.equipoB = el.propEquipoB.value.trim() || 'Visitante';
+        // Con tarjeta Equipos los nombres son de toda la botonera: cambiarlos
+        // acá los cambia también en la tarjeta, así nunca dicen cosas distintas.
+        const tarjeta = state.elements.find(x => x.type === 'teams');
+        if (tarjeta) { tarjeta.equipoA = e.equipoA; tarjeta.equipoB = e.equipoB; }
+    }
+    if (e.type === 'teams' && el.propEqNombreA) {
+        e.equipoA = el.propEqNombreA.value.trim() || 'Local';
+        e.equipoB = el.propEqNombreB.value.trim() || 'Visitante';
+        e.colorA  = el.propEqColorA.value || '#3a8fd6';
+        e.colorB  = el.propEqColorB.value || '#dc2626';
+    }
+    if (e.type === 'text' && el.propTamanoTexto) {
+        e.fontSize = parseInt(el.propTamanoTexto.value) || 18;
+        // Al escribir o agrandar la letra, la caja crece para que entre: si no,
+        // el lienzo recorta lo que sobra y un título queda cortado a los lados.
+        // Solo crece: un tamaño que ajustaste a mano no se achica.
+        const ancho = Math.ceil(medirTexto(e.name || '', e.fontSize) + 28);
+        const alto  = Math.ceil(e.fontSize * 1.3 + 16);
+        e.w = Math.max(e.w, ancho);
+        e.h = Math.max(e.h, alto);
     }
     if (e.type === 'event' && el.propSubPlantilla && !hojaDe(e)) {
         const v = el.propSubPlantilla.value;
@@ -1972,7 +2046,7 @@ function crearAccionesFlotantes() {
 }
 
 function defaultColor(type) {
-    return { event:'#3a8fd6', popup_label:'#f8d022', descriptor:'#fef08a', counter:null, container:null, line:'#4c51bf' }[type] || '#3a8fd6';
+    return { event:'#3a8fd6', popup_label:'#f8d022', descriptor:'#fef08a', counter:null, container:null, line:'#4c51bf', text:'#1c1c1e' }[type] || '#3a8fd6';
 }
 function brightness(hex) {
     hex = hex.replace('#','');
@@ -2048,6 +2122,7 @@ function reajustarLienzo() {
 
 function renderElements() {
     aplicarEscalaLienzo();
+    aplicarColoresEquipos();
     el.canvas.innerHTML = '';
 
     // Solo la pestaña a la vista: en vivo la Principal (o el detalle abierto),
@@ -2087,7 +2162,12 @@ function renderElements() {
         div.style.height = e.h + 'px';
         div.style.zIndex = isContainer ? 1 : 10;
 
-        if (e.color && e.color !== defaultColor(e.type)) {
+        if (e.type === 'text') {
+            // En un texto el color es el de la letra: no lleva fondo.
+            div.style.color = e.color || defaultColor('text');
+        } else if (e.type === 'teams') {
+            // La tarjeta toma los colores de cada equipo, no el color del botón.
+        } else if (e.color && e.color !== defaultColor(e.type)) {
             div.style.setProperty('--btn-color', e.color);
             div.classList.add('has-color');
             div.style.color = brightness(e.color) > 150 ? '#000' : '#fff';
@@ -2095,6 +2175,14 @@ function renderElements() {
 
         if (isContainer) {
             div.innerHTML = '';
+        } else if (e.type === 'text') {
+            // Texto libre: se ve igual en el editor, en vivo y en una pestaña.
+            div.innerHTML = `<span class="texto-libre" style="font-size:${parseInt(e.fontSize) || 18}px">${e.name}</span>`;
+        } else if (e.type === 'teams') {
+            div.innerHTML =
+                `<div class="eq-lado"><span class="eq-punto eq-a"></span><span class="eq-nombre">${e.equipoA || 'Local'}</span></div>` +
+                `<span class="eq-vs">vs</span>` +
+                `<div class="eq-lado"><span class="eq-nombre">${e.equipoB || 'Visitante'}</span><span class="eq-punto eq-b"></span></div>`;
         } else if (enDetalle) {
             // En el detalle solo importa el nombre: es lo que se va a etiquetar.
             div.innerHTML = `<span>${e.name}</span>`;
@@ -2109,7 +2197,9 @@ function renderElements() {
                     `<span class="pos-nombre">${nombre}</span>` +
                     (state.mode === 'live' ? `<span class="pos-pct" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="pct"></span>` : '') +
                 `</div>`;
-            div.innerHTML = lado('A', e.equipoA || 'Local') + lado('B', e.equipoB || 'Visitante');
+            // Los nombres son de toda la botonera (tarjeta Equipos, si hay).
+            const nombres = nombresEquipos();
+            div.innerHTML = lado('A', nombres.A) + lado('B', nombres.B);
         } else if (state.mode === 'live' && e.type === 'counter') {
             div.innerHTML = `<span>${state.counters[e.id] || 0}</span>`;
         } else if (state.mode === 'live' && e.type === 'event') {
@@ -2137,7 +2227,8 @@ function renderElements() {
             });
         }
 
-        if (state.mode === 'live' && !isContainer) {
+        // Texto y tarjeta de equipos son solo para leer: en vivo no se tocan.
+        if (state.mode === 'live' && !isContainer && e.type !== 'text' && e.type !== 'teams') {
             if (enDetalle) {
                 div.addEventListener('click', () => tocarEnDetalle(e.name));
             } else if (e.type === 'possession') {
@@ -2992,10 +3083,6 @@ function renderLivePanel() {
 // Cada tramo es un clip más en state.events, así llega al XML y a la sesión
 // guardada sin nada extra; los porcentajes salen de sumar esos clips.
 // ─────────────────────────────────────────────
-function nombreEquipo(e, equipo) {
-    return equipo === 'A' ? (e.equipoA || 'Local') : (e.equipoB || 'Visitante');
-}
-
 function tocarPosesion(e, equipo) {
     if (!state.isPlaying) startTimer();
     const actual = state.posesion[e.id];
@@ -3018,7 +3105,7 @@ function cerrarTramoPosesion(e) {
     state.events.unshift({
         id: Date.now() + (++_evSeq),
         buttonId: e.id,
-        name: 'Posesión ' + nombreEquipo(e, tramo.equipo),
+        name: 'Posesión ' + nombresEquipos()[tramo.equipo],
         posesionDe: e.id,
         equipo: tramo.equipo,           // los totales van por equipo, no por nombre:
         start: tramo.desde,             // así renombrar un equipo no parte la cuenta
@@ -3040,9 +3127,30 @@ function equipoDeBoton(buttonId) {
     return (b && b.type === 'event' && (b.equipo === 'A' || b.equipo === 'B')) ? b.equipo : null;
 }
 
+// Nombres de los equipos para toda la botonera: de la tarjeta Equipos si hay
+// una; si no, del botón de posesión (como antes); si no, Local y Visitante.
 function nombresEquipos() {
-    const pos = state.elements.find(x => x.type === 'possession');
-    return { A: (pos && pos.equipoA) || 'Local', B: (pos && pos.equipoB) || 'Visitante' };
+    const fuente = state.elements.find(x => x.type === 'teams') ||
+                   state.elements.find(x => x.type === 'possession');
+    return { A: (fuente && fuente.equipoA) || 'Local', B: (fuente && fuente.equipoB) || 'Visitante' };
+}
+
+function coloresEquipos() {
+    const tarjeta = state.elements.find(x => x.type === 'teams');
+    return { A: (tarjeta && tarjeta.colorA) || '#3a8fd6', B: (tarjeta && tarjeta.colorB) || '#dc2626' };
+}
+
+// Los colores de los equipos pintan varias cosas: las mitades del botón de
+// posesión, la franja de los eventos, el panel. Van como variables CSS, así
+// cambiar un color en la tarjeta los cambia en todos lados a la vez.
+function aplicarColoresEquipos() {
+    const c = coloresEquipos();
+    const raiz = document.documentElement.style;
+    raiz.setProperty('--equipo-a', c.A);
+    raiz.setProperty('--equipo-b', c.B);
+    // Letra legible sobre el color elegido: en un amarillo, blanco no se lee.
+    raiz.setProperty('--equipo-a-texto', brightness(c.A) > 150 ? '#000' : '#fff');
+    raiz.setProperty('--equipo-b-texto', brightness(c.B) > 150 ? '#000' : '#fff');
 }
 
 // Reparte el tiempo entre los dos equipos sin contar nada dos veces:
@@ -3247,8 +3355,8 @@ function rgbDeEvento(nombre, buttonId, equipo) {
     let hex = (e && e.color) || defaultColor(e ? e.type : 'event') || '#3a8fd6';
     // Los dos equipos de la posesión comparten botón: sin esto sus filas
     // saldrían del mismo color. Cada una toma el de su mitad del botón.
-    if (equipo === 'A') hex = '#3a8fd6';
-    if (equipo === 'B') hex = '#dc2626';
+    if (equipo === 'A') hex = coloresEquipos().A;
+    if (equipo === 'B') hex = coloresEquipos().B;
     hex = String(hex).replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
     return {

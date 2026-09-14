@@ -280,8 +280,44 @@ body {
 }
 
 /* Evento que suma posesión: una franja del color de su equipo. */
-.canvas-element.equipo-A { box-shadow: inset 6px 0 0 #1e3a8a; }
-.canvas-element.equipo-B { box-shadow: inset 6px 0 0 #dc2626; }
+.canvas-element.equipo-A { box-shadow: inset 6px 0 0 var(--equipo-a, #1e3a8a); }
+.canvas-element.equipo-B { box-shadow: inset 6px 0 0 var(--equipo-b, #dc2626); }
+
+/* Texto libre: se ve, pero no se toca ni se registra. */
+.canvas-element[data-eltype="text"] {
+    background: transparent;
+    border: 1.5px dashed transparent;
+    font-weight: 700;
+    line-height: 1.15;
+}
+/* En el editor, un borde tenue para poder agarrarlo; en vivo no se ve. */
+.canvas-element.mode-setup[data-eltype="text"] { border-color: #c7c7cc; }
+.texto-libre { white-space: nowrap; }
+
+/* Tarjeta de equipos */
+.canvas-element[data-eltype="teams"] {
+    flex-direction: row;
+    gap: 10px;
+    padding: 0 12px;
+    background: #fff;
+    border: 1.5px solid #d1d1d6;
+    border-radius: 10px;
+    color: #1c1c1e;
+    font-size: 14px;
+    font-weight: 800;
+}
+.eq-lado { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.eq-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.eq-punto { width: 12px; height: 12px; border-radius: 999px; flex-shrink: 0; }
+.eq-a { background: var(--equipo-a, #3a8fd6); }
+.eq-b { background: var(--equipo-b, #dc2626); }
+.eq-vs { color: #8e8e93; font-size: 12px; font-weight: 600; }
+
+/* Texto y equipos son para leer: en vivo no reaccionan al toque. */
+.canvas-element.mode-live[data-eltype="text"],
+.canvas-element.mode-live[data-eltype="teams"] { cursor: default; }
+.canvas-element.mode-live[data-eltype="text"]:active,
+.canvas-element.mode-live[data-eltype="teams"]:active { transform: none; filter: none; }
 
 /* Etiqueta ya elegida en una pestaña de detalle con varias por elegir. */
 .canvas-element.elegida {
@@ -309,8 +345,9 @@ body {
     color: #fff;
     transition: filter .1s;
 }
-.pos-A { background: linear-gradient(180deg, #5cb0f5 0%, #3a8fd6 100%); }
-.pos-B { background: linear-gradient(180deg, #f87171 0%, #dc2626 100%); }
+/* Colores de los equipos: salen de la tarjeta Equipos (variables que pone app.js). */
+.pos-A { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--equipo-a, #3a8fd6); color: var(--equipo-a-texto, #fff); }
+.pos-B { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--equipo-b, #dc2626); color: var(--equipo-b-texto, #fff); }
 .pos-lado + .pos-lado { border-left: 1.5px solid rgba(0,0,0,.25); }
 .pos-nombre { font-size: 12px; font-weight: 700; line-height: 1.1; }
 .pos-pct { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
@@ -327,7 +364,7 @@ body {
     border-radius: 999px;
     overflow: hidden;
     margin-bottom: 10px;
-    background: #dc2626;
+    background: var(--equipo-b, #dc2626);
 }
 .pos-panel-barra .pos-A { width: 50%; transition: width .3s; }
 .pos-panel-barra .pos-B { flex: 1; }

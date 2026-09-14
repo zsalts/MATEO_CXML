@@ -127,6 +127,14 @@
                         <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
                         <span>Línea (ToI)</span>
                     </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="text">
+                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#fff;border-color:#c7c7cc;">T</div>
+                        <span>Texto</span>
+                    </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="teams">
+                        <div class="swatch" style="background:linear-gradient(90deg,#3a8fd6 50%,#dc2626 50%);border-color:#555;border-radius:50%;"></div>
+                        <span>Equipos</span>
+                    </button>
                     <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="possession">
                         <div class="swatch" style="background:linear-gradient(90deg,#3a8fd6 50%,#ef4444 50%);border-color:#555;"></div>
                         <span>Posesión</span>
@@ -201,6 +209,8 @@
                         <option value="counter">Contador</option>
                         <option value="line">Línea (ToI)</option>
                         <option value="possession">Posesión</option>
+                        <option value="text">Texto</option>
+                        <option value="teams">Equipos</option>
                     </select>
                 </div>
 
@@ -285,6 +295,38 @@
                     <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
                         <span class="text-[#2a5b84] text-sm">Cerrar las otras líneas</span>
                         <input id="propLineExclusive" type="checkbox" class="w-5 h-5">
+                    </div>
+                </div>
+
+                <!-- Texto libre -->
+                <div id="propTextoSection" class="hidden">
+                    <div class="inspector-section-label">TAMAÑO DEL TEXTO</div>
+                    <div class="inspector-cell">
+                        <select id="propTamanoTexto" class="w-full bg-transparent text-sm focus:outline-none text-black">
+                            <option value="12">Chico</option>
+                            <option value="14">Mediano chico</option>
+                            <option value="18">Mediano</option>
+                            <option value="24">Grande</option>
+                            <option value="32">Muy grande</option>
+                            <option value="48">Título</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">El texto se escribe en NOMBRE, y su color es el de COLOR. En vivo se ve, pero no se toca ni se registra.</p>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de equipos -->
+                <div id="propEquiposSection" class="hidden">
+                    <div class="inspector-section-label">EQUIPOS</div>
+                    <div class="inspector-cell flex justify-between items-center">
+                        <input id="propEqColorA" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
+                        <input id="propEqNombreA" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:150px;" placeholder="Local">
+                    </div>
+                    <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
+                        <input id="propEqColorB" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
+                        <input id="propEqNombreB" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:150px;" placeholder="Visitante">
+                    </div>
+                    <div class="inspector-cell">
+                        <p class="text-xs text-gray-400">Nombres y colores para toda la botonera: los usan la posesión, los eventos que le suman a un equipo, el panel y el XML.</p>
                     </div>
                 </div>
 
