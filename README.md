@@ -30,6 +30,9 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
 - En vivo se codifica siempre desde la Principal. Tocás el evento, se abre su
   pestaña, tocás un botón y queda como etiqueta del evento; la pantalla vuelve
   sola. "Volver sin elegir" sale sin etiquetar.
+- Cada pestaña define **cuántas etiquetas se eligen** antes de volver (de 1 a
+  5, en el selector al lado de su nombre). Por ejemplo, un ingreso al área con 2
+  y un tiro con 1. Tocar una ya elegida la desmarca, y "Listo" termina antes.
 - Todo queda en la misma plantilla: se guarda, se exporta y viaja por la nube
   junto con la Principal.
 

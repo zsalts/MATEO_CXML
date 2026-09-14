@@ -127,6 +127,10 @@
                         <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
                         <span>Línea (ToI)</span>
                     </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="possession">
+                        <div class="swatch" style="background:linear-gradient(90deg,#3a8fd6 50%,#ef4444 50%);border-color:#555;"></div>
+                        <span>Posesión</span>
+                    </button>
                     <button id="btnInsertHoja" class="ios-menu-row border-t border-gray-100">
                         <div class="swatch" style="background:#1c1c1e;border-color:#1c1c1e;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;">⧉</div>
                         <span>Pestaña nueva</span>
@@ -196,6 +200,7 @@
                         <option value="container">Contenedor</option>
                         <option value="counter">Contador</option>
                         <option value="line">Línea (ToI)</option>
+                        <option value="possession">Posesión</option>
                     </select>
                 </div>
 
@@ -275,6 +280,22 @@
                     </div>
                 </div>
 
+                <!-- Posesión -->
+                <div id="propPosesionSection" class="hidden">
+                    <div class="inspector-section-label">EQUIPOS</div>
+                    <div class="inspector-cell flex justify-between items-center">
+                        <span class="text-[#2a5b84] text-sm">Lado izquierdo</span>
+                        <input id="propEquipoA" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:130px;" placeholder="Local">
+                    </div>
+                    <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
+                        <span class="text-[#2a5b84] text-sm">Lado derecho</span>
+                        <input id="propEquipoB" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:130px;" placeholder="Visitante">
+                    </div>
+                    <div class="inspector-cell">
+                        <p class="text-xs text-gray-400">En vivo: tocá el lado del equipo que tiene la pelota. Tocar otra vez el mismo lado corta la posesión (pelota muerta). Cada tramo queda como clip en el XML.</p>
+                    </div>
+                </div>
+
                 <!-- Acciones -->
                 <div class="inspector-section-label">ACCIONES</div>
                 <div class="inspector-cell">
@@ -294,7 +315,10 @@
             <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-[#f2f2f7]">
                 <div class="seg-control">
                     <button id="tabLog" class="seg-btn seg-active">Registro</button>
-                    <button id="tabToi" class="seg-btn">Tiempo en hielo</button>
+                    <!-- "En hielo" y no "Tiempo en hielo": con la pestaña Posesión la
+                         fila quedaba a 1 px de desbordar, y en el iPad la fuente es más ancha -->
+                    <button id="tabToi" class="seg-btn">En hielo</button>
+                    <button id="tabPos" class="seg-btn">Posesión</button>
                 </div>
                 <button id="btnClearEvents" class="text-red-500 text-sm ml-2 flex-shrink-0">Borrar</button>
             </div>
@@ -312,6 +336,10 @@
                 </div>
                 <div id="toiList" class="flex-1 overflow-y-auto"></div>
                 <button id="btnExportToi" class="py-2.5 text-[#007aff] text-sm font-medium border-t border-gray-200 bg-[#f2f2f7]">Exportar ToI (CSV)</button>
+            </div>
+
+            <div id="posView" class="hidden flex-1 flex-col overflow-hidden">
+                <div id="posList" class="flex-1 overflow-y-auto"></div>
             </div>
         </aside>
 

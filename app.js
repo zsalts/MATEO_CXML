@@ -42,7 +42,8 @@ const state = {
 
     hojas: [],                 // Pestañas de la botonera: [{ id, name }]. La Principal no figura
     hojaActiva: null,          // Pestaña que se está editando (null = Principal)
-    detalle: null              // Pestaña de detalle abierta en vivo
+    detalle: null,             // Pestaña de detalle abierta en vivo
+    posesion: {}               // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
 };
 
 const DEFAULT_W = 120;
@@ -51,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v28';
+const APP_VERSION = 'v32';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -141,6 +142,12 @@ const el = {
     propDetalleSection:  D('propDetalleSection'),
     hojasBar:            D('hojasBar'),
     btnInsertHoja:       D('btnInsertHoja'),
+    tabPos:              D('tabPos'),
+    posView:             D('posView'),
+    posList:             D('posList'),
+    propPosesionSection: D('propPosesionSection'),
+    propEquipoA:         D('propEquipoA'),
+    propEquipoB:         D('propEquipoB'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1128,6 +1135,13 @@ function setMode(mode) {
     if (state.openEvents && state.openEvents.length > 0) {
         for (let i = state.openEvents.length - 1; i >= 0; i--) closeOpenEventAt(i, true);
     }
+    // Y la posesión que esté corriendo: el último tramo también tiene que
+    // llegar al XML, que se exporta justo después.
+    Object.keys(state.posesion || {}).forEach(id => {
+        const botonPos = state.elements.find(x => String(x.id) === id);
+        if (botonPos) cerrarTramoPosesion(botonPos);
+        else delete state.posesion[id];
+    });
 
     closeInsertMenu();
 
@@ -1159,6 +1173,7 @@ function setMode(mode) {
 
         state.time = 0; state.isPlaying = false;
         state.events = []; state.counters = {}; state.toi = {};
+        state.posesion = {};
         state.sessionStartedAt = null;
         setLiveTab('log');
         updateTimerUI();
@@ -1207,6 +1222,7 @@ function bindEvents() {
     on(el.btnClearEvents, 'click', async () => {
         if (await customConfirm('¿Borrar todos los eventos y el tiempo acumulado?', 'Limpiar Eventos', true, 'Borrar')) {
             state.events = []; state.counters = {}; state.toi = {}; state.openEvents = [];
+            state.posesion = {};
             renderLivePanel(); renderElements();
         }
     });
@@ -1246,6 +1262,9 @@ function bindEvents() {
     on(el.btnAjustar, 'click', alternarAjuste);
     on(el.propSubPlantilla, 'change', updateSelected);
     on(el.btnInsertHoja, 'click', insertarHoja);
+    on(el.tabPos, 'click', () => setLiveTab('pos'));
+    on(el.propEquipoA, 'input', updateSelected);
+    on(el.propEquipoB, 'input', updateSelected);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1541,7 +1560,8 @@ function createElement(type) {
         popup_label: { name:'Etiqueta emergente',  w:DEFAULT_W, h:DEFAULT_H },
         counter:     { name:'0',                   w:80,        h:60        },
         container:   { name:'',                    w:200,       h:180       },
-        line:        { name:'Línea 1',             w:140,       h:52        }
+        line:        { name:'Línea 1',             w:140,       h:52        },
+        possession:  { name:'Posesión',            w:260,       h:72        }
     };
     const d = defaults[type] || defaults.event;
 
@@ -1560,6 +1580,7 @@ function createElement(type) {
         lineExclusive: true
     };
     if (state.hojaActiva) newEl.hoja = state.hojaActiva;   // nace en la pestaña que estás editando
+    if (type === 'possession') { newEl.equipoA = 'Local'; newEl.equipoB = 'Visitante'; }
     state.elements.push(newEl);
     saveData();
     selectElement(newEl.id);
@@ -1684,6 +1705,8 @@ function selectElement(id) {
     el.propLag.value   = (e.lag  === undefined || e.lag  === null) ? 1 : e.lag;
     if (el.propDescriptors) el.propDescriptors.value = (e.popups || []).join(', ');
     llenarSelectorDetalle(e);
+    if (el.propEquipoA) el.propEquipoA.value = e.equipoA || 'Local';
+    if (el.propEquipoB) el.propEquipoB.value = e.equipoB || 'Visitante';
     if (el.lineBadge) el.lineBadge.textContent = (e.lineMemberIds || []).length;
     if (el.propLineExclusive) el.propLineExclusive.checked = e.lineExclusive !== false;
     if (el.propPopupDescriptors) el.propPopupDescriptors.value = (e.popups || []).join(', ');
@@ -1804,6 +1827,7 @@ function syncSections(type) {
     el.propTimesSection.style.display = (type === 'event')       ? 'block' : 'none';
     el.propPopupSection.style.display = (type === 'popup_label') ? 'block' : 'none';
     if (el.propLineSection) el.propLineSection.style.display = (type === 'line') ? 'block' : 'none';
+    if (el.propPosesionSection) el.propPosesionSection.style.display = (type === 'possession') ? 'block' : 'none';
     // Lead y Lag aplican tanto en modo fijo como manual → siempre visibles para tipo 'event'
     if (el.fixedTimesSubSection) {
         el.fixedTimesSubSection.style.display = (type === 'event') ? 'block' : 'none';
@@ -1827,6 +1851,10 @@ function updateSelected() {
         e.popups = el.propPopupDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
+    }
+    if (e.type === 'possession' && el.propEquipoA && el.propEquipoB) {
+        e.equipoA = el.propEquipoA.value.trim() || 'Local';
+        e.equipoB = el.propEquipoB.value.trim() || 'Visitante';
     }
     if (e.type === 'event' && el.propSubPlantilla && !hojaDe(e)) {
         const v = el.propSubPlantilla.value;
@@ -2048,6 +2076,18 @@ function renderElements() {
         } else if (enDetalle) {
             // En el detalle solo importa el nombre: es lo que se va a etiquetar.
             div.innerHTML = `<span>${e.name}</span>`;
+            // Con varias etiquetas por elegir, las ya tocadas quedan marcadas.
+            if (state.detalle.elegidas.includes(e.name)) div.classList.add('elegida');
+        } else if (e.type === 'possession') {
+            // Partido en dos: cada mitad es un equipo. En vivo muestra su %, y
+            // la mitad del equipo que tiene la pelota se enciende.
+            const activo = (state.mode === 'live' && state.posesion[e.id]) ? state.posesion[e.id].equipo : null;
+            const lado = (eq, nombre) =>
+                `<div class="pos-lado pos-${eq}${activo === eq ? ' activo' : ''}" data-equipo="${eq}">` +
+                    `<span class="pos-nombre">${nombre}</span>` +
+                    (state.mode === 'live' ? `<span class="pos-pct" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="pct"></span>` : '') +
+                `</div>`;
+            div.innerHTML = lado('A', e.equipoA || 'Local') + lado('B', e.equipoB || 'Visitante');
         } else if (state.mode === 'live' && e.type === 'counter') {
             div.innerHTML = `<span>${state.counters[e.id] || 0}</span>`;
         } else if (state.mode === 'live' && e.type === 'event') {
@@ -2078,6 +2118,11 @@ function renderElements() {
         if (state.mode === 'live' && !isContainer) {
             if (enDetalle) {
                 div.addEventListener('click', () => tocarEnDetalle(e.name));
+            } else if (e.type === 'possession') {
+                div.addEventListener('click', ev => {
+                    const lado = ev.target.closest('.pos-lado');
+                    if (lado) tocarPosesion(e, lado.dataset.equipo);
+                });
             } else if (e.type === 'popup_label') {
                 div.addEventListener('click', () => handlePopupLabelClick(e.name));
             } else if (e.type === 'line') {
@@ -2120,7 +2165,12 @@ function renderLinks() {
     el.svgArrows.querySelectorAll('path, circle').forEach(n => n.remove());
     if (state.mode !== 'setup') return;
 
+    // Solo los enlaces entre botones de la pestaña a la vista. Las pestañas
+    // comparten las coordenadas del lienzo: sin este filtro, al abrir una
+    // pestaña quedaban dibujadas encima las flechas de la Principal.
+    const aLaVista = new Set(elementosEnPantalla().map(e => e.id));
     state.links.forEach(lnk => {
+        if (!aLaVista.has(lnk.fromId) || !aLaVista.has(lnk.toId)) return;
         const p1 = centerOf(lnk.fromId), p2 = centerOf(lnk.toId);
         if (p1.x || p2.x) drawArrow(p1, p2, false, lnk.id);
     });
@@ -2209,10 +2259,50 @@ function updateTimerUI() {
 // ─────────────────────────────────────────────
 let _evSeq = 0;
 
-// Acumula segundos en hielo para un botón
-function addToi(buttonId, seconds) {
-    if (!(seconds > 0)) return;
-    state.toi[buttonId] = (state.toi[buttonId] || 0) + seconds;
+// Largo total de una lista de tramos [inicio, fin], contando UNA sola vez lo
+// que se superpone. Antes cada clip sumaba su duración entera, y lo marcado al
+// mismo tiempo se contaba doble: dos toques seguidos de un evento de tiempo
+// fijo se pisan por el tiempo previo y posterior, y el posterior de un turno
+// se pisa con el previo del siguiente. Tramos que se tocan quedan como uno.
+function unirTramos(tramos) {
+    const ordenados = tramos
+        .map(([a, b]) => [Math.max(0, a), b])
+        .filter(([a, b]) => b > a)
+        .sort((x, y) => x[0] - y[0]);
+    let total = 0, cantidad = 0, ini = null, fin = null;
+    ordenados.forEach(([a, b]) => {
+        if (ini === null || a > fin) {
+            if (ini !== null) { total += fin - ini; cantidad++; }
+            ini = a;
+            fin = b;
+        } else if (b > fin) {
+            fin = b;
+        }
+    });
+    if (ini !== null) { total += fin - ini; cantidad++; }
+    return { total: total, cantidad: cantidad };
+}
+
+// Tiempo de un botón: sus clips archivados más el que esté abierto, unidos.
+// Los clips de posesión quedan afuera: tienen su propia cuenta por equipo.
+function tiempoEnHielo(buttonId) {
+    const tramos = state.events
+        .filter(ev => ev.buttonId === buttonId && !ev.posesionDe && ev.end != null)
+        .map(ev => [ev.start, ev.end]);
+    (state.openEvents || []).forEach(o => {
+        if (o.buttonId === buttonId) tramos.push([o.start, state.time]);
+    });
+    return unirTramos(tramos);
+}
+
+// Para guardar con la sesión: el tiempo por botón, ya unido.
+function toiCalculado() {
+    const mapa = {};
+    state.elements.filter(e => e.type === 'event').forEach(e => {
+        const t = tiempoEnHielo(e.id).total;
+        if (t > 0) mapa[e.id] = t;
+    });
+    return mapa;
 }
 
 // Crea la instancia de evento a partir de un botón del lienzo
@@ -2242,17 +2332,19 @@ function closeOpenEventAt(index, noLag) {
     if (!openEv) return null;
 
     openEv.end = noLag ? state.time : state.time + (openEv.lag || 0);
-    state.events.unshift(openEv);
-    state.counters[openEv.buttonId] = (state.counters[openEv.buttonId] || 0) + 1;
-    addToi(openEv.buttonId, openEv.end - openEv.start);
+    // Un evento se archiva y se cuenta una sola vez, lo cierre quien lo cierre.
+    if (!state.events.some(e => e.id === openEv.id)) {
+        state.events.unshift(openEv);
+        state.counters[openEv.buttonId] = (state.counters[openEv.buttonId] || 0) + 1;
 
-    // Disparar contadores enlazados
-    state.links.filter(l => l.fromId === openEv.buttonId).forEach(l => {
-        const target = state.elements.find(el => el.id === l.toId);
-        if (target && target.type === 'counter') {
-            state.counters[target.id] = (state.counters[target.id] || 0) + 1;
-        }
-    });
+        // Disparar contadores enlazados
+        state.links.filter(l => l.fromId === openEv.buttonId).forEach(l => {
+            const target = state.elements.find(el => el.id === l.toId);
+            if (target && target.type === 'counter') {
+                state.counters[target.id] = (state.counters[target.id] || 0) + 1;
+            }
+        });
+    }
 
     state.openEvents.splice(index, 1);
     return openEv;
@@ -2319,14 +2411,31 @@ function updateLiveClocks() {
         const id = parseInt(node.dataset.clockFor);
         node.textContent = openMap[id] ? fmt(liveOf(id)) : '';
     });
+    // Tiempo en hielo con los tramos unidos, calculado una vez por botón por tick.
+    const hieloDe = {};
+    const hielo = id => hieloDe[id] || (hieloDe[id] = tiempoEnHielo(id));
     document.querySelectorAll('[data-toi-for]').forEach(node => {
-        const id = parseInt(node.dataset.toiFor);
-        const total = (state.toi[id] || 0) + liveOf(id);
+        const total = hielo(parseInt(node.dataset.toiFor)).total;
         node.textContent = total > 0 ? 'Σ ' + fmt(total) : '';
     });
     document.querySelectorAll('[data-toirow-for]').forEach(node => {
-        const id = parseInt(node.dataset.toirowFor);
-        node.textContent = fmt((state.toi[id] || 0) + liveOf(id));
+        node.textContent = fmt(hielo(parseInt(node.dataset.toirowFor)).total);
+    });
+
+    // Posesión: el % y los tiempos corren con el reloj, sin redibujar nada.
+    const tiemposDe = {};
+    const tiempos = id => tiemposDe[id] || (tiemposDe[id] = tiemposPosesion(id));
+    document.querySelectorAll('[data-pos-for]').forEach(node => {
+        const t = tiempos(parseInt(node.dataset.posFor));
+        const eq = node.dataset.equipo;
+        if (node.dataset.campo === 'tiempo') {
+            node.textContent = fmt(t[eq]);
+        } else if (node.dataset.campo === 'barra') {
+            node.style.width = (t.pctA === null ? 50 : t.pctA) + '%';
+        } else {
+            const pct = eq === 'A' ? t.pctA : t.pctB;
+            node.textContent = pct === null ? '–' : pct + '%';
+        }
     });
 }
 
@@ -2487,11 +2596,15 @@ function handlePopupLabelClick(labelName) {
 function finalizeEvent() {
     const ev = state.pendingEvent;
     if (!ev) return;
-    const isNew = !state.events.some(e => e.id === ev.id);
-    state.events.unshift(ev);
+    // Un evento manual sigue grabando en openEvents y lo archiva
+    // closeOpenEventAt cuando se corta. Si además se archivara acá, quedaría
+    // dos veces: dos clips en el XML y el contador sumando 2 por un toque.
+    // Y uno ya archivado no se vuelve a agregar a la lista.
+    const sigueAbierto = (state.openEvents || []).includes(ev);
+    const isNew = !sigueAbierto && !state.events.some(e => e.id === ev.id);
     if (isNew) {
+        state.events.unshift(ev);
         state.counters[ev.buttonId] = (state.counters[ev.buttonId]||0)+1;
-        addToi(ev.buttonId, (ev.end != null ? ev.end : ev.start) - ev.start);
         state.links.filter(l => l.fromId === ev.buttonId).forEach(l => {
             const t = state.elements.find(e => e.id === l.toId);
             if (t && t.type === 'counter') state.counters[t.id] = (state.counters[t.id]||0)+1;
@@ -2537,7 +2650,7 @@ async function insertarHoja() {
         evento ? `Detalle ${evento.name}` : `Pestaña ${state.hojas.length + 1}`, 'Pestaña nueva');
     if (!nombre || !nombre.trim()) return;
 
-    const hoja = { id: 'h' + Date.now(), name: nombre.trim() };
+    const hoja = { id: 'h' + Date.now(), name: nombre.trim(), etiquetas: 1 };
     state.hojas.push(hoja);
     if (evento) {
         evento.subHojaId = hoja.id;
@@ -2623,6 +2736,24 @@ function renderHojasBar() {
             x.textContent = '✕';
             x.addEventListener('click', () => eliminarHoja(h));
             barra.appendChild(x);
+
+            // Cuántas etiquetas se eligen en esta pestaña antes de volver sola:
+            // un "Ingreso al área" puede llevar 2 y un "Tiro" solo 1.
+            const cant = document.createElement('select');
+            cant.className = 'hoja-etiquetas';
+            cant.title = 'Etiquetas a elegir antes de volver';
+            [1, 2, 3, 4, 5].forEach(n => {
+                const o = document.createElement('option');
+                o.value = String(n);
+                o.textContent = n === 1 ? 'Elige 1 etiqueta' : `Elige ${n} etiquetas`;
+                cant.appendChild(o);
+            });
+            cant.value = String(h.etiquetas || 1);
+            cant.addEventListener('change', () => {
+                h.etiquetas = parseInt(cant.value) || 1;
+                saveData();
+            });
+            barra.appendChild(cant);
         }
     });
 
@@ -2647,7 +2778,7 @@ function plantillaDeDetalle(e) {
     if (!e) return null;
     if (e.subHojaId) {
         const hoja = state.hojas.find(h => h.id === e.subHojaId);
-        if (hoja) return { name: hoja.name, elements: elementosDeHoja(hoja.id) };
+        if (hoja) return { name: hoja.name, elements: elementosDeHoja(hoja.id), etiquetas: hoja.etiquetas || 1 };
     }
     if (!e.subPlantillaId) return null;
     // Comparado como texto: los ids son números, pero una copia importada o
@@ -2660,6 +2791,9 @@ function abrirDetalle(eventoEl, plantilla) {
         evento:    eventoEl.name,
         plantilla: plantilla.name,
         elements:  JSON.parse(JSON.stringify(plantilla.elements || [])),
+        // Cuántas etiquetas se eligen antes de volver, y cuáles van elegidas.
+        max:       Math.max(1, parseInt(plantilla.etiquetas) || 1),
+        elegidas:  [],
         // Para volver exactamente adonde estabas mirando en la principal.
         scroll:    { x: el.canvasContainer.scrollLeft, y: el.canvasContainer.scrollTop }
     };
@@ -2681,27 +2815,51 @@ function volverScroll(d) {
     el.canvasContainer.scrollTop  = d.scroll.y;
 }
 
-// Botón tocado en la plantilla de detalle: etiqueta del evento, y de vuelta.
+// Botón tocado en la pestaña de detalle. Cada pestaña dice cuántas etiquetas
+// se eligen (una por defecto): al llegar a esa cantidad se pegan todas al
+// evento y la pantalla vuelve sola. Tocar una ya elegida la desmarca, así un
+// toque de más no la cuenta dos veces.
 function tocarEnDetalle(nombre) {
-    // Primero se sale: handlePopupLabelClick redibuja, y tiene que dibujar la
-    // principal, no otra vez el detalle.
+    const d = state.detalle;
+    if (!d) return;
+    const i = d.elegidas.indexOf(nombre);
+    if (i >= 0) d.elegidas.splice(i, 1);
+    else d.elegidas.push(nombre);
+
+    if (d.elegidas.length >= d.max) {
+        terminarDetalle();
+        return;
+    }
+    mostrarBarraDetalle();
+    renderElements();
+}
+
+// Pega lo elegido al evento y vuelve a la principal. Sin nada elegido es
+// "volver sin elegir": el evento de tiempo fijo igual queda registrado, sin
+// etiqueta, y el manual sigue grabando.
+function terminarDetalle() {
     const d = salirDeDetalle();
-    // Ya sabe dónde pegar la etiqueta: al evento pendiente (tiempo fijo, y lo
-    // cierra) o al que está grabando (manual).
-    handlePopupLabelClick(nombre);
+    pegarEtiquetas(d ? d.elegidas : []);
     renderLivePanel();
     renderElements();
     volverScroll(d);
 }
 
-// "Volver sin elegir": para un toque equivocado. El evento de tiempo fijo
-// igual queda registrado, sin etiqueta; el manual sigue grabando.
-function cancelarDetalle() {
-    const d = salirDeDetalle();
+// El botón de la barra: "Volver sin elegir" o "Listo", según haya elegidas.
+function cancelarDetalle() { terminarDetalle(); }
+
+// Mismo destino que las etiquetas emergentes: el evento pendiente (el de
+// tiempo fijo se cierra acá), si no el último que está grabando, si no el
+// último registrado. Una etiqueta repetida no se agrega dos veces.
+function pegarEtiquetas(nombres) {
+    const abiertos = state.openEvents || [];
+    const destino = state.pendingEvent || abiertos[abiertos.length - 1] || state.events[0];
+    if (destino) {
+        nombres.forEach(n => { if (!destino.descriptors.includes(n)) destino.descriptors.push(n); });
+    }
     if (state.pendingEvent && state.pendingEvent.timeMode !== 'manual') finalizeEvent();
-    renderLivePanel();
-    renderElements();
-    volverScroll(d);
+    state.activePopupElementIds = [];
+    state.tempPopupButtons = [];
 }
 
 // Barra arriba del lienzo con qué se está detallando y la salida. Va fuera del
@@ -2722,7 +2880,11 @@ function mostrarBarraDetalle() {
         barra.querySelector('.bd-cancelar').addEventListener('click', cancelarDetalle);
         zona.appendChild(barra);
     }
-    barra.querySelector('.bd-texto').textContent = state.detalle.evento + ' › ' + state.detalle.plantilla;
+    const d = state.detalle;
+    barra.querySelector('.bd-texto').textContent = d.evento + ' › ' + d.plantilla +
+        (d.max > 1 ? ` · ${d.elegidas.length} de ${d.max}` : '');
+    // Con algo elegido se puede terminar antes de completar la cantidad.
+    barra.querySelector('.bd-cancelar').textContent = d.elegidas.length ? 'Listo' : 'Volver sin elegir';
     // Centrada sobre el lienzo, no sobre toda la zona: en vivo el panel de
     // registro ocupa la derecha, y centrada en el total le tapaba las pestañas.
     barra.style.left = (el.canvasContainer.offsetLeft + el.canvasContainer.clientWidth / 2) + 'px';
@@ -2772,17 +2934,116 @@ function setLiveTab(tab) {
     state.liveTab = tab;
     if (el.tabLog) el.tabLog.classList.toggle('seg-active', tab === 'log');
     if (el.tabToi) el.tabToi.classList.toggle('seg-active', tab === 'toi');
+    if (el.tabPos) el.tabPos.classList.toggle('seg-active', tab === 'pos');
     if (el.logView) el.logView.classList.toggle('hidden', tab !== 'log');
     if (el.toiView) {
         el.toiView.classList.toggle('hidden', tab !== 'toi');
         el.toiView.classList.toggle('flex',   tab === 'toi');
+    }
+    if (el.posView) {
+        el.posView.classList.toggle('hidden', tab !== 'pos');
+        el.posView.classList.toggle('flex',   tab === 'pos');
     }
     renderLivePanel();
 }
 
 function renderLivePanel() {
     if (state.liveTab === 'toi') renderToiList();
+    else if (state.liveTab === 'pos') renderPosesionPanel();
     else renderEventList();
+}
+
+// ─────────────────────────────────────────────
+// POSESIÓN
+// Un botón partido en dos equipos. Tocás el lado del que tiene la pelota: se
+// cierra el tramo del otro y empieza el suyo. Tocar el lado que ya la tiene
+// corta la posesión (pelota muerta, lateral, tiempo muerto) y ese rato no
+// cuenta para ninguno.
+// Cada tramo es un clip más en state.events, así llega al XML y a la sesión
+// guardada sin nada extra; los porcentajes salen de sumar esos clips.
+// ─────────────────────────────────────────────
+function nombreEquipo(e, equipo) {
+    return equipo === 'A' ? (e.equipoA || 'Local') : (e.equipoB || 'Visitante');
+}
+
+function tocarPosesion(e, equipo) {
+    if (!state.isPlaying) startTimer();
+    const actual = state.posesion[e.id];
+    if (actual) cerrarTramoPosesion(e);
+    // El mismo lado otra vez: queda cortada. El otro lado: empieza su tramo.
+    if (!actual || actual.equipo !== equipo) {
+        state.posesion[e.id] = { equipo: equipo, desde: state.time };
+    }
+    renderLivePanel();
+    renderElements();
+}
+
+function cerrarTramoPosesion(e) {
+    const tramo = state.posesion[e.id];
+    if (!tramo) return;
+    delete state.posesion[e.id];
+    const fin = state.time;
+    // Un doble toque sin querer no deja un clip de medio segundo en el XML.
+    if (fin - tramo.desde < 0.5) return;
+    state.events.unshift({
+        id: Date.now() + (++_evSeq),
+        buttonId: e.id,
+        name: 'Posesión ' + nombreEquipo(e, tramo.equipo),
+        posesionDe: e.id,
+        equipo: tramo.equipo,           // los totales van por equipo, no por nombre:
+        start: tramo.desde,             // así renombrar un equipo no parte la cuenta
+        end: fin,
+        timestamp: fmt(tramo.desde),
+        lead: 0, lag: 0,
+        exclusiveIds: [], isExclusive: false,
+        timeMode: 'manual',
+        line: null,
+        descriptors: []
+    });
+}
+
+function tiemposPosesion(id) {
+    const tramos = { A: [], B: [] };
+    state.events.forEach(ev => {
+        if (ev.posesionDe === id && tramos[ev.equipo]) tramos[ev.equipo].push([ev.start, ev.end]);
+    });
+    const abierto = state.posesion[id];
+    if (abierto) tramos[abierto.equipo].push([abierto.desde, state.time]);
+    // Con la misma regla que el tiempo en hielo: lo que se pisa cuenta una vez.
+    const a = unirTramos(tramos.A), b = unirTramos(tramos.B);
+    const t = { A: a.total, B: b.total, tramos: a.cantidad + b.cantidad };
+    const total = t.A + t.B;
+    t.pctA = total > 0 ? Math.round(t.A / total * 100) : null;
+    t.pctB = total > 0 ? 100 - t.pctA : null;
+    return t;
+}
+
+function renderPosesionPanel() {
+    if (!el.posList) return;
+    const botones = elementosDeHoja(null).filter(e => e.type === 'possession');
+    el.posList.innerHTML = '';
+    if (!botones.length) {
+        el.posList.innerHTML = '<div class="p-6 text-center text-sm text-gray-500">Esta botonera no tiene botón de posesión.<br>Agregalo con Insertar ▼ → Posesión.</div>';
+        return;
+    }
+    botones.forEach(e => {
+        const t = tiemposPosesion(e.id);
+        const fila = (eq) =>
+            `<div class="pos-panel-fila">` +
+                `<span class="pos-panel-punto pos-${eq}"></span>` +
+                `<span class="pos-panel-nombre">${nombreEquipo(e, eq)}</span>` +
+                `<span class="pos-panel-pct" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="pct"></span>` +
+                `<span class="pos-panel-tiempo" data-pos-for="${e.id}" data-equipo="${eq}" data-campo="tiempo"></span>` +
+            `</div>`;
+        const bloque = document.createElement('div');
+        bloque.className = 'pos-panel';
+        bloque.innerHTML =
+            `<div class="pos-panel-barra"><div class="pos-A" data-pos-for="${e.id}" data-campo="barra"></div><div class="pos-B"></div></div>` +
+            fila('A') + fila('B') +
+            `<div class="pos-panel-pie">${t.tramos} ${t.tramos === 1 ? 'tramo' : 'tramos'} de posesión</div>`;
+        el.posList.appendChild(bloque);
+    });
+    updateLiveClocks();
 }
 
 // Filas de la tabla ToI: un renglón por jugador con tiempo o en hielo
@@ -2794,14 +3055,10 @@ function toiRows() {
         .filter(e => e.type === 'event')
         .map(e => {
             const onIce = !!openMap[e.id];
-            const live  = onIce ? Math.max(0, state.time - openMap[e.id].start) : 0;
-            return {
-                id: e.id,
-                name: e.name,
-                onIce,
-                shifts: state.events.filter(ev => ev.buttonId === e.id).length + (onIce ? 1 : 0),
-                total: (state.toi[e.id] || 0) + live
-            };
+            // Tramos unidos: lo que se pisa cuenta una vez, y dos toques que se
+            // superponen son un solo turno, no dos.
+            const hielo = tiempoEnHielo(e.id);
+            return { id: e.id, name: e.name, onIce, shifts: hielo.cantidad, total: hielo.total };
         })
         .filter(r => r.total > 0 || r.onIce);
 
@@ -2888,10 +3145,14 @@ function fechaSportscode(d) {
 // Los colores de ROWS van en 16 bits (0-65535), no en 0-255
 function a16bits(v) { return Math.round(v / 255 * 65535); }
 
-function rgbDeEvento(nombre, buttonId) {
+function rgbDeEvento(nombre, buttonId, equipo) {
     let e = state.elements.find(x => x.id === buttonId);
     if (!e) e = state.elements.find(x => x.type === 'event' && x.name === nombre);
     let hex = (e && e.color) || defaultColor(e ? e.type : 'event') || '#3a8fd6';
+    // Los dos equipos de la posesión comparten botón: sin esto sus filas
+    // saldrían del mismo color. Cada una toma el de su mitad del botón.
+    if (equipo === 'A') hex = '#3a8fd6';
+    if (equipo === 'B') hex = '#dc2626';
     hex = String(hex).replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
     return {
@@ -3270,7 +3531,7 @@ async function saveCurrentSession() {
         startedAt: state.sessionStartedAt ? state.sessionStartedAt.toISOString() : null,
         events: JSON.parse(JSON.stringify(state.events)),
         counters: JSON.parse(JSON.stringify(state.counters)),
-        toi: JSON.parse(JSON.stringify(state.toi))
+        toi: toiCalculado()
     };
     sessions.unshift(newSession);
     saveSessions(sessions);
@@ -3326,7 +3587,7 @@ function exportCustomXML(eventsList, title, inicio) {
     xml += T + '<ROWS>\n';
     codigos.forEach(c => {
         const ev = ordenado.find(e => e.name === c);
-        const rgb = rgbDeEvento(c, ev && ev.buttonId);
+        const rgb = rgbDeEvento(c, ev && ev.buttonId, ev && ev.equipo);
         xml += T + T + '<row>\n';
         xml += T + T + T + '<code>' + xmlEsc(c) + '</code>\n';
         xml += T + T + T + '<R>' + a16bits(rgb.r) + '</R>\n';
