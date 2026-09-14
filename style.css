@@ -238,6 +238,37 @@ body {
     touch-action: manipulation;
 }
 .barra-detalle .bd-cancelar:active { background: rgba(255,255,255,.26); }
+
+/* Pestañas de la botonera en el editor. */
+#hojasBar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    overflow-x: auto;
+    background: #f2f2f7;
+    border-bottom: 1px solid #d1d5db;
+    position: relative;
+    z-index: 29;
+}
+/* El id le gana a la clase .hidden de Tailwind: sin esto la barra no se ocultaría. */
+#hojasBar.hidden { display: none; }
+.hoja-tab, .hoja-mas, .hoja-borrar {
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #e5e5ea;
+    color: #1c1c1e;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+}
+.hoja-tab.activa { background: #1c1c1e; color: #fff; }
+.hoja-borrar { padding: 5px 8px; margin-left: -4px; background: transparent; color: #ef4444; }
+.hoja-mas { background: transparent; color: #007aff; }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }

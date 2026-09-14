@@ -38,7 +38,11 @@ const state = {
     pendingEvent: null,
     activePopupElementIds: [], // IDs de elementos popup_label visibles en pantalla
     tempPopupButtons: [],      // Botones popup generados dinámicamente en canvas
-    openEvents: []             // Eventos en modo manual/excluyente actualmente abiertos (grabando)
+    openEvents: [],            // Eventos en modo manual/excluyente actualmente abiertos (grabando)
+
+    hojas: [],                 // Pestañas de la botonera: [{ id, name }]. La Principal no figura
+    hojaActiva: null,          // Pestaña que se está editando (null = Principal)
+    detalle: null              // Pestaña de detalle abierta en vivo
 };
 
 const DEFAULT_W = 120;
@@ -47,7 +51,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v27';
+const APP_VERSION = 'v28';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -134,6 +138,9 @@ const el = {
     btnDuplicateElement: D('btnDuplicateElement'),
     btnAjustar:          D('btnAjustar'),
     propSubPlantilla:    D('propSubPlantilla'),
+    propDetalleSection:  D('propDetalleSection'),
+    hojasBar:            D('hojasBar'),
+    btnInsertHoja:       D('btnInsertHoja'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -740,7 +747,7 @@ function armarRespaldo() {
         app: 'tagview', kind: 'backup', version: 1,
         dispositivo: nombreDispositivo(),
         date: new Date().toISOString(),
-        current:   { elements: state.elements, links: state.links },
+        current:   { elements: state.elements, links: state.links, hojas: state.hojas },
         templates: getSavedTemplates(),
         sessions:  getSavedSessions()
     };
@@ -1019,12 +1026,15 @@ function buildSvgDefs() {
 function loadData() {
     const e = lsGet('tv_elements');
     const l = lsGet('tv_links');
+    const h = lsGet('tv_hojas');
     if (e) state.elements = JSON.parse(e);
     if (l) state.links    = JSON.parse(l);
+    if (h) state.hojas    = JSON.parse(h);
 }
 function saveData() {
     lsSet('tv_elements', JSON.stringify(state.elements));
     lsSet('tv_links',    JSON.stringify(state.links));
+    lsSet('tv_hojas',    JSON.stringify(state.hojas));
 }
 
 // ─────────────────────────────────────────────
@@ -1110,6 +1120,9 @@ function setMode(mode) {
     // Terminar la codificación con una plantilla de detalle abierta: se cierra.
     state.detalle = null;
     mostrarBarraDetalle();
+    // Se codifica siempre desde la Principal, estés editando la pestaña que sea.
+    if (mode === 'live') state.hojaActiva = null;
+    renderHojasBar();
 
     // Al salir de live, cerrar cualquier turno abierto (acumulando su ToI)
     if (state.openEvents && state.openEvents.length > 0) {
@@ -1232,6 +1245,7 @@ function bindEvents() {
     on(el.btnDuplicateElement, 'click', duplicateSelected);
     on(el.btnAjustar, 'click', alternarAjuste);
     on(el.propSubPlantilla, 'change', updateSelected);
+    on(el.btnInsertHoja, 'click', insertarHoja);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1504,7 +1518,8 @@ function finishMarquee() {
     const x2 = Math.max(state.marqueeStart.x, state.marqueeEnd.x);
     const y2 = Math.max(state.marqueeStart.y, state.marqueeEnd.y);
     if (x2 - x1 < 4 && y2 - y1 < 4) return; // Click sin arrastrar → no seleccionar nada
-    state.selectedIds = state.elements
+    // Solo la pestaña a la vista: las otras ocupan las mismas coordenadas.
+    state.selectedIds = elementosEnPantalla()
         .filter(e => e.x < x2 && e.x + e.w > x1 && e.y < y2 && e.y + e.h > y1)
         .map(e => e.id);
     state.selectedId = state.selectedIds[0] || null;
@@ -1544,6 +1559,7 @@ function createElement(type) {
         lineMemberIds: [],
         lineExclusive: true
     };
+    if (state.hojaActiva) newEl.hoja = state.hojaActiva;   // nace en la pestaña que estás editando
     state.elements.push(newEl);
     saveData();
     selectElement(newEl.id);
@@ -1684,7 +1700,9 @@ function openExclusiveModal() {
     el.exclusiveModalTitle.textContent = `Excluyentes con "${current.name}"`;
     el.exclusiveEventsList.innerHTML = '';
 
-    const otherEvents = state.elements.filter(item => item.type === 'event' && item.id !== current.id);
+    // Solo de la misma pestaña: excluir contra un botón de otra no tiene sentido.
+    const otherEvents = state.elements.filter(item => item.type === 'event' && item.id !== current.id
+                                                   && hojaDe(item) === hojaDe(current));
 
     if (otherEvents.length === 0) {
         el.exclusiveEventsList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500">No hay otros eventos en la plantilla.</div>`;
@@ -1740,7 +1758,8 @@ function openLineModal() {
     el.lineModalTitle.textContent = `Jugadores de "${current.name}"`;
     el.lineMembersList.innerHTML = '';
 
-    const players = state.elements.filter(item => item.type === 'event');
+    // Solo de la misma pestaña: los botones de un detalle no son jugadores.
+    const players = state.elements.filter(item => item.type === 'event' && hojaDe(item) === hojaDe(current));
 
     if (players.length === 0) {
         el.lineMembersList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500">No hay botones de Evento todavía. Creá uno por jugador.</div>`;
@@ -1809,8 +1828,10 @@ function updateSelected() {
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     }
-    if (e.type === 'event' && el.propSubPlantilla) {
-        e.subPlantillaId = el.propSubPlantilla.value || null;
+    if (e.type === 'event' && el.propSubPlantilla && !hojaDe(e)) {
+        const v = el.propSubPlantilla.value;
+        e.subHojaId      = v.startsWith('h:') ? v.slice(2) : null;
+        e.subPlantillaId = v.startsWith('t:') ? v.slice(2) : null;
     }
     
     syncSections(e.type);
@@ -1927,8 +1948,8 @@ const ajustarActivo = () => lsGet('tv_ajustar') !== '0';
 // Cuánto hay que achicar para que entre todo. null si el lienzo no está a la
 // vista (otra página): ahí no se puede medir, y se recalcula al volver.
 function escalaParaEntrar() {
-    // Lo que está en pantalla: la plantilla de detalle, si hay una abierta.
-    const lista = (state.mode === 'live' && state.detalle) ? state.detalle.elements : state.elements;
+    // Solo lo que está en pantalla: cada pestaña se ajusta por su cuenta.
+    const lista = elementosEnPantalla();
     if (!lista.length) return 1;
     // El Inspector se abre y se cierra al tocar botones: si restara ancho, el
     // panel cambiaría de tamaño cada vez que seleccionás algo.
@@ -1981,9 +2002,10 @@ function renderElements() {
     aplicarEscalaLienzo();
     el.canvas.innerHTML = '';
 
-    // Con una plantilla de detalle abierta se dibuja esa en lugar de la principal.
+    // Solo la pestaña a la vista: en vivo la Principal (o el detalle abierto),
+    // en el editor la pestaña elegida.
     const enDetalle = state.mode === 'live' && !!state.detalle;
-    const fuente = enDetalle ? state.detalle.elements : state.elements;
+    const fuente = elementosEnPantalla();
 
     const containers = fuente.filter(e => e.type === 'container');
     const others     = fuente.filter(e => e.type !== 'container');
@@ -2128,10 +2150,13 @@ function drawArrow(p1, p2, isTemp, id) {
 // CONTAINER HELPERS
 // ─────────────────────────────────────────────
 function getContainerSiblingPopups(eventEl) {
-    const containers = state.elements.filter(c => c.type === 'container');
+    // Se busca por posición: sin limitar a la pestaña del evento, un contenedor
+    // de otra pestaña en el mismo lugar le sumaría emergentes ajenas.
+    const mismos = elementosDeHoja(hojaDe(eventEl));
+    const containers = mismos.filter(c => c.type === 'container');
     const results = [];
     for (const cont of containers) {
-        const inside = state.elements.filter(e =>
+        const inside = mismos.filter(e =>
             e.id !== cont.id &&
             e.x >= cont.x && e.y >= cont.y &&
             e.x + e.w <= cont.x + cont.w &&
@@ -2480,14 +2505,151 @@ function finalizeEvent() {
 }
 
 // ─────────────────────────────────────────────
+// PESTAÑAS
+// Una botonera puede tener pestañas de detalle adentro: "Principal" más, por
+// ejemplo, "Detalle tiro". Todo vive en la misma lista de botones, y cada uno
+// sabe a qué pestaña pertenece (sin pestaña = Principal). Así una sola
+// plantilla guarda, sube a la nube y trae la botonera entera.
+// ─────────────────────────────────────────────
+const hojaDe = e => e.hoja || null;
+
+function elementosDeHoja(hojaId) {
+    return state.elements.filter(e => hojaDe(e) === (hojaId || null));
+}
+
+// Lo que se ve en el lienzo ahora mismo. Todo lo que dibuja, mide o selecciona
+// pasa por acá: con las pestañas en una sola lista, recorrer state.elements
+// entero mezclaría botones de pestañas distintas.
+function elementosEnPantalla() {
+    if (state.mode === 'live') return state.detalle ? state.detalle.elements : elementosDeHoja(null);
+    return elementosDeHoja(state.hojaActiva);
+}
+
+async function insertarHoja() {
+    closeInsertMenu();
+    // Con un evento de la Principal seleccionado, la pestaña nace conectada a
+    // él: es lo que se quiere casi siempre, y ahorra ir al Inspector.
+    const sel = (state.selectedId && state.selectedIds.length <= 1)
+        ? state.elements.find(e => e.id === state.selectedId) : null;
+    const evento = (sel && sel.type === 'event' && !hojaDe(sel)) ? sel : null;
+
+    const nombre = await customPrompt('Nombre de la pestaña:',
+        evento ? `Detalle ${evento.name}` : `Pestaña ${state.hojas.length + 1}`, 'Pestaña nueva');
+    if (!nombre || !nombre.trim()) return;
+
+    const hoja = { id: 'h' + Date.now(), name: nombre.trim() };
+    state.hojas.push(hoja);
+    if (evento) {
+        evento.subHojaId = hoja.id;
+        evento.subPlantillaId = null;
+    }
+    saveData();
+    cambiarHoja(hoja.id);
+}
+
+function cambiarHoja(hojaId) {
+    state.hojaActiva = hojaId || null;
+    state.isLinking = false;
+    state.linkStartId = null;
+    selectElement(null);
+    el.canvasContainer.scrollLeft = 0;
+    el.canvasContainer.scrollTop  = 0;
+    renderAll();
+    renderHojasBar();
+}
+
+async function renombrarHoja(hojaId) {
+    const hoja = state.hojas.find(h => h.id === hojaId);
+    if (!hoja) return;
+    const nombre = await customPrompt('Nuevo nombre de la pestaña:', hoja.name, 'Renombrar pestaña');
+    if (!nombre || !nombre.trim()) return;
+    hoja.name = nombre.trim();
+    saveData();
+    renderAll();        // la marca "↗" de los eventos muestra el nombre
+    renderHojasBar();
+}
+
+async function eliminarHoja(hoja) {
+    const ids = new Set(elementosDeHoja(hoja.id).map(e => e.id));
+    const ok = await customConfirm(
+        `¿Eliminar la pestaña "${hoja.name}"` + (ids.size ? ` y sus ${ids.size} botones?` : '?') +
+        '\n\nLos eventos que la abrían vuelven a funcionar como eventos comunes.',
+        'Eliminar pestaña', true);
+    if (!ok) return;
+
+    state.elements = state.elements.filter(e => !ids.has(e.id));
+    state.links    = state.links.filter(l => !ids.has(l.fromId) && !ids.has(l.toId));
+    state.elements.forEach(e => {
+        if (e.subHojaId === hoja.id) e.subHojaId = null;
+        if (e.exclusiveIds)  e.exclusiveIds  = e.exclusiveIds.filter(id => !ids.has(id));
+        if (e.lineMemberIds) e.lineMemberIds = e.lineMemberIds.filter(id => !ids.has(id));
+    });
+    state.hojas = state.hojas.filter(h => h.id !== hoja.id);
+    saveData();
+    cambiarHoja(null);
+}
+
+// Barra de pestañas del editor. Solo aparece si hay pestañas: una botonera sin
+// pestañas se ve exactamente igual que antes.
+function renderHojasBar() {
+    const barra = el.hojasBar;
+    if (!barra) return;
+    const visible = state.mode === 'setup' && state.hojas.length > 0;
+    barra.classList.toggle('hidden', !visible);
+    if (!visible) return;
+
+    barra.innerHTML = '';
+    const activa = state.hojaActiva || null;
+
+    const pestana = (id, nombre) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hoja-tab' + (activa === id ? ' activa' : '');
+        b.textContent = nombre;
+        if (id && activa === id) b.title = 'Tocá de nuevo para renombrar';
+        // Tocar la pestaña que ya está abierta la renombra: no hace falta otro botón.
+        b.addEventListener('click', () => (id && activa === id) ? renombrarHoja(id) : cambiarHoja(id));
+        barra.appendChild(b);
+    };
+
+    pestana(null, 'Principal');
+    state.hojas.forEach(h => {
+        pestana(h.id, h.name);
+        if (activa === h.id) {
+            const x = document.createElement('button');
+            x.type = 'button';
+            x.className = 'hoja-borrar';
+            x.title = 'Eliminar pestaña';
+            x.textContent = '✕';
+            x.addEventListener('click', () => eliminarHoja(h));
+            barra.appendChild(x);
+        }
+    });
+
+    const mas = document.createElement('button');
+    mas.type = 'button';
+    mas.className = 'hoja-mas';
+    mas.textContent = '+ Pestaña';
+    mas.addEventListener('click', insertarHoja);
+    barra.appendChild(mas);
+}
+
+// ─────────────────────────────────────────────
 // PLANTILLA DE DETALLE
 // Un evento puede abrir otra plantilla al tocarlo en vivo: tocás "Tiro", se
 // abre la botonera de detalle, tocás "Al arco", queda como etiqueta del Tiro
 // y la pantalla vuelve sola a la principal. Es la idea de las etiquetas
 // emergentes, pero con una botonera entera armada a gusto.
 // ─────────────────────────────────────────────
+// Lo que abre el evento, como { name, elements }: una pestaña de la misma
+// botonera o, como en la versión anterior, otra plantilla guardada.
 function plantillaDeDetalle(e) {
-    if (!e || !e.subPlantillaId) return null;
+    if (!e) return null;
+    if (e.subHojaId) {
+        const hoja = state.hojas.find(h => h.id === e.subHojaId);
+        if (hoja) return { name: hoja.name, elements: elementosDeHoja(hoja.id) };
+    }
+    if (!e.subPlantillaId) return null;
     // Comparado como texto: los ids son números, pero una copia importada o
     // restaurada podría traerlos como string.
     return getSavedTemplates().find(t => String(t.id) === String(e.subPlantillaId)) || null;
@@ -2572,19 +2734,34 @@ function mostrarBarraDetalle() {
 function llenarSelectorDetalle(e) {
     const sel = el.propSubPlantilla;
     if (!sel) return;
+    // Un botón que ya vive dentro de una pestaña no abre otra: no se encadenan.
+    if (el.propDetalleSection) el.propDetalleSection.style.display = hojaDe(e) ? 'none' : '';
+
     sel.innerHTML = '';
-    const ninguna = document.createElement('option');
-    ninguna.value = '';
-    ninguna.textContent = 'Ninguna';
-    sel.appendChild(ninguna);
-    getSavedTemplates().forEach(t => {
+    const opcion = (padre, valor, texto) => {
         const o = document.createElement('option');
-        o.value = String(t.id);
-        o.textContent = t.name;
-        sel.appendChild(o);
-    });
-    const actual = e.subPlantillaId ? String(e.subPlantillaId) : '';
-    // Si la plantilla asignada se borró, se muestra Ninguna en vez de inventarla.
+        o.value = valor;
+        o.textContent = texto;
+        padre.appendChild(o);
+    };
+    opcion(sel, '', 'Ninguna');
+    // Prefijos h: / t: porque una pestaña y una plantilla podrían compartir id.
+    if (state.hojas.length) {
+        const g = document.createElement('optgroup');
+        g.label = 'Pestañas de esta botonera';
+        state.hojas.forEach(h => opcion(g, 'h:' + h.id, h.name));
+        sel.appendChild(g);
+    }
+    const plantillas = getSavedTemplates();
+    if (plantillas.length) {
+        const g = document.createElement('optgroup');
+        g.label = 'Otras plantillas';
+        plantillas.forEach(t => opcion(g, 't:' + t.id, t.name));
+        sel.appendChild(g);
+    }
+    const actual = e.subHojaId ? 'h:' + e.subHojaId
+                 : e.subPlantillaId ? 't:' + e.subPlantillaId : '';
+    // Si lo asignado se borró, se muestra Ninguna en vez de inventarlo.
     sel.value = [...sel.options].some(o => o.value === actual) ? actual : '';
 }
 
@@ -2784,7 +2961,7 @@ function renderTemplatesList() {
         row.innerHTML = `
             <div class="flex-1 pr-2">
                 <div class="font-bold text-sm text-black">${t.name}</div>
-                <div class="text-xs text-gray-400 font-mono">${t.date} · ${t.elements ? t.elements.length : 0} botones</div>
+                <div class="text-xs text-gray-400 font-mono">${t.date} · ${t.elements ? t.elements.length : 0} botones${(t.hojas && t.hojas.length) ? ` · ${t.hojas.length} pestaña${t.hojas.length === 1 ? '' : 's'}` : ''}</div>
             </div>
             <div class="flex items-center space-x-2">
                 <button class="btn-file-tmpl px-2 py-1 bg-gray-100 text-gray-600 font-bold text-xs rounded-lg" title="Guardar en Archivos">⤓</button>
@@ -2796,6 +2973,10 @@ function renderTemplatesList() {
         row.querySelector('.btn-load-tmpl').addEventListener('click', () => {
             state.elements = JSON.parse(JSON.stringify(t.elements || []));
             state.links    = JSON.parse(JSON.stringify(t.links || []));
+            state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
+            state.hojaActiva = null;
+            selectElement(null);
+            renderHojasBar();
             saveData();
             renderAll();
             setPage('botonera');
@@ -2829,7 +3010,8 @@ async function saveCurrentTemplate() {
         name: name.trim(),
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: JSON.parse(JSON.stringify(state.elements)),
-        links: JSON.parse(JSON.stringify(state.links))
+        links: JSON.parse(JSON.stringify(state.links)),
+        hojas: JSON.parse(JSON.stringify(state.hojas))
     };
     templates.unshift(newTmpl);
     saveTemplates(templates);
@@ -2840,7 +3022,10 @@ async function createNewTemplate() {
     if (await customConfirm('¿Crear un lienzo en blanco? Se limpiará la pantalla actual.', 'Nuevo Lienzo', true, 'Limpiar')) {
         state.elements = [];
         state.links    = [];
+        state.hojas    = [];
+        state.hojaActiva = null;
         selectElement(null);
+        renderHojasBar();
         saveData();
         renderAll();
         setPage('botonera');
@@ -2857,7 +3042,8 @@ async function exportTemplateToFile(tmpl) {
         name: 'Lienzo actual',
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: state.elements,
-        links: state.links
+        links: state.links,
+        hojas: state.hojas
     };
     if (!t.elements || !t.elements.length) {
         customAlert('El lienzo está vacío. Agregá botones antes de exportar.', 'Plantilla vacía');
@@ -2866,7 +3052,7 @@ async function exportTemplateToFile(tmpl) {
     const payload = {
         app: 'tagview', kind: 'template', version: 1,
         name: t.name, date: t.date,
-        elements: t.elements, links: t.links || []
+        elements: t.elements, links: t.links || [], hojas: t.hojas || []
     };
     await saveToFiles(safeFileName(`Plantilla ${t.name}`, '.json'), JSON.stringify(payload, null, 2));
 }
@@ -2882,7 +3068,10 @@ async function importTemplateFromFile() {
 
     state.elements = JSON.parse(JSON.stringify(data.elements || []));
     state.links    = JSON.parse(JSON.stringify(data.links || []));
+    state.hojas    = JSON.parse(JSON.stringify(data.hojas || []));
+    state.hojaActiva = null;
     selectElement(null);
+    renderHojasBar();
     saveData();
     renderAll();
 
@@ -2893,7 +3082,8 @@ async function importTemplateFromFile() {
         name: data.name || 'Plantilla importada',
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: JSON.parse(JSON.stringify(state.elements)),
-        links: JSON.parse(JSON.stringify(state.links))
+        links: JSON.parse(JSON.stringify(state.links)),
+        hojas: JSON.parse(JSON.stringify(state.hojas))
     });
     saveTemplates(templates);
     renderTemplatesList();
@@ -2975,6 +3165,9 @@ async function aplicarRespaldo(data, origen) {
         if (data.current) {
             state.elements = JSON.parse(JSON.stringify(data.current.elements || []));
             state.links    = JSON.parse(JSON.stringify(data.current.links || []));
+            state.hojas    = JSON.parse(JSON.stringify(data.current.hojas || []));
+            state.hojaActiva = null;
+            renderHojasBar();
             selectElement(null);
             saveData();
             renderAll();

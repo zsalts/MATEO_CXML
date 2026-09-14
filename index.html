@@ -127,6 +127,10 @@
                         <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
                         <span>Línea (ToI)</span>
                     </button>
+                    <button id="btnInsertHoja" class="ios-menu-row border-t border-gray-100">
+                        <div class="swatch" style="background:#1c1c1e;border-color:#1c1c1e;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;">⧉</div>
+                        <span>Pestaña nueva</span>
+                    </button>
                     <button id="btnStartCodingMenu" class="ios-menu-row border-t border-gray-300 text-[#2ca038] font-bold">
                         <span>▶ Iniciar Codificación</span>
                     </button>
@@ -146,6 +150,9 @@
             </div>
         </div>
     </div>
+
+    <!-- PESTAÑAS de la botonera: solo en el editor, y solo si hay pestañas -->
+    <div id="hojasBar" class="hidden"></div>
 
     <!-- BARRA DE HERRAMIENTAS (Live) -->
     <div id="liveBar" class="hidden bg-[#f2f2f7] border-b border-gray-300 z-30">
@@ -235,10 +242,12 @@
                         <p class="text-xs text-gray-400 mt-1">Aparecerán como botones debajo del evento al tocarlo en vivo.</p>
                     </div>
 
-                    <div class="inspector-section-label">AL TOCARLO, ABRIR PLANTILLA</div>
-                    <div class="inspector-cell">
-                        <select id="propSubPlantilla" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
-                        <p class="text-xs text-gray-400 mt-1">En vivo se abre esa plantilla: tocás un botón, queda como etiqueta del evento y vuelve sola.</p>
+                    <div id="propDetalleSection">
+                        <div class="inspector-section-label">AL TOCARLO, ABRIR PESTAÑA</div>
+                        <div class="inspector-cell">
+                            <select id="propSubPlantilla" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
+                            <p class="text-xs text-gray-400 mt-1">Creala con Insertar ▼ → Pestaña nueva. En vivo: tocás un botón de la pestaña, queda como etiqueta del evento y vuelve sola.</p>
+                        </div>
                     </div>
                 </div>
 

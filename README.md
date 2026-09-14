@@ -19,6 +19,20 @@ es opcional y se apaga dejando `nube-config.js` vacío.
 - **Archivos** — plantillas, sesiones y copias de seguridad como `.json` que
   se guardan y se abren desde la app Archivos del iPad.
 
+## Pestañas de detalle
+
+Una botonera puede tener pestañas adentro: **Insertar ▼ → Pestaña nueva**. Si
+lo hacés con un evento seleccionado, la pestaña queda conectada a ese evento.
+También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
+
+- En el editor aparece la barra **Principal · Detalle… · + Pestaña**. Tocar la
+  pestaña que ya está abierta la renombra; la ✕ la elimina con sus botones.
+- En vivo se codifica siempre desde la Principal. Tocás el evento, se abre su
+  pestaña, tocás un botón y queda como etiqueta del evento; la pantalla vuelve
+  sola. "Volver sin elegir" sale sin etiquetar.
+- Todo queda en la misma plantilla: se guarda, se exporta y viaja por la nube
+  junto con la Principal.
+
 ## Dónde se guardan los datos
 
 En el dispositivo, siempre. El hosting solo sirve los archivos estáticos: nunca
@@ -120,6 +134,17 @@ Para regenerarlo después de tocar el código:
 python3 build-ipad.py
 ```
 
+Sin Python (en Windows viene PowerShell de fábrica), `build-ipad.ps1` hace
+exactamente lo mismo:
+
+```bash
+powershell -ExecutionPolicy Bypass -File build-ipad.ps1
+```
+
+Ojo si lo editás: Windows PowerShell 5.1 lee el `.ps1` como Windows-1252, y
+un guion largo (—) escrito en UTF-8 se convierte en una comilla tipográfica que
+corta las cadenas. En el script no hay ninguno a propósito.
+
 ## Sobre los estilos
 
 `tailwind.css` es CSS estático, generado una vez a partir de las clases que la
@@ -163,5 +188,6 @@ versión y otro mostrando otra.
 | `sw.js` | Service worker (caché offline) |
 | `manifest.json` | Metadatos de la PWA |
 | `build-ipad.py` | Genera el archivo único |
+| `build-ipad.ps1` | Lo mismo, con PowerShell, para cuando no hay Python |
 | `TagView-iPad.html` | Archivo único generado |
 # xml
