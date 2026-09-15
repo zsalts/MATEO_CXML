@@ -52,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -157,6 +157,11 @@ const el = {
     propEqColorA:        D('propEqColorA'),
     propEqNombreB:       D('propEqNombreB'),
     propEqColorB:        D('propEqColorB'),
+    inspectorUno:        D('inspectorContent'),
+    inspectorMulti:      D('inspectorMulti'),
+    multiResumen:        D('multiResumen'),
+    propMultiEquipo:     D('propMultiEquipo'),
+    multiAyuda:          D('multiAyuda'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1280,6 +1285,7 @@ function bindEvents() {
     on(el.propEqNombreB, 'input', updateSelected);
     on(el.propEqColorA, 'input', updateSelected);
     on(el.propEqColorB, 'input', updateSelected);
+    on(el.propMultiEquipo, 'change', aplicarEquipoMultiple);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1709,11 +1715,59 @@ function updateInspectorForSelection() {
     if (state.selectedIds.length === 1) {
         selectElement(state.selectedIds[0]);
     } else if (state.selectedIds.length > 1) {
-        // Multi-selección: ocultar inspector individual
-        el.inspectorPanel.classList.add('hidden');
+        // Varios: el Inspector pasa a la vista de grupo, con lo que se puede
+        // cambiar en todos a la vez. Antes se ocultaba, y había que ir de a uno.
+        mostrarInspectorMultiple();
     } else {
         el.inspectorPanel.classList.add('hidden');
     }
+}
+
+// Inspector de un elemento o de un grupo: son dos vistas del mismo panel.
+function vistaInspector(multiple) {
+    if (el.inspectorUno)   el.inspectorUno.style.display   = multiple ? 'none' : '';
+    if (el.inspectorMulti) el.inspectorMulti.style.display = multiple ? 'flex' : 'none';
+}
+
+function mostrarInspectorMultiple() {
+    const seleccion = state.elements.filter(e => state.selectedIds.includes(e.id));
+    // Solo los eventos de la Principal suman posesión: en una pestaña de
+    // detalle los botones son etiquetas.
+    const eventos = seleccion.filter(e => e.type === 'event' && !hojaDe(e));
+
+    el.inspectorPanel.classList.remove('hidden');
+    vistaInspector(true);
+    el.multiResumen.textContent = `${seleccion.length} SELECCIONADOS · ${eventos.length} ${eventos.length === 1 ? 'EVENTO' : 'EVENTOS'}`;
+
+    const sel = el.propMultiEquipo;
+    const nombres = nombresEquipos();
+    const equipos = new Set(eventos.map(e => (e.equipo === 'A' || e.equipo === 'B') ? e.equipo : ''));
+    const opciones = [['', 'Ninguno'], ['A', nombres.A], ['B', nombres.B]];
+    // Si ya tienen equipos distintos, decirlo en vez de mostrar uno cualquiera.
+    if (equipos.size > 1) opciones.unshift(['*', 'Distintos: elegí uno para todos']);
+    sel.innerHTML = '';
+    opciones.forEach(([valor, texto]) => {
+        const o = document.createElement('option');
+        o.value = valor;
+        o.textContent = texto;
+        sel.appendChild(o);
+    });
+    sel.value = equipos.size > 1 ? '*' : ([...equipos][0] || '');
+    sel.disabled = eventos.length === 0;
+    el.multiAyuda.textContent = eventos.length
+        ? `Se aplica a los ${eventos.length} eventos seleccionados. Lo demás de la selección no cambia.`
+        : 'En la selección no hay eventos: la posesión se asigna a eventos.';
+}
+
+function aplicarEquipoMultiple() {
+    const v = el.propMultiEquipo.value;
+    if (v === '*') return;
+    state.elements.forEach(e => {
+        if (state.selectedIds.includes(e.id) && e.type === 'event' && !hojaDe(e)) e.equipo = v || null;
+    });
+    saveData();
+    renderElements();           // la franja del equipo aparece en todos
+    mostrarInspectorMultiple(); // y el selector deja de decir "Distintos"
 }
 
 function selectElement(id) {
@@ -1731,6 +1785,7 @@ function selectElement(id) {
     const e = state.elements.find(e => e.id === id);
     if (!e) { el.inspectorPanel.classList.add('hidden'); return; }
     el.inspectorPanel.classList.remove('hidden');
+    vistaInspector(false);
 
     el.propName.value  = e.name;
     el.propType.value  = e.type;
@@ -1977,9 +2032,11 @@ function renderAll() { renderElements(); renderLinks(); }
 // nodo ya no está en el documento los eventos no llegan a document y el
 // arrastre se corta. Por eso, mientras se toca, se actualiza en el lugar.
 function updateSelectionClasses() {
+    const grupo = state.mode === 'setup' && state.selectedIds.length > 1;
     el.canvas.querySelectorAll('.canvas-element[data-id]').forEach(nodo => {
         const id = parseInt(nodo.dataset.id);
         nodo.classList.toggle('selected', id === state.selectedId);
+        nodo.classList.toggle('en-seleccion', grupo && state.selectedIds.includes(id));
     });
     posicionarAccionesFlotantes();
 }
@@ -2151,7 +2208,10 @@ function renderElements() {
 
         const div = document.createElement('div');
         const lineOn = state.mode === 'live' && isLineActive(e);
-        div.className = `canvas-element mode-${state.mode}${e.id === state.selectedId ? ' selected' : ''}${isContainer ? ' is-container' : ''}${isRecording ? ' is-recording' : ''}${lineOn ? ' is-line-active' : ''}`;
+        // Con varios seleccionados, todos quedan marcados: antes solo se veía el
+        // primero y no se sabía qué había agarrado el rectángulo.
+        const enGrupo = state.mode === 'setup' && state.selectedIds.length > 1 && state.selectedIds.includes(e.id);
+        div.className = `canvas-element mode-${state.mode}${e.id === state.selectedId ? ' selected' : ''}${enGrupo ? ' en-seleccion' : ''}${isContainer ? ' is-container' : ''}${isRecording ? ' is-recording' : ''}${lineOn ? ' is-line-active' : ''}`;
         div.dataset.eltype = e.type;
         div.dataset.id     = e.id;
         // Evento que suma posesión: franja del color de su equipo.

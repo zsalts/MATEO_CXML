@@ -191,6 +191,16 @@
                 <button id="btnHideInspector" class="text-[#007aff] font-bold text-base">Listo</button>
             </div>
             
+            <!-- Varios seleccionados: solo lo que se puede cambiar en todos a la vez -->
+            <div id="inspectorMulti" class="hidden flex-col flex-1">
+                <div id="multiResumen" class="inspector-section-label">VARIOS SELECCIONADOS</div>
+                <div class="inspector-section-label">SUMA A LA POSESIÓN DE</div>
+                <div class="inspector-cell">
+                    <select id="propMultiEquipo" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
+                    <p id="multiAyuda" class="text-xs text-gray-400 mt-1"></p>
+                </div>
+            </div>
+
             <div id="inspectorContent" class="flex flex-col flex-1">
                 <!-- Nombre -->
                 <div class="inspector-section-label">NOMBRE</div>

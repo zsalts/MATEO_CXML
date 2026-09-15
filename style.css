@@ -173,6 +173,11 @@ body {
     z-index: 200;
 }
 .canvas-element.selected .resize-handle { display: block; }
+/* Parte de una selección de varios: se ven todos los que agarró el rectángulo. */
+.canvas-element.en-seleccion {
+    outline: 2px solid #007aff;
+    outline-offset: 2px;
+}
 
 /* Duplicar / Eliminar flotando encima del elemento seleccionado. Sueltos en
    el lienzo, no adentro del botón: .canvas-element tiene overflow: hidden y
