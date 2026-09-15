@@ -36,6 +36,18 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
 - Todo queda en la misma plantilla: se guarda, se exporta y viaja por la nube
   junto con la Principal.
 
+## Terminar, equipos y etiquetas fijas
+
+- **Terminar** guarda sola la codificación en la página XML y exporta el
+  archivo, los dos con el nombre `LOCAL vs VISITANTE 15-09-2026 20h30` (día y
+  hora del primer PLAY).
+- **Equipos cargados:** en la tarjeta Equipos y en el botón de Posesión los
+  equipos se eligen de una lista. "＋ Cargar equipo…" suma uno nuevo, con el
+  color que tenga ese lado de la tarjeta. La lista va en la copia de seguridad.
+- **Etiqueta fija** (Insertar ▼): en vivo, al tocarla queda encendida y se pega
+  a todo lo que marques. Tocar otra etiqueta fija apaga la anterior; tocar la
+  misma la saca. Sirve para el tiempo, el cuarto o una situación de juego.
+
 ## Dónde se guardan los datos
 
 En el dispositivo, siempre. El hosting solo sirve los archivos estáticos: nunca

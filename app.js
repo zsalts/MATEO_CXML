@@ -43,7 +43,9 @@ const state = {
     hojas: [],                 // Pestañas de la botonera: [{ id, name }]. La Principal no figura
     hojaActiva: null,          // Pestaña que se está editando (null = Principal)
     detalle: null,             // Pestaña de detalle abierta en vivo
-    posesion: {}               // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
+    posesion: {},              // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
+    etiquetaFija: null,        // Id de la etiqueta fija puesta en vivo: se pega a todo lo que se marca
+    sesionCargada: null        // Nombre de la codificación guardada abierta con "Ver", si es eso lo que hay
 };
 
 const DEFAULT_W = 120;
@@ -52,7 +54,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v40';
+const APP_VERSION = 'v42';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -780,7 +782,8 @@ function armarRespaldo() {
         date: new Date().toISOString(),
         current:   { elements: state.elements, links: state.links, hojas: state.hojas },
         templates: getSavedTemplates(),
-        sessions:  getSavedSessions()
+        sessions:  getSavedSessions(),
+        equipos:   equiposCargados()
     };
 }
 
@@ -1204,9 +1207,10 @@ function setMode(mode) {
         if (state.isPlaying) pauseTimer();
         releaseWakeLock();
 
-        // Al terminar de codificar, descargar automáticamente el archivo XML si hay eventos
+        // Al terminar: la codificación queda guardada sola en la página XML y
+        // el archivo sale con el día y la hora del partido en el nombre.
         if (isExitingLive && state.events.length > 0) {
-            exportXML();
+            guardarPartidoAlTerminar();
         }
     } else {
         // El cronómetro vive en la barra de herramientas, justo debajo del
@@ -1222,6 +1226,8 @@ function setMode(mode) {
         state.time = 0; state.isPlaying = false;
         state.events = []; state.counters = {}; state.toi = {};
         state.posesion = {};
+        state.etiquetaFija = null;
+        state.sesionCargada = null;
         state.sessionStartedAt = null;
         setLiveTab('log');
         updateTimerUI();
@@ -1311,14 +1317,18 @@ function bindEvents() {
     on(el.propSubPlantilla, 'change', updateSelected);
     on(el.btnInsertHoja, 'click', insertarHoja);
     on(el.tabPos, 'click', () => setLiveTab('pos'));
-    on(el.propEquipoA, 'input', updateSelected);
-    on(el.propEquipoB, 'input', updateSelected);
+    // Selectores de equipo: solo 'change'. Con 'input' también, elegir
+    // "Cargar equipo…" guardaba ese texto como nombre antes de preguntar.
+    on(el.propEquipoA, 'change', elegirEquipo);
+    on(el.propEquipoB, 'change', elegirEquipo);
     on(el.propEquipoEvento, 'change', updateSelected);
     on(el.propTamanoTexto, 'change', updateSelected);
-    on(el.propEqNombreA, 'input', updateSelected);
-    on(el.propEqNombreB, 'input', updateSelected);
+    on(el.propEqNombreA, 'change', elegirEquipo);
+    on(el.propEqNombreB, 'change', elegirEquipo);
     on(el.propEqColorA, 'input', updateSelected);
     on(el.propEqColorB, 'input', updateSelected);
+    on(el.propEqColorA, 'change', () => recordarColorEquipo(el.propEqNombreA, el.propEqColorA));
+    on(el.propEqColorB, 'change', () => recordarColorEquipo(el.propEqNombreB, el.propEqColorB));
     on(el.propMultiEquipo, 'change', aplicarEquipoMultiple);
     on(el.propMostrarContador, 'change', updateSelected);
     on(el.propMultiContador, 'change', aplicarContadorMultiple);
@@ -1744,6 +1754,7 @@ function createElement(type, extra) {
     const defaults = {
         event:       { name:'Evento',              w:DEFAULT_W, h:DEFAULT_H },
         descriptor:  { name:'Etiqueta',            w:DEFAULT_W, h:DEFAULT_H },
+        sticky_label:{ name:'Etiqueta fija',       w:DEFAULT_W, h:DEFAULT_H },
         popup_label: { name:'Etiqueta emergente',  w:DEFAULT_W, h:DEFAULT_H },
         counter:     { name:'0',                   w:80,        h:60        },
         container:   { name:'',                    w:200,       h:180       },
@@ -2002,11 +2013,11 @@ function selectElement(id) {
     if (el.propDescriptors) el.propDescriptors.value = (e.popups || []).join(', ');
     llenarSelectorDetalle(e);
     // La posesión muestra los nombres de toda la botonera (tarjeta Equipos si hay).
-    if (el.propEquipoA) el.propEquipoA.value = nombresEquipos().A;
-    if (el.propEquipoB) el.propEquipoB.value = nombresEquipos().B;
+    if (el.propEquipoA) llenarSelectEquipo(el.propEquipoA, nombresEquipos().A);
+    if (el.propEquipoB) llenarSelectEquipo(el.propEquipoB, nombresEquipos().B);
     if (e.type === 'teams' && el.propEqNombreA) {
-        el.propEqNombreA.value = e.equipoA || 'Local';
-        el.propEqNombreB.value = e.equipoB || 'Visitante';
+        llenarSelectEquipo(el.propEqNombreA, e.equipoA || 'Local');
+        llenarSelectEquipo(el.propEqNombreB, e.equipoB || 'Visitante');
         el.propEqColorA.value  = e.colorA  || '#3a8fd6';
         el.propEqColorB.value  = e.colorB  || '#dc2626';
     }
@@ -2323,7 +2334,7 @@ function crearAccionesFlotantes() {
 }
 
 function defaultColor(type) {
-    return { event:'#3a8fd6', popup_label:'#f8d022', descriptor:'#fef08a', counter:null, container:null, line:'#4c51bf', text:'#1c1c1e' }[type] || '#3a8fd6';
+    return { event:'#3a8fd6', popup_label:'#f8d022', descriptor:'#fef08a', sticky_label:'#fdba74', counter:null, container:null, line:'#4c51bf', text:'#1c1c1e' }[type] || '#3a8fd6';
 }
 function brightness(hex) {
     hex = hex.replace('#','');
@@ -2439,6 +2450,7 @@ function renderElements() {
         div.dataset.id     = e.id;
         // Evento que suma posesión: franja del color de su equipo.
         if (e.type === 'event' && (e.equipo === 'A' || e.equipo === 'B')) div.classList.add('equipo-' + e.equipo);
+        if (state.mode === 'live' && e.type === 'sticky_label' && state.etiquetaFija === e.id) div.classList.add('fija-activa');
         div.style.left   = e.x + 'px';
         div.style.top    = e.y + 'px';
         div.style.width  = e.w + 'px';
@@ -2540,6 +2552,8 @@ function renderElements() {
                     const lado = ev.target.closest('.pos-lado');
                     if (lado) tocarPosesion(e, lado.dataset.equipo);
                 });
+            } else if (e.type === 'sticky_label') {
+                div.addEventListener('click', () => tocarEtiquetaFija(e));
             } else if (e.type === 'popup_label') {
                 div.addEventListener('click', () => handlePopupLabelClick(e.name));
             } else if (e.type === 'line') {
@@ -2745,8 +2759,21 @@ function makeEventInstance(e) {
         isExclusive: !!e.isExclusive,
         timeMode: e.timeMode || 'fixed',
         line: null,
-        descriptors: []
+        descriptors: etiquetasFijas()
     };
+}
+
+// La etiqueta fija que esté puesta, lista para pegarle a un evento nuevo.
+function etiquetasFijas() {
+    const fija = state.etiquetaFija && state.elements.find(x => x.id === state.etiquetaFija);
+    return fija ? [fija.name] : [];
+}
+
+// Tocar una etiqueta fija la pone; tocar otra la reemplaza, y tocar la misma
+// la saca. No arranca el reloj: se puede dejar puesta antes del PLAY.
+function tocarEtiquetaFija(e) {
+    state.etiquetaFija = state.etiquetaFija === e.id ? null : e.id;
+    renderElements();
 }
 
 // Cierra el turno abierto en la posición `index`, lo archiva y suma su ToI.
@@ -3430,7 +3457,7 @@ function cerrarTramoPosesion(e) {
         exclusiveIds: [], isExclusive: false,
         timeMode: 'manual',
         line: null,
-        descriptors: []
+        descriptors: etiquetasFijas()
     });
 }
 
@@ -3469,6 +3496,79 @@ function cortarRival(equipo) {
         const boton = state.elements.find(x => String(x.id) === id);
         if (boton) cerrarTramoPosesion(boton);
     });
+}
+
+// ─────────────────────────────────────────────
+// EQUIPOS CARGADOS
+// Lista de equipos (nombre y color) guardada en el dispositivo. En la tarjeta
+// Equipos y en la posesión se eligen de acá en vez de escribirlos cada vez.
+// ─────────────────────────────────────────────
+const NUEVO_EQUIPO = '__nuevo__';
+
+function equiposCargados() {
+    try { return JSON.parse(lsGet('tv_equipos') || '[]'); } catch (err) { return []; }
+}
+function guardarEquipos(lista) {
+    lsSet('tv_equipos', JSON.stringify(lista));
+    respaldarEnNube();
+}
+
+// Opciones: los equipos cargados, el nombre actual si no está en la lista
+// (una plantilla vieja con "Local") y al final "Cargar equipo…".
+function llenarSelectEquipo(select, actual) {
+    const nombres = equiposCargados().map(t => t.nombre);
+    if (actual && !nombres.includes(actual)) nombres.unshift(actual);
+    select.innerHTML = '';
+    nombres.concat([NUEVO_EQUIPO]).forEach(n => {
+        const o = document.createElement('option');
+        o.value = n;
+        o.textContent = n === NUEVO_EQUIPO ? '＋ Cargar equipo…' : n;
+        select.appendChild(o);
+    });
+    select.value = actual || nombres[0] || '';
+}
+
+function colorDelSelector(select) {
+    return select === el.propEqNombreA ? el.propEqColorA
+         : select === el.propEqNombreB ? el.propEqColorB : null;
+}
+
+async function elegirEquipo(ev) {
+    const select = ev.target;
+    const idElegido = state.selectedId;
+    const colorInput = colorDelSelector(select);
+    if (select.value === NUEVO_EQUIPO) {
+        const esA = select === el.propEquipoA || select === el.propEqNombreA;
+        const anterior = nombresEquipos()[esA ? 'A' : 'B'];
+        const escrito = await customPrompt('Nombre del equipo:', '', 'Cargar equipo');
+        const nombre = escrito && escrito.trim();
+        if (!nombre) { llenarSelectEquipo(select, anterior); return; }
+        const lista = equiposCargados();
+        const ya = lista.find(t => t.nombre.toLowerCase() === nombre.toLowerCase());
+        if (!ya) {
+            lista.push({ nombre: nombre, color: colorInput ? colorInput.value : null });
+            guardarEquipos(lista);
+        }
+        llenarSelectEquipo(select, ya ? ya.nombre : nombre);
+        if (ya && ya.color && colorInput) colorInput.value = ya.color;
+    } else if (colorInput) {
+        // En la tarjeta, el equipo trae su color.
+        const t = equiposCargados().find(x => x.nombre === select.value);
+        if (t && t.color) colorInput.value = t.color;
+    }
+    // Mientras se escribía el nombre pudo cambiar la selección.
+    if (state.selectedId !== idElegido) return;
+    updateSelected();
+    selectElement(idElegido);   // el otro selector también tiene que ver el equipo nuevo
+}
+
+// Cambiar el color en la tarjeta lo deja guardado para ese equipo.
+function recordarColorEquipo(select, colorInput) {
+    const lista = equiposCargados();
+    const t = lista.find(x => x.nombre === select.value);
+    if (!t || t.color === colorInput.value) return;
+    t.color = colorInput.value;
+    guardarEquipos(lista);
 }
 
 // Nombres de los equipos para toda la botonera: de la tarjeta Equipos si hay
@@ -3736,11 +3836,49 @@ function xmlEsc(v) {
         .replace(/"/g, '&quot;');
 }
 
+// "LOMAS vs GEBA 15-09-2026 20h30": día y hora del primer PLAY. Con "h" y no
+// ":" porque el nombre del archivo no admite los dos puntos.
+function nombrePartido() {
+    const d = state.sessionStartedAt || new Date();
+    const p = n => String(n).padStart(2, '0');
+    const eq = nombresEquipos();
+    return `${eq.A} vs ${eq.B} ${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}h${p(d.getMinutes())}`;
+}
+
+function armarSesion(nombre) {
+    return {
+        id: Date.now(),
+        name: nombre,
+        date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+        duration: fmt(state.time),
+        startedAt: state.sessionStartedAt ? state.sessionStartedAt.toISOString() : null,
+        events: JSON.parse(JSON.stringify(state.events)),
+        counters: JSON.parse(JSON.stringify(state.counters)),
+        toi: toiCalculado()
+    };
+}
+
+// Al tocar Terminar: sin preguntar nada, la codificación queda en la página
+// XML y se exporta el archivo, los dos con el día y la hora del partido.
+function guardarPartidoAlTerminar() {
+    // Una codificación abierta desde la página XML ya está guardada: solo
+    // sale su XML, con su nombre, sin sumarla otra vez a la lista.
+    const nombre = state.sesionCargada || nombrePartido();
+    if (!state.sesionCargada) {
+        const sessions = getSavedSessions();
+        sessions.unshift(armarSesion(nombre));
+        saveSessions(sessions);
+    }
+    try {
+        exportCustomXML(state.events, nombre, state.sessionStartedAt);
+    } catch (err) {
+        customAlert('La codificación quedó guardada, pero no se pudo generar el XML: ' + ((err && err.message) || err), 'Exportar XML');
+    }
+}
+
 function exportXML() {
     try {
-        exportCustomXML(state.events,
-            `Tagging_${new Date().toISOString().slice(0,10)}`,
-            state.sessionStartedAt);
+        exportCustomXML(state.events, nombrePartido(), state.sessionStartedAt);
     } catch (err) {
         customAlert('No se pudo generar el XML: ' + ((err && err.message) || err), 'Exportar XML');
     }
@@ -3978,6 +4116,8 @@ async function aplicarRespaldo(data, origen) {
     try {
         saveTemplates(data.templates || []);
         saveSessions(data.sessions || []);
+        // Una copia vieja no trae equipos: se quedan los que ya había.
+        if (data.equipos) lsSet('tv_equipos', JSON.stringify(data.equipos));
         if (data.current) {
             state.elements = JSON.parse(JSON.stringify(data.current.elements || []));
             state.links    = JSON.parse(JSON.stringify(data.current.links || []));
@@ -4045,6 +4185,7 @@ function renderSessionsList() {
             state.events   = JSON.parse(JSON.stringify(s.events || []));
             state.counters = JSON.parse(JSON.stringify(s.counters || {}));
             state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
+            state.sesionCargada = s.name;
             renderLivePanel();
             renderElements();
             setPage('botonera');
@@ -4073,22 +4214,11 @@ async function saveCurrentSession() {
         customAlert('No hay eventos grabados en la sesión actual.', 'Sin Eventos');
         return;
     }
-    const defaultName = `Partido ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
-    const name = await customPrompt('Nombre de la sesión de codificación:', defaultName, 'Guardar Sesión');
+    const name = await customPrompt('Nombre de la sesión de codificación:', nombrePartido(), 'Guardar Sesión');
     if (!name || !name.trim()) return;
 
     const sessions = getSavedSessions();
-    const newSession = {
-        id: Date.now(),
-        name: name.trim(),
-        date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-        duration: fmt(state.time),
-        startedAt: state.sessionStartedAt ? state.sessionStartedAt.toISOString() : null,
-        events: JSON.parse(JSON.stringify(state.events)),
-        counters: JSON.parse(JSON.stringify(state.counters)),
-        toi: toiCalculado()
-    };
-    sessions.unshift(newSession);
+    sessions.unshift(armarSesion(name.trim()));
     saveSessions(sessions);
     renderSessionsList();
 }

@@ -118,6 +118,19 @@ body {
     color: #000;
     border-radius: 6px;
 }
+/* Etiqueta fija: borde punteado; en vivo se enciende mientras está puesta */
+.canvas-element[data-eltype="sticky_label"] {
+    background: #ffedd5;
+    border: 1.5px dashed #f97316;
+    color: #000;
+    border-radius: 6px;
+}
+.canvas-element[data-eltype="sticky_label"].fija-activa {
+    background: #f97316;
+    border-style: solid;
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(249,115,22,.45);
+}
 /* Counter */
 .canvas-element[data-eltype="counter"] {
     background: #f5f5f7;

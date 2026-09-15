@@ -124,6 +124,10 @@
                         <div class="swatch" style="background:#fef08a;border-color:#d6b30e;"></div>
                         <span>Etiqueta</span>
                     </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="sticky_label">
+                        <div class="swatch" style="background:#ffedd5;border:1.5px dashed #f97316;"></div>
+                        <span>Etiqueta fija</span>
+                    </button>
                     <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="container">
                         <div class="swatch" style="background:#fff;border:2px solid #aaa;border-radius:4px;"></div>
                         <span>Contenedor</span>
@@ -242,6 +246,7 @@
                     <select id="propType" class="w-full bg-transparent text-base focus:outline-none text-black">
                         <option value="event">Evento</option>
                         <option value="descriptor">Etiqueta</option>
+                        <option value="sticky_label">Etiqueta fija</option>
                         <option value="popup_label">Etiqueta emergente</option>
                         <option value="container">Contenedor</option>
                         <option value="counter">Contador</option>
@@ -402,14 +407,14 @@
                     <div class="inspector-section-label">EQUIPOS</div>
                     <div class="inspector-cell flex justify-between items-center">
                         <input id="propEqColorA" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
-                        <input id="propEqNombreA" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:150px;" placeholder="Local">
+                        <select id="propEqNombreA" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:170px;"></select>
                     </div>
                     <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
                         <input id="propEqColorB" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
-                        <input id="propEqNombreB" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:150px;" placeholder="Visitante">
+                        <select id="propEqNombreB" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:170px;"></select>
                     </div>
                     <div class="inspector-cell">
-                        <p class="text-xs text-gray-400">Nombres y colores para toda la botonera: los usan la posesión, los eventos que le suman a un equipo, el panel y el XML.</p>
+                        <p class="text-xs text-gray-400">Elegí de los equipos cargados, o "＋ Cargar equipo…" para sumar uno nuevo: queda guardado con su color. Nombres y colores para toda la botonera: los usan la posesión, los eventos que le suman a un equipo, el panel y el XML.</p>
                     </div>
                 </div>
 
@@ -418,14 +423,14 @@
                     <div class="inspector-section-label">EQUIPOS</div>
                     <div class="inspector-cell flex justify-between items-center">
                         <span class="text-[#2a5b84] text-sm">Lado izquierdo</span>
-                        <input id="propEquipoA" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:130px;" placeholder="Local">
+                        <select id="propEquipoA" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:150px;"></select>
                     </div>
                     <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
                         <span class="text-[#2a5b84] text-sm">Lado derecho</span>
-                        <input id="propEquipoB" type="text" class="text-right bg-transparent text-[#007aff] text-sm focus:outline-none border-b border-gray-300" style="width:130px;" placeholder="Visitante">
+                        <select id="propEquipoB" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:150px;"></select>
                     </div>
                     <div class="inspector-cell">
-                        <p class="text-xs text-gray-400">En vivo: tocá el lado del equipo que tiene la pelota. Tocar otra vez el mismo lado corta la posesión (pelota muerta). Cada tramo queda como clip en el XML.</p>
+                        <p class="text-xs text-gray-400">Elegí los equipos de la lista, o "＋ Cargar equipo…" para sumar uno. En vivo: tocá el lado del equipo que tiene la pelota. Tocar otra vez el mismo lado corta la posesión (pelota muerta). Cada tramo queda como clip en el XML.</p>
                     </div>
                 </div>
 
