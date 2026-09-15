@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 const state = {
     mode: 'setup',
-    page: 'botonera',          // 'botonera' | 'plantillas' | 'xml' | 'stats'
+    page: 'botonera',          // 'botonera' | 'plantillas' | 'xml'
     elements: [],
     links: [],
     selectedId: null,
@@ -43,12 +43,7 @@ const state = {
     hojas: [],                 // Pestañas de la botonera: [{ id, name }]. La Principal no figura
     hojaActiva: null,          // Pestaña que se está editando (null = Principal)
     detalle: null,             // Pestaña de detalle abierta en vivo
-    posesion: {},              // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
-
-    stats: null,               // Qué botón y qué etiqueta es cada estadística (ver statsConfig)
-    statsFuente: 'actual',     // 'actual' o el id de una codificación guardada
-    statsCuarto: -1,           // Cuarto que muestran los gráficos (-1 = todo el partido)
-    statsConfigAbierta: false
+    posesion: {}               // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
 };
 
 const DEFAULT_W = 120;
@@ -57,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v41';
+const APP_VERSION = 'v40';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -74,12 +69,6 @@ const el = {
     pageBotonera:  D('pageBotonera'),
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
-    pageStats:     D('pageStats'),
-    statsFuente:   D('statsFuente'),
-    statsCuartos:  D('statsCuartos'),
-    statsCuerpo:   D('statsCuerpo'),
-    btnStatsActualizar: D('btnStatsActualizar'),
-    btnStatsConfig:     D('btnStatsConfig'),
     titleLogo:     D('titleLogo'),
     appVersion:    D('appVersion'),
     timerDisplay:  D('timerDisplay'),
@@ -789,7 +778,7 @@ function armarRespaldo() {
         app: 'tagview', kind: 'backup', version: 1,
         dispositivo: nombreDispositivo(),
         date: new Date().toISOString(),
-        current:   { elements: state.elements, links: state.links, hojas: state.hojas, stats: state.stats },
+        current:   { elements: state.elements, links: state.links, hojas: state.hojas },
         templates: getSavedTemplates(),
         sessions:  getSavedSessions()
     };
@@ -1096,14 +1085,11 @@ function loadData() {
     if (e) state.elements = JSON.parse(e);
     if (l) state.links    = JSON.parse(l);
     if (h) state.hojas    = JSON.parse(h);
-    const s = lsGet('tv_stats');
-    if (s) state.stats    = JSON.parse(s);
 }
 function saveData() {
     lsSet('tv_elements', JSON.stringify(state.elements));
     lsSet('tv_links',    JSON.stringify(state.links));
     lsSet('tv_hojas',    JSON.stringify(state.hojas));
-    lsSet('tv_stats',    JSON.stringify(state.stats));
 }
 
 // ─────────────────────────────────────────────
@@ -1147,10 +1133,9 @@ function setPage(page) {
     const paginas = {
         botonera:   el.pageBotonera,
         plantillas: el.pagePlantillas,
-        xml:        el.pageXml,
-        stats:      el.pageStats
+        xml:        el.pageXml
     };
-    const nombres = { botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML', stats: 'Estadísticas' };
+    const nombres = { botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
 
     Object.keys(paginas).forEach(k => {
         const activa = (k === page);
@@ -1175,17 +1160,6 @@ function setPage(page) {
 
     if (page === 'plantillas') renderTemplatesList();
     if (page === 'xml')        renderSessionsList();
-
-    clearInterval(_statsTimer);
-    _statsTimer = null;
-    if (page === 'stats') {
-        renderStats();
-        // Con el partido corriendo, el tablero se va actualizando solo.
-        _statsTimer = setInterval(() => {
-            if (state.mode === 'live' && state.isPlaying && state.statsFuente === 'actual' &&
-                !state.statsConfigAbierta) renderStats();
-        }, 3000);
-    }
 }
 
 // ─────────────────────────────────────────────
@@ -1369,34 +1343,6 @@ function bindEvents() {
         duplicateSelected();
     });
     on(el.btnHideInspector, 'click', () => selectElement(null));
-
-    on(el.statsFuente, 'change', () => { state.statsFuente = el.statsFuente.value; renderStats(); });
-    on(el.statsCuartos, 'click', ev => {
-        const b = ev.target.closest('[data-q]');
-        if (!b) return;
-        state.statsCuarto = parseInt(b.dataset.q);
-        renderStats();
-    });
-    on(el.btnStatsActualizar, 'click', renderStats);
-    on(el.btnStatsConfig, 'click', () => { state.statsConfigAbierta = !state.statsConfigAbierta; renderStats(); });
-    on(el.statsCuerpo, 'input', cambioStatsConfig);
-    on(el.statsCuerpo, 'change', cambioStatsConfig);
-    on(el.statsCuerpo, 'click', ev => {
-        const b = ev.target.closest('[data-accion]');
-        if (!b) return;
-        if (b.dataset.accion === 'configurar') {
-            state.statsConfigAbierta = true;
-            renderStats();
-        } else if (b.dataset.accion === 'adivinar') {
-            const n = statsAdivinar();
-            renderStats();
-            customAlert(n
-                ? `Completé ${n} ${n === 1 ? 'casilla' : 'casillas'}. Revisá que estén bien.`
-                : 'No encontré nada para completar. El equipo de cada botón sale de "Suma a la posesión de", o del nombre del equipo dentro del nombre del botón.',
-                'Completar por nombre');
-        }
-    });
-    window.addEventListener('resize', () => { if (state.page === 'stats') ajustarStats(); });
 
     on(el.canvasContainer, 'mousedown', onCanvasDown);
     document.addEventListener('mousemove', onGlobalMove);
@@ -3801,510 +3747,6 @@ function exportXML() {
 }
 
 // ─────────────────────────────────────────────
-// ESTADÍSTICAS
-// Tablero del partido armado con lo codificado, por equipo y por cuarto. La
-// app no sabe qué botón es un tiro o una recuperación: se elige en Configurar,
-// por nombre de botón y de etiqueta. Por nombre y no por id, así sirve igual
-// para una codificación guardada. La configuración viaja con la plantilla.
-// ─────────────────────────────────────────────
-const STATS_METRICAS = [
-    ['rec',   'Recuperación'],
-    ['perd',  'Pérdida'],
-    ['in25',  'Ingreso a 25 yardas'],
-    ['area',  'Ingreso al área'],
-    ['tiro',  'Tiro al arco'],
-    ['corto', 'Corner corto'],
-    ['penal', 'Penal'],
-    ['gol',   'Gol']
-];
-
-const statsNumerados = (p, n) => Array.from({ length: n }, (_, i) => p + (i + 1)).join(', ');
-
-// [clave, qué es, valor de fábrica, cuántas tienen que ser (0 = las que quieras)]
-const STATS_LISTAS = [
-    ['bw',     'Zonas de recuperación: una fila por zona en la tabla de goles', 'BW1, BW2, BW3, BW4', 0],
-    ['cancha', 'Zonas de cancha: 12, en filas de a 3, empezando por el arco rival', statsNumerados('Z', 12), 12],
-    ['area',   'Zonas de ingreso al área, de izquierda a derecha', statsNumerados('A', 7), 0],
-    ['in25',   'Zonas de ingreso a 25 yardas, de izquierda a derecha', '25 Izq, 25 Centro, 25 Der', 0],
-    ['tipo',   'Tipo de ingreso al área: controlada y dividida', 'Controlada, Dividida', 2],
-    ['tiro',   'Zonas de tiro: 9, en filas de a 3, empezando por el arco', statsNumerados('T', 9), 9],
-    ['result', 'Resultado del tiro: atajado, desviado y gol', 'Atajado, Desviado, Gol', 3],
-    ['origen', 'Origen del gol: jugada, corner corto y penal', 'Jugada, Corto, Penal', 3]
-];
-
-let _statsTimer = null;
-
-// Sin tildes ni mayúsculas: "Pérdida" y "perdida" son el mismo botón.
-function statsNorm(s) {
-    s = String(s == null ? '' : s).toLowerCase().trim();
-    return s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s;
-}
-
-function statsPct(a, b) {
-    return b > 0 ? Math.round(a / b * 100) + '%' : '–';
-}
-
-// La configuración guardada, completada con los valores de fábrica.
-function statsConfig() {
-    const s = state.stats || {};
-    const c = { cuartos: [0, 1, 2, 3].map(i => (s.cuartos && s.cuartos[i]) || ''), A: {}, B: {}, listas: {} };
-    STATS_METRICAS.forEach(([k]) => {
-        c.A[k] = (s.A && s.A[k]) || '';
-        c.B[k] = (s.B && s.B[k]) || '';
-    });
-    STATS_LISTAS.forEach(([k, , fabrica]) => {
-        const v = s.listas && s.listas[k];
-        c.listas[k] = typeof v === 'string' ? v : fabrica;
-    });
-    return c;
-}
-
-function statsLista(cfg, k) {
-    return cfg.listas[k].split(',').map(x => x.trim()).filter(Boolean);
-}
-
-function guardarStatsConfig(cfg) {
-    state.stats = cfg;
-    saveData();
-}
-
-function statsUnicos(lista) {
-    const vistos = new Set();
-    return lista.filter(n => {
-        const k = statsNorm(n);
-        if (!k || vistos.has(k)) return false;
-        vistos.add(k);
-        return true;
-    });
-}
-
-// Los eventos de la Principal: los botones de las pestañas son etiquetas.
-function statsNombresEventos(fuente) {
-    return statsUnicos(state.elements.filter(e => e.type === 'event' && !hojaDe(e)).map(e => e.name)
-        .concat(fuente.eventos.filter(e => !e.posesionDe).map(e => e.name)));
-}
-
-function statsNombresEtiquetas(fuente) {
-    const nombres = [];
-    const sinNombre = ['text', 'image', 'container', 'teams', 'possession', 'counter'];
-    state.elements.forEach(e => {
-        if (e.type === 'descriptor' || e.type === 'popup_label' ||
-            (hojaDe(e) && !sinNombre.includes(e.type))) nombres.push(e.name);
-        (e.popups || []).forEach(p => nombres.push(p));
-    });
-    fuente.eventos.forEach(ev => (ev.descriptors || []).forEach(d => nombres.push(d)));
-    return statsUnicos(nombres);
-}
-
-// Completa lo que esté vacío mirando los nombres: "Recuperación Lomas", "Tiro
-// GEBA", "1C". El equipo sale de "Suma a la posesión de" o del nombre del
-// equipo dentro del nombre del botón.
-function statsAdivinar() {
-    const cfg = statsConfig();
-    const eqs = nombresEquipos();
-    const nA = statsNorm(eqs.A), nB = statsNorm(eqs.B);
-    // En este orden: "Gol de corto" es un gol, "Ingreso 25" no es un ingreso al área.
-    const claves = [['gol', /\bgol/], ['penal', /penal/], ['corto', /corto|corner/], ['in25', /25/],
-                    ['area', /area|circulo/], ['tiro', /tiro|remate/], ['perd', /perdid/], ['rec', /recup/]];
-    let completados = 0;
-    state.elements.filter(e => e.type === 'event' && !hojaDe(e)).forEach(b => {
-        const nom = statsNorm(b.name);
-        const q = nom.match(/^(?:([1-4])\s*(?:c|q|er|do|ro|to|°|º)?(?:\s*cuarto)?|cuarto\s*([1-4]))$/);
-        if (q) {
-            const i = parseInt(q[1] || q[2]) - 1;
-            if (!cfg.cuartos[i]) { cfg.cuartos[i] = b.name; completados++; }
-            return;
-        }
-        const eq = (b.equipo === 'A' || b.equipo === 'B') ? b.equipo
-                 : (nA && nom.includes(nA)) ? 'A'
-                 : (nB && nom.includes(nB)) ? 'B' : null;
-        const clave = claves.find(([, re]) => re.test(nom));
-        if (eq && clave && !cfg[eq][clave[0]]) { cfg[eq][clave[0]] = b.name; completados++; }
-    });
-    guardarStatsConfig(cfg);
-    return completados;
-}
-
-// De dónde salen los números: la codificación en pantalla o una guardada.
-function statsFuente() {
-    if (state.statsFuente !== 'actual') {
-        const s = getSavedSessions().find(x => String(x.id) === String(state.statsFuente));
-        if (s) return { eventos: s.events || [], eventosPos: s.events || [], enCurso: false, detalle: `${s.name} · ${s.date}` };
-        state.statsFuente = 'actual';
-    }
-    const enCurso = state.mode === 'live';
-    // Lo que está grabando todavía cuenta, cortado en este momento.
-    const abiertos = (state.openEvents || []).map(o => Object.assign({}, o, { end: state.time }));
-    return {
-        eventos: state.events.concat(abiertos),
-        eventosPos: state.events,
-        enCurso: enCurso,
-        detalle: `${enCurso ? 'En curso' : 'Última codificación'} · ${fmt(state.time)}`
-    };
-}
-
-// Qué pasó después de una recuperación: lo que hace el mismo equipo hasta que
-// la pierde, la vuelve a recuperar o el rival hace algo con la pelota. La
-// pérdida del rival no corta: suele marcarse junto con esta recuperación.
-function statsJugada(eventos, i, eq, metricas, fila) {
-    fila.total++;
-    const vio = {};
-    for (let j = i + 1; j < eventos.length; j++) {
-        const ms = metricas(eventos[j]);
-        if (ms.some(m => m.eq !== eq && m.k !== 'perd')) break;
-        const mias = ms.filter(m => m.eq === eq).map(m => m.k);
-        if (mias.includes('rec')) break;
-        ['area', 'corto', 'penal', 'gol'].forEach(k => { if (mias.includes(k)) vio[k] = 1; });
-        if (mias.includes('perd')) { vio.perd = 1; break; }
-    }
-    Object.keys(vio).forEach(k => { fila[k]++; });
-}
-
-// `filtro`: el cuarto que muestran los gráficos (-1 = todos). La tabla por
-// cuartos y el marcador siempre son del partido entero.
-function statsCalcular(fuente, cfg, filtro) {
-    const listas = {};
-    STATS_LISTAS.forEach(([k]) => { listas[k] = statsLista(cfg, k).map(statsNorm); });
-    const eventos = fuente.eventos.filter(e => !e.posesionDe).slice().sort((a, b) => a.start - b.start);
-
-    const porNombre = {};
-    ['A', 'B'].forEach(eq => STATS_METRICAS.forEach(([k]) => {
-        const n = statsNorm(cfg[eq][k]);
-        if (n) (porNombre[n] = porNombre[n] || []).push({ eq: eq, k: k });
-    }));
-    const metricas = e => porNombre[statsNorm(e.name)] || [];
-    const zona = (e, lista) => {
-        const d = (e.descriptors || []).map(statsNorm);
-        return lista.findIndex(z => d.includes(z));
-    };
-
-    // Un cuarto va desde que se toca su botón hasta que se toca el siguiente.
-    const inicios = cfg.cuartos.map(n => {
-        const nn = statsNorm(n);
-        const ts = nn ? fuente.eventos.filter(e => statsNorm(e.name) === nn).map(e => e.start) : [];
-        return ts.length ? Math.min.apply(null, ts) : null;
-    });
-    const cuartoDe = t => {
-        let q = -1, desde = -Infinity;
-        inicios.forEach((s, i) => { if (s != null && s <= t && s > desde) { desde = s; q = i; } });
-        return q;
-    };
-    const finDe = i => {
-        let fin = Infinity;
-        inicios.forEach(o => { if (o != null && o > inicios[i] && o < fin) fin = o; });
-        return fin;
-    };
-
-    const ceros = n => new Array(n).fill(0);
-    const nuevo = () => ({
-        // 0-3 los cuartos, 4 el total
-        cuartos: [0, 1, 2, 3, 4].map(() => ({ rec: 0, bw: 0, perd: 0, in25: 0, area: 0, tiro: 0, corto: 0, penal: 0, gol: 0, pos: null })),
-        origen: ceros(3),
-        bw: listas.bw.map(() => ({ total: 0, area: 0, corto: 0, penal: 0, gol: 0, perd: 0 })),
-        rec: ceros(12), perd: ceros(12),
-        zonasArea: ceros(listas.area.length), zonas25: ceros(listas.in25.length),
-        tipo: ceros(2), area: 0, in25: 0,
-        tiro: ceros(9), result: ceros(3), goles: 0
-    });
-    const r = { A: nuevo(), B: nuevo(), hayCuartos: inicios.some(s => s != null) };
-
-    eventos.forEach((e, i) => {
-        metricas(e).forEach(m => {
-            const t = r[m.eq];
-            const res = m.k === 'tiro' ? zona(e, listas.result) : -1;
-            const bw = m.k === 'rec' ? zona(e, listas.bw) : -1;
-            const claves = [m.k];
-            if (bw >= 0) claves.push('bw');
-            // Sin botón de gol, el gol es el tiro con esa etiqueta.
-            if (res === 2 && !cfg[m.eq].gol) claves.push('gol');
-
-            const q = cuartoDe(e.start);
-            claves.forEach(k => {
-                t.cuartos[4][k]++;
-                if (q >= 0) t.cuartos[q][k]++;
-            });
-            if (filtro >= 0 && q !== filtro) return;
-
-            if (m.k === 'rec' || m.k === 'perd') {
-                const z = zona(e, listas.cancha);
-                if (z >= 0 && z < 12) t[m.k][z]++;
-            }
-            if (bw >= 0) statsJugada(eventos, i, m.eq, metricas, t.bw[bw]);
-            if (m.k === 'area') {
-                t.area++;
-                const z = zona(e, listas.area);
-                if (z >= 0) t.zonasArea[z]++;
-                const ti = zona(e, listas.tipo);
-                if (ti >= 0 && ti < 2) t.tipo[ti]++;
-            }
-            if (m.k === 'in25') {
-                t.in25++;
-                const z = zona(e, listas.in25);
-                if (z >= 0) t.zonas25[z]++;
-            }
-            if (m.k === 'tiro' || m.k === 'gol') {
-                const z = zona(e, listas.tiro);
-                if (z >= 0 && z < 9) t.tiro[z]++;
-            }
-            if (res === 0 || res === 1) t.result[res]++;
-            if (claves.includes('gol')) {
-                t.goles++;
-                const o = zona(e, listas.origen);
-                if (o >= 0 && o < 3) t.origen[o]++;
-            }
-        });
-    });
-
-    // Posesión por cuarto: el mismo reparto del panel en vivo, recortado.
-    const segs = tramosDePosesion(fuente.eventosPos, state.time, fuente.enCurso);
-    const hasta = fuente.enCurso && state.time > 0 ? state.time : Infinity;
-    const posesionEntre = (a, b) => {
-        const t = { A: 0, B: 0 };
-        segs.forEach(s => {
-            const x = Math.max(s.a, a), y = Math.min(s.b, b, hasta);
-            if (y > x) t[s.eq] += y - x;
-        });
-        return t.A + t.B > 0 ? Math.round(t.A / (t.A + t.B) * 100) : null;
-    };
-    const ponerPos = (i, p) => {
-        r.A.cuartos[i].pos = p;
-        r.B.cuartos[i].pos = p == null ? null : 100 - p;
-    };
-    inicios.forEach((s, i) => { if (s != null) ponerPos(i, posesionEntre(s, finDe(i))); });
-    ponerPos(4, posesionEntre(-Infinity, Infinity));
-    return r;
-}
-
-function renderStats() {
-    if (!el.statsCuerpo) return;
-    renderStatsBarra();
-    if (state.statsConfigAbierta) { renderStatsConfig(); return; }
-
-    const cfg = statsConfig();
-    if (!STATS_METRICAS.some(([k]) => cfg.A[k] || cfg.B[k])) {
-        el.statsCuerpo.innerHTML =
-            `<div class="p-6 text-center text-sm text-gray-500">Todavía no elegiste qué botón es cada estadística.<br>` +
-            `<button class="st-config-boton" data-accion="configurar">Configurar</button></div>`;
-        return;
-    }
-    const fuente = statsFuente();
-    const r = statsCalcular(fuente, cfg, state.statsCuarto);
-    el.statsCuerpo.innerHTML =
-        `<div class="stats-escala"><div class="stats-tablero">${statsTableroHTML(r, cfg, fuente)}</div></div>`;
-    ajustarStats();
-}
-
-function renderStatsBarra() {
-    const sesiones = getSavedSessions();
-    el.statsFuente.innerHTML = '<option value="actual">Codificación actual</option>' +
-        sesiones.map(s => `<option value="${s.id}">${xmlEsc(s.name)}</option>`).join('');
-    el.statsFuente.value = String(state.statsFuente);
-    el.statsCuartos.innerHTML = ['Todo', '1C', '2C', '3C', '4C'].map((n, i) =>
-        `<button class="seg-btn${state.statsCuarto === i - 1 ? ' seg-active' : ''}" data-q="${i - 1}">${n}</button>`).join('');
-    el.statsCuartos.classList.toggle('hidden', state.statsConfigAbierta);
-    el.btnStatsActualizar.classList.toggle('hidden', state.statsConfigAbierta);
-    el.btnStatsConfig.textContent = state.statsConfigAbierta ? 'Ver tablero' : 'Configurar';
-}
-
-// El tablero se dibuja con medidas fijas y se escala para entrar en pantalla.
-function ajustarStats() {
-    const cont = el.statsCuerpo;
-    const caja = cont && cont.querySelector('.stats-escala');
-    if (!caja || !cont.clientWidth) return;
-    const tablero = caja.firstElementChild;
-    const k = Math.min(1.5, (cont.clientWidth - 24) / tablero.offsetWidth);
-    tablero.style.transform = `scale(${k})`;
-    caja.style.width  = (tablero.offsetWidth  * k) + 'px';
-    caja.style.height = (tablero.offsetHeight * k) + 'px';
-}
-
-function statsTableroHTML(r, cfg, fuente) {
-    const eqs = nombresEquipos();
-    const filtro = state.statsCuarto >= 0 ? ` · Gráficos del ${state.statsCuarto + 1}C` : '';
-    const lado = (eq) => {
-        const t = r[eq];
-        return `<div class="st-col">
-            ${stLado(t, eq, cfg)}
-            <div class="st-par">${stCancha('Recuperaciones', t.rec, 'izq')}${stCancha('Pérdidas', t.perd, 'der')}</div>
-            ${stTiros(t)}
-        </div>`;
-    };
-    return `
-        <div class="st-cabecera">
-            <div class="st-partido">${xmlEsc(eqs.A)}<span>vs</span>${xmlEsc(eqs.B)}</div>
-            <div class="st-marcador">${r.A.cuartos[4].gol} - ${r.B.cuartos[4].gol}</div>
-            <div class="st-detalle">${xmlEsc(fuente.detalle)}${filtro}${r.hayCuartos ? '' : ' · Sin botones de cuarto marcados'}</div>
-        </div>
-        <div class="st-grilla">
-            ${lado('A')}
-            <div class="st-col">
-                ${stCuartos(r)}
-                ${stArea('Ingresos área favor', r.A, 'A', cfg)}
-                ${stArea('Ingresos área contra', r.B, 'B', cfg)}
-            </div>
-            ${lado('B')}
-        </div>`;
-}
-
-function stLado(t, eq, cfg) {
-    const rival = eq === 'A' ? 'B' : 'A';
-    const origen = statsLista(cfg, 'origen');
-    const goles = ['Jugada', 'Corner corto', 'Penal'].map((fabrica, i) =>
-        `<span>${xmlEsc(origen[i] || fabrica)} = ${t.origen[i]}</span>`).join('');
-    const zonas = statsLista(cfg, 'bw');
-    const filas = zonas.length
-        ? zonas.map((z, i) => `<tr><th>${xmlEsc(z)}</th>` +
-            ['total', 'area', 'corto', 'penal', 'gol'].map(k => `<td class="st-${eq}">${t.bw[i][k]}</td>`).join('') +
-            `<td class="st-${rival}">${t.bw[i].perd}</td></tr>`).join('')
-        : '<tr><td colspan="7" class="st-vacio">Sin zonas de recuperación</td></tr>';
-    return `<div>
-        <div class="st-negro"><b>Goles</b>${goles}</div>
-        <table class="st-tabla">
-            <tr><th></th><th>Total</th><th>Área</th><th>Corto</th><th>Penal</th><th>Gol</th><th>Perd</th></tr>
-            ${filas}
-        </table>
-    </div>`;
-}
-
-function stCuartos(r) {
-    const cols = [['rec', 'Rec'], ['bw', 'BW'], ['pos', 'Pos'], ['area', 'Área'], ['tiro', 'Tiros'], ['corto', 'CC'], ['perd', 'Perd'], ['gol', 'Gol']];
-    const espejo = cols.slice().reverse();
-    const celda = (fila, k, eq) =>
-        `<td class="st-${eq}">${k === 'pos' ? (fila.pos == null ? '–' : fila.pos + '%') : fila[k]}</td>`;
-    const cabecera = cols.map(c => `<th>${c[1]}</th>`).join('') + '<th></th>' + espejo.map(c => `<th>${c[1]}</th>`).join('');
-    const filas = ['1C', '2C', '3C', '4C', 'T'].map((q, i) =>
-        `<tr${i === 4 ? ' class="st-total"' : ''}>` +
-        cols.map(([k]) => celda(r.A.cuartos[i], k, 'A')).join('') +
-        `<th class="st-q">${q}</th>` +
-        espejo.map(([k]) => celda(r.B.cuartos[i], k, 'B')).join('') +
-        '</tr>').join('');
-    return `<table class="st-tabla st-cuartos"><tr>${cabecera}</tr>${filas}</table>`;
-}
-
-// Cancha de 4 filas por 3 columnas, con las sumas por fila a un costado y por
-// columna abajo. Arriba, el arco rival.
-function stCancha(titulo, datos, ladoSumas) {
-    const suma = l => l.reduce((a, b) => a + b, 0);
-    const porFila = [0, 1, 2, 3].map(f => suma(datos.slice(f * 3, f * 3 + 3)));
-    const porCol = [0, 1, 2].map(c => suma(datos.filter((_, i) => i % 3 === c)));
-    const numeros = l => l.map(v => `<span>${v}</span>`).join('');
-    return `<div>
-        <div class="st-titulo">${titulo} = ${suma(datos)}</div>
-        <div class="st-cancha-fila st-sumas-${ladoSumas}">
-            <div class="st-sumas">${numeros(porFila)}</div>
-            <div class="st-cancha">${numeros(datos)}</div>
-        </div>
-        <div class="st-sumas-col st-sumas-${ladoSumas}">${numeros(porCol)}</div>
-    </div>`;
-}
-
-function stTiros(t) {
-    return `<div>
-        <div class="st-titulo st-titulo-izq">Zonas tiro al arco</div>
-        <div class="st-arco"></div>
-        <div class="st-tiros">${t.tiro.map(v => `<span>${v}</span>`).join('')}</div>
-        <div class="st-pie"><span>Atajados = ${t.result[0]}</span><span>Desviados = ${t.result[1]}</span><span>Gol = ${t.goles}</span></div>
-    </div>`;
-}
-
-// Medio campo con el área: las zonas de ingreso al área van repartidas por
-// dentro del arco, y las de 25 yardas en la franja de abajo.
-function stArea(titulo, t, eq, cfg) {
-    const zArea = statsLista(cfg, 'area'), z25 = statsLista(cfg, 'in25');
-    const tipo = statsLista(cfg, 'tipo');
-    const cx = 150;
-    const marca = (x, y, n) =>
-        `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})">` +
-        `<polygon class="st-pent st-pent-${eq}" points="0,-10 10,-3 6,9 -6,9 -10,-3"/><text y="4">${n}</text></g>`;
-    const enArea = zArea.map((_, i) => {
-        const ang = Math.PI * (i + 1) / (zArea.length + 1);
-        return marca(cx - Math.cos(ang) * 78, 12 + Math.sin(ang) * 46, t.zonasArea[i]);
-    }).join('');
-    const en25 = z25.map((_, i) => marca(30 + (i + 0.5) * 240 / z25.length, 112, t.zonas25[i])).join('');
-    const totalTipo = t.tipo[0] + t.tipo[1];
-    return `<div>
-        <div class="st-titulo">${titulo} = ${t.area}</div>
-        <svg viewBox="0 0 300 140" class="st-area-svg">
-            <rect x="${cx - 12}" y="0" width="24" height="4" class="st-linea-llena"/>
-            <path d="M${cx - 85} 0 A70 70 0 0 0 ${cx - 15} 70 L${cx + 15} 70 A70 70 0 0 0 ${cx + 85} 0" class="st-linea"/>
-            <path d="M${cx - 110} 0 A95 95 0 0 0 ${cx - 15} 95 L${cx + 15} 95 A95 95 0 0 0 ${cx + 110} 0" class="st-linea st-punteada"/>
-            <line x1="0" y1="130" x2="300" y2="130" class="st-linea"/>
-            ${enArea}${en25}
-        </svg>
-        <div class="st-pie">
-            <span>Ingresos 25y = ${t.in25}</span>
-            <span>Efectividad 25y = ${statsPct(t.area, t.in25)}</span>
-            <span>Efectividad área = ${statsPct(t.goles, t.area)}</span>
-        </div>
-        <div class="st-pie">
-            <span>Área ${xmlEsc(tipo[0] || 'Controlada')} = ${statsPct(t.tipo[0], totalTipo)}</span>
-            <span>Área ${xmlEsc(tipo[1] || 'Dividida')} = ${statsPct(t.tipo[1], totalTipo)}</span>
-        </div>
-    </div>`;
-}
-
-function renderStatsConfig() {
-    const cfg = statsConfig();
-    const fuente = statsFuente();
-    const eventos = statsNombresEventos(fuente);
-    const eqs = nombresEquipos();
-    const opciones = actual => {
-        // Un nombre elegido que ya no está en la botonera se sigue mostrando.
-        const lista = actual && !eventos.some(n => statsNorm(n) === statsNorm(actual)) ? eventos.concat([actual]) : eventos;
-        return '<option value="">—</option>' + lista.map(n =>
-            `<option value="${xmlEsc(n)}"${actual && statsNorm(n) === statsNorm(actual) ? ' selected' : ''}>${xmlEsc(n)}</option>`).join('');
-    };
-    const cuartos = cfg.cuartos.map((n, i) =>
-        `<label class="st-config-fila"><span>${i + 1}C</span><select data-cuarto="${i}">${opciones(n)}</select></label>`).join('');
-    const metricas = STATS_METRICAS.map(([k, nombre]) =>
-        `<tr><th>${nombre}</th>` +
-        ['A', 'B'].map(eq => `<td><select data-eq="${eq}" data-k="${k}">${opciones(cfg[eq][k])}</select></td>`).join('') +
-        '</tr>').join('');
-    const listas = STATS_LISTAS.map(([k, titulo, , cuantas]) => {
-        const n = statsLista(cfg, k).length;
-        const aviso = cuantas && n !== cuantas ? `<em class="st-config-aviso">hay ${n}, van ${cuantas}</em>` : '';
-        return `<label class="st-config-lista"><span>${titulo}${aviso}</span>` +
-               `<input type="text" data-lista="${k}" value="${xmlEsc(cfg.listas[k])}" autocomplete="off" autocapitalize="off" spellcheck="false"></label>`;
-    }).join('');
-    const etiquetas = statsNombresEtiquetas(fuente);
-
-    el.statsCuerpo.innerHTML = `
-        <div class="st-config">
-            <p class="st-config-ayuda">Elegí qué botón de tu botonera es cada cosa. Los números salen del nombre de cada evento y de sus etiquetas, así que también sirven para las codificaciones guardadas. Esto se guarda con la plantilla.</p>
-            <button class="st-config-boton" data-accion="adivinar">Completar por nombre</button>
-
-            <div class="inspector-section-label">CUARTOS · LO MARCADO DESDE UN CUARTO HASTA EL SIGUIENTE ES DE ESE CUARTO</div>
-            <div class="st-config-caja st-config-cuartos">${cuartos}</div>
-
-            <div class="inspector-section-label">EVENTOS</div>
-            <div class="st-config-caja">
-                <table class="st-config-tabla"><tr><th></th><th>${xmlEsc(eqs.A)}</th><th>${xmlEsc(eqs.B)}</th></tr>${metricas}</table>
-                <p class="st-config-nota">Sin botón de Gol, cuenta como gol el tiro con la etiqueta de gol. Si tenés botón de Gol, no le pongas además esa etiqueta al tiro.</p>
-            </div>
-
-            <div class="inspector-section-label">ETIQUETAS · SEPARADAS POR COMA, COMO SE LLAMAN EN LA BOTONERA</div>
-            <div class="st-config-caja">
-                ${listas}
-                ${etiquetas.length ? `<p class="st-config-nota">En tu botonera: ${etiquetas.map(n => `<span class="ev-tag-chip">${xmlEsc(n)}</span>`).join(' ')}</p>` : ''}
-            </div>
-        </div>`;
-}
-
-function cambioStatsConfig(ev) {
-    const c = ev.target;
-    if (!state.statsConfigAbierta || !c || !c.dataset) return;
-    const cfg = statsConfig();
-    if (c.dataset.cuarto != null)  cfg.cuartos[parseInt(c.dataset.cuarto)] = c.value;
-    else if (c.dataset.eq)         cfg[c.dataset.eq][c.dataset.k] = c.value;
-    else if (c.dataset.lista)      cfg.listas[c.dataset.lista] = c.value;
-    else return;
-    guardarStatsConfig(cfg);
-    // Mientras escribís no se redibuja, que se perdería el foco. Al salir del
-    // campo sí, para actualizar el aviso de cuántas zonas faltan.
-    if (ev.type === 'change' && c.dataset.lista) renderStatsConfig();
-}
-
-// ─────────────────────────────────────────────
 // HISTORIAL DE PLANTILLAS
 // ─────────────────────────────────────────────
 function getSavedTemplates() {
@@ -4348,7 +3790,6 @@ function renderTemplatesList() {
             state.elements = JSON.parse(JSON.stringify(t.elements || []));
             state.links    = JSON.parse(JSON.stringify(t.links || []));
             state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
-            if (t.stats) state.stats = JSON.parse(JSON.stringify(t.stats));
             state.hojaActiva = null;
             selectElement(null);
             renderHojasBar();
@@ -4386,8 +3827,7 @@ async function saveCurrentTemplate() {
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: JSON.parse(JSON.stringify(state.elements)),
         links: JSON.parse(JSON.stringify(state.links)),
-        hojas: JSON.parse(JSON.stringify(state.hojas)),
-        stats: JSON.parse(JSON.stringify(state.stats))
+        hojas: JSON.parse(JSON.stringify(state.hojas))
     };
     templates.unshift(newTmpl);
     saveTemplates(templates);
@@ -4419,8 +3859,7 @@ async function exportTemplateToFile(tmpl) {
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: state.elements,
         links: state.links,
-        hojas: state.hojas,
-        stats: state.stats
+        hojas: state.hojas
     };
     if (!t.elements || !t.elements.length) {
         customAlert('El lienzo está vacío. Agregá botones antes de exportar.', 'Plantilla vacía');
@@ -4429,8 +3868,7 @@ async function exportTemplateToFile(tmpl) {
     const payload = {
         app: 'tagview', kind: 'template', version: 1,
         name: t.name, date: t.date,
-        elements: t.elements, links: t.links || [], hojas: t.hojas || [],
-        stats: t.stats || null
+        elements: t.elements, links: t.links || [], hojas: t.hojas || []
     };
     await saveToFiles(safeFileName(`Plantilla ${t.name}`, '.json'), JSON.stringify(payload, null, 2));
 }
@@ -4447,7 +3885,6 @@ async function importTemplateFromFile() {
     state.elements = JSON.parse(JSON.stringify(data.elements || []));
     state.links    = JSON.parse(JSON.stringify(data.links || []));
     state.hojas    = JSON.parse(JSON.stringify(data.hojas || []));
-    if (data.stats) state.stats = JSON.parse(JSON.stringify(data.stats));
     state.hojaActiva = null;
     selectElement(null);
     renderHojasBar();
@@ -4462,8 +3899,7 @@ async function importTemplateFromFile() {
         date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         elements: JSON.parse(JSON.stringify(state.elements)),
         links: JSON.parse(JSON.stringify(state.links)),
-        hojas: JSON.parse(JSON.stringify(state.hojas)),
-        stats: JSON.parse(JSON.stringify(state.stats))
+        hojas: JSON.parse(JSON.stringify(state.hojas))
     });
     saveTemplates(templates);
     renderTemplatesList();
@@ -4546,7 +3982,6 @@ async function aplicarRespaldo(data, origen) {
             state.elements = JSON.parse(JSON.stringify(data.current.elements || []));
             state.links    = JSON.parse(JSON.stringify(data.current.links || []));
             state.hojas    = JSON.parse(JSON.stringify(data.current.hojas || []));
-            if (data.current.stats) state.stats = JSON.parse(JSON.stringify(data.current.stats));
             state.hojaActiva = null;
             renderHojasBar();
             selectElement(null);
