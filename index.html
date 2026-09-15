@@ -127,6 +127,10 @@
                         <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
                         <span>Línea (ToI)</span>
                     </button>
+                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="image">
+                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#fff;border-color:#c7c7cc;">▣</div>
+                        <span>Imagen</span>
+                    </button>
                     <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="text">
                         <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#fff;border-color:#c7c7cc;">T</div>
                         <span>Texto</span>
@@ -204,6 +208,16 @@
                     <span class="text-[#2a5b84] text-sm">Mostrar cuántas veces lo marqué</span>
                     <input id="propMultiContador" type="checkbox" class="w-5 h-5">
                 </div>
+                <div class="inspector-section-label">TRANSPARENCIA</div>
+                <div class="inspector-cell">
+                    <select id="propMultiTransparencia" class="w-full bg-transparent text-sm focus:outline-none text-black">
+                        <option value="100">Sólido</option>
+                        <option value="80">80% · un poco transparente</option>
+                        <option value="60">60%</option>
+                        <option value="40">40%</option>
+                        <option value="25">25% · casi transparente</option>
+                    </select>
+                </div>
             </div>
 
             <div id="inspectorContent" class="flex flex-col flex-1">
@@ -226,6 +240,7 @@
                         <option value="possession">Posesión</option>
                         <option value="text">Texto</option>
                         <option value="teams">Equipos</option>
+                        <option value="image">Imagen</option>
                     </select>
                 </div>
 
@@ -234,6 +249,21 @@
                 <div class="inspector-cell flex items-center space-x-3">
                     <input id="propColor" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
                     <span class="text-gray-500 text-sm">Color del botón</span>
+                </div>
+
+                <!-- Transparencia: para todos menos la imagen, que tiene su propia opacidad -->
+                <div id="propTransparenciaSection">
+                    <div class="inspector-section-label">TRANSPARENCIA</div>
+                    <div class="inspector-cell">
+                        <select id="propTransparencia" class="w-full bg-transparent text-sm focus:outline-none text-black">
+                            <option value="100">Sólido</option>
+                            <option value="80">80% · un poco transparente</option>
+                            <option value="60">60%</option>
+                            <option value="40">40%</option>
+                            <option value="25">25% · casi transparente</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">Para ver lo que hay detrás, por ejemplo una cancha de fondo. En vivo se toca igual.</p>
+                    </div>
                 </div>
 
                 <!-- Opciones de evento (tiempos) -->
@@ -316,6 +346,29 @@
                     <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
                         <span class="text-[#2a5b84] text-sm">Cerrar las otras líneas</span>
                         <input id="propLineExclusive" type="checkbox" class="w-5 h-5">
+                    </div>
+                </div>
+
+                <!-- Imagen -->
+                <div id="propImagenSection" class="hidden">
+                    <div class="inspector-section-label">IMAGEN</div>
+                    <div class="inspector-cell">
+                        <button id="btnCambiarImagen" class="text-[#007aff] text-base font-normal w-full text-left">Cambiar imagen…</button>
+                    </div>
+                    <div class="inspector-cell border-t border-gray-200">
+                        <select id="propAjusteImagen" class="w-full bg-transparent text-sm focus:outline-none text-black">
+                            <option value="contain">Ajustar: se ve entera</option>
+                            <option value="cover">Rellenar: ocupa toda la caja</option>
+                        </select>
+                    </div>
+                    <div class="inspector-cell border-t border-gray-200">
+                        <select id="propOpacidadImagen" class="w-full bg-transparent text-sm focus:outline-none text-black">
+                            <option value="100">Opacidad 100%</option>
+                            <option value="70">Opacidad 70%</option>
+                            <option value="40">Opacidad 40%</option>
+                            <option value="20">Opacidad 20%</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">Va detrás de los botones: sirve de fondo (una cancha, un escudo). En vivo se ve, pero no se toca.</p>
                     </div>
                 </div>
 

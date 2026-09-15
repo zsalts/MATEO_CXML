@@ -299,6 +299,27 @@ body {
 .canvas-element.mode-setup[data-eltype="text"] { border-color: #c7c7cc; }
 .texto-libre { white-space: nowrap; }
 
+/* Imagen: detrás de los botones, sin fondo propio. */
+.canvas-element[data-eltype="image"] {
+    background: transparent;
+    border: 1.5px dashed transparent;
+    padding: 0;
+    color: #8e8e93;
+}
+.canvas-element.mode-setup[data-eltype="image"] { border-color: #c7c7cc; }
+/* La imagen no captura el toque: así se arrastra y cambia de tamaño la caja. */
+.img-libre {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+}
+.canvas-element.mode-live[data-eltype="image"] { cursor: default; }
+.canvas-element.mode-live[data-eltype="image"]:active { transform: none; filter: none; }
+
 /* Tarjeta de equipos */
 .canvas-element[data-eltype="teams"] {
     flex-direction: row;
