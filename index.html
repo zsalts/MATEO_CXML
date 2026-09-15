@@ -83,6 +83,9 @@
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="xml">
                     <span class="menu-check">✓</span><span>XML</span>
                 </button>
+                <button class="menu-page ios-menu-row border-t border-gray-100" data-page="stats">
+                    <span class="menu-check">✓</span><span>Estadísticas</span>
+                </button>
                 <!-- Sin la clase menu-page: esas filas se conectan solas a las páginas -->
                 <button id="menuTema" class="menu-tema ios-menu-row border-t border-gray-300">
                     <span class="menu-check">✓</span><span>Modo oscuro</span>
@@ -548,6 +551,19 @@
         </div>
 
         <div id="sessionsList" class="flex-1 overflow-y-auto divide-y divide-gray-100 bg-white"></div>
+    </div>
+
+    <!-- ══ PÁGINA: ESTADÍSTICAS ══ -->
+    <div id="pageStats" class="flex-1 hidden flex-col overflow-hidden bg-[#f2f2f7]">
+        <div class="st-barra bg-white border-b border-gray-300">
+            <select id="statsFuente"></select>
+            <div id="statsCuartos" class="seg-control"></div>
+            <div class="st-barra-fin">
+                <button id="btnStatsActualizar" class="text-[#007aff] text-sm">Actualizar</button>
+                <button id="btnStatsConfig" class="text-[#007aff] text-sm font-medium">Configurar</button>
+            </div>
+        </div>
+        <div id="statsCuerpo" class="flex-1 overflow-auto"></div>
     </div>
 
     <!-- MODAL SELECCIONAR EVENTOS EXCLUYENTES -->

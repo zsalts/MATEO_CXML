@@ -702,6 +702,131 @@ body {
 .menu-tema { justify-content: flex-start; }
 .menu-tema.is-on .menu-check { visibility: visible; }
 
+/* ═══════════════════════════════════════════
+   ESTADÍSTICAS
+   El tablero tiene medidas fijas, como una planilla: se dibuja a 1040 px y
+   JS lo escala para que entre en pantalla. Sus colores no cambian con el
+   modo oscuro. Sin gap en flex: Safari viejo de iPad no lo entiende.
+   ═══════════════════════════════════════════ */
+.st-barra { display: flex; align-items: center; flex-wrap: wrap; padding: 4px 12px; }
+.st-barra > * { margin: 4px 12px 4px 0; }
+.st-barra select { font-size: 14px; padding: 5px 8px; border: 1px solid #d1d1d6; border-radius: 8px; background: #fff; color: #000; max-width: 260px; }
+.st-barra-fin { margin-left: auto !important; margin-right: 0 !important; }
+.st-barra-fin button + button { margin-left: 16px; }
+#statsCuerpo { -webkit-overflow-scrolling: touch; }
+
+.stats-escala { margin: 12px auto; overflow: hidden; }
+.stats-tablero {
+    width: 1040px;
+    transform-origin: 0 0;
+    background: #8e8e8e;
+    color: #000;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+.st-cabecera { text-align: center; margin-bottom: 10px; }
+.st-partido { font-size: 26px; font-weight: 800; text-transform: uppercase; }
+.st-partido span { font-size: 20px; margin: 0 10px; text-transform: none; }
+.st-marcador { font-size: 26px; font-weight: 800; word-spacing: 12px; }
+.st-detalle { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+
+.st-grilla { display: grid; grid-template-columns: 280px 1fr 280px; grid-gap: 12px; gap: 12px; align-items: start; }
+.st-col > * + * { margin-top: 14px; }
+
+.st-tabla { width: 100%; border-collapse: separate; border-spacing: 2px; background: #111; font-size: 11px; font-weight: 700; text-align: center; }
+.st-tabla th { color: #fff; padding: 5px 1px; font-size: 10px; }
+.st-tabla td { padding: 6px 1px; }
+.st-A { background: var(--equipo-a, #3a8fd6); color: var(--equipo-a-texto, #fff); }
+.st-B { background: var(--equipo-b, #dc2626); color: var(--equipo-b-texto, #fff); }
+/* Fila del total: el color del equipo oscurecido, con el número bien blanco */
+.st-total td { box-shadow: inset 0 0 0 100px rgba(0,0,0,.5); color: #fff; }
+.st-cuartos .st-q { background: #000; width: 24px; }
+.st-vacio { color: #aaa; }
+.st-negro { background: #000; color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; text-align: center; padding: 4px 6px; }
+.st-negro b { display: block; font-size: 11px; }
+.st-negro span { margin: 0 5px; white-space: nowrap; }
+
+.st-titulo { font-size: 11px; font-weight: 800; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
+.st-titulo-izq { text-align: left; }
+.st-pie { display: flex; justify-content: space-around; font-size: 10px; font-weight: 800; text-transform: uppercase; margin-top: 4px; }
+
+.st-par { display: flex; justify-content: space-between; }
+.st-par > div { width: 48%; }
+.st-par .st-titulo { font-size: 10px; white-space: nowrap; }
+.st-cancha-fila { display: flex; }
+.st-cancha-fila.st-sumas-der { flex-direction: row-reverse; }
+.st-sumas { width: 18px; display: flex; flex-direction: column; }
+.st-sumas span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.st-sumas-col { display: flex; padding-left: 18px; }
+.st-sumas-col.st-sumas-der { padding-left: 0; padding-right: 18px; }
+.st-sumas-col span { flex: 1; text-align: center; font-size: 12px; font-weight: 800; }
+
+.st-cancha, .st-tiros {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: #2f4a22;
+    border: 3px solid #10197a;
+}
+.st-cancha { flex: 1; grid-template-rows: repeat(4, 38px); }
+.st-tiros  { grid-template-rows: repeat(3, 30px); }
+.st-cancha span, .st-tiros span {
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 14px;
+    border-right: 1px dashed rgba(255,255,255,.35);
+    border-bottom: 1px dashed rgba(255,255,255,.35);
+}
+.st-cancha span:nth-child(3n), .st-tiros span:nth-child(3n) { border-right: 0; }
+.st-cancha span:nth-last-child(-n+3), .st-tiros span:nth-last-child(-n+3) { border-bottom: 0; }
+/* Las áreas de los dos arcos, dibujadas encima sin tapar los números */
+.st-cancha::before, .st-cancha::after, .st-tiros::after {
+    content: ''; position: absolute; pointer-events: none;
+    border: 1px solid rgba(255,255,255,.6);
+}
+.st-cancha::before { top: 0; left: 26%; right: 26%; height: 24px; border-top: 0; border-radius: 0 0 60px 60px; }
+.st-cancha::after  { bottom: 0; left: 26%; right: 26%; height: 24px; border-bottom: 0; border-radius: 60px 60px 0 0; }
+.st-tiros::after   { top: 0; left: 6%; right: 6%; height: 88%; border-top: 0; border-radius: 0 0 50% 50%; }
+.st-arco { width: 24%; height: 10px; margin: 0 auto; border: 2px solid #eee; border-bottom: 0; }
+
+.st-area-svg { display: block; width: 100%; height: auto; background: #2f4a22; border: 3px solid #10197a; }
+.st-linea { fill: none; stroke: rgba(255,255,255,.75); stroke-width: 1.2; }
+.st-punteada { stroke-dasharray: 4 3; }
+.st-linea-llena { fill: #eee; }
+.st-pent { stroke: #000; stroke-width: .8; }
+.st-pent-A { fill: var(--equipo-a, #3a8fd6); }
+.st-pent-B { fill: var(--equipo-b, #dc2626); }
+.st-area-svg text { font-size: 9px; font-weight: 700; text-anchor: middle; }
+.st-pent-A + text { fill: var(--equipo-a-texto, #fff); }
+.st-pent-B + text { fill: var(--equipo-b-texto, #fff); }
+
+/* Configuración */
+.st-config { max-width: 640px; margin: 0 auto; padding-bottom: 40px; }
+.st-config-ayuda { font-size: 13px; color: #3c3c43; padding: 14px 16px 6px; line-height: 1.4; }
+.st-config-boton { margin: 8px 16px 4px; padding: 7px 14px; border-radius: 10px; background: #007aff; color: #fff; font-size: 13px; font-weight: 600; }
+.st-config-caja { background: #fff; padding: 8px 16px; border-bottom: 1px solid #e5e7eb; }
+.st-config-cuartos { display: grid; grid-template-columns: repeat(2, 1fr); grid-gap: 6px 16px; gap: 6px 16px; }
+.st-config-fila { display: flex; align-items: center; font-size: 13px; }
+.st-config-fila > span { width: 30px; flex-shrink: 0; font-weight: 700; }
+.st-config select, .st-config input[type="text"] {
+    width: 100%; min-width: 0; font-size: 14px; padding: 6px 8px;
+    border: 1px solid #d1d1d6; border-radius: 8px; background: #fff; color: #000;
+}
+.st-config-tabla { width: 100%; font-size: 13px; border-collapse: collapse; }
+.st-config-tabla th { text-align: left; font-weight: 600; padding: 4px 8px 4px 0; white-space: nowrap; }
+.st-config-tabla td { padding: 3px 4px; width: 40%; }
+.st-config-lista { display: block; font-size: 12px; color: #3c3c43; margin: 8px 0 10px; }
+.st-config-lista > span { display: block; margin-bottom: 3px; }
+.st-config-aviso { color: #d70015; font-weight: 600; font-style: normal; margin-left: 6px; }
+.st-config-nota { font-size: 12px; color: #6b7280; margin: 8px 0 4px; line-height: 1.9; }
+
+html[data-tema="oscuro"] .st-config-caja { background: #1c1c1e; border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .st-config-ayuda,
+html[data-tema="oscuro"] .st-config-lista { color: #c7c7cc; }
+html[data-tema="oscuro"] .st-config select,
+html[data-tema="oscuro"] .st-config input[type="text"],
+html[data-tema="oscuro"] .st-barra select { background: #2c2c2e; color: #f2f2f7; border-color: #48484a; }
+
 /* Texto libre sin color propio: toma el del tema (negro en claro). */
 .canvas-element[data-eltype="text"] { color: #1c1c1e; }
 

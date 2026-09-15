@@ -36,6 +36,30 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
 - Todo queda en la misma plantilla: se guarda, se exporta y viaja por la nube
   junto con la Principal.
 
+## Estadísticas
+
+**☰ → Estadísticas** arma un tablero del partido con lo codificado: marcador,
+tabla por cuartos (recuperaciones, BW, posesión, ingresos al área, tiros,
+cortos, pérdidas y goles), goles por origen y qué terminó pasando después de
+cada recuperación por zona BW, recuperaciones y pérdidas por zona de cancha,
+ingresos al área y a 25 yardas, y zonas de tiro con su resultado.
+
+Muestra la codificación actual (se actualiza sola mientras corre el reloj) o
+cualquiera guardada. Arriba se elige si los gráficos son del partido entero o
+de un cuarto; la tabla por cuartos y el marcador siempre son del partido.
+
+La app no sabe qué botón es cada cosa: se elige en **Configurar**, por nombre.
+
+- **Cuartos:** botones 1C…4C. Lo marcado desde que tocás un cuarto hasta el
+  siguiente es de ese cuarto.
+- **Eventos:** qué botón es la recuperación, el tiro, el gol, etc. de cada
+  equipo. "Completar por nombre" lo intenta solo con los nombres de los
+  botones y el equipo de "Suma a la posesión de".
+- **Etiquetas:** cómo se llaman las zonas (BW, cancha, área, 25 yardas, tiro),
+  el tipo de ingreso, el resultado del tiro y el origen del gol.
+
+La configuración viaja con la plantilla, en el archivo y en la nube.
+
 ## Dónde se guardan los datos
 
 En el dispositivo, siempre. El hosting solo sirve los archivos estáticos: nunca
