@@ -52,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v35';
+const APP_VERSION = 'v37';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -162,6 +162,8 @@ const el = {
     multiResumen:        D('multiResumen'),
     propMultiEquipo:     D('propMultiEquipo'),
     multiAyuda:          D('multiAyuda'),
+    propMostrarContador: D('propMostrarContador'),
+    propMultiContador:   D('propMultiContador'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1286,6 +1288,8 @@ function bindEvents() {
     on(el.propEqColorA, 'input', updateSelected);
     on(el.propEqColorB, 'input', updateSelected);
     on(el.propMultiEquipo, 'change', aplicarEquipoMultiple);
+    on(el.propMostrarContador, 'change', updateSelected);
+    on(el.propMultiContador, 'change', aplicarContadorMultiple);
     // En la PC: Ctrl+D (Cmd+D en Mac). Sin el preventDefault, el navegador lo
     // toma para agregar la página a favoritos.
     document.addEventListener('keydown', ev => {
@@ -1756,7 +1760,15 @@ function mostrarInspectorMultiple() {
     sel.disabled = eventos.length === 0;
     el.multiAyuda.textContent = eventos.length
         ? `Se aplica a los ${eventos.length} eventos seleccionados. Lo demás de la selección no cambia.`
-        : 'En la selección no hay eventos: la posesión se asigna a eventos.';
+        : 'En la selección no hay eventos: la posesión y el contador son de los eventos.';
+
+    if (el.propMultiContador) {
+        const conContador = eventos.filter(e => e.mostrarContador).length;
+        el.propMultiContador.checked = eventos.length > 0 && conContador === eventos.length;
+        // Algunos sí y otros no: la casilla queda a medias, en vez de mentir.
+        el.propMultiContador.indeterminate = conContador > 0 && conContador < eventos.length;
+        el.propMultiContador.disabled = eventos.length === 0;
+    }
 }
 
 function aplicarEquipoMultiple() {
@@ -1768,6 +1780,16 @@ function aplicarEquipoMultiple() {
     saveData();
     renderElements();           // la franja del equipo aparece en todos
     mostrarInspectorMultiple(); // y el selector deja de decir "Distintos"
+}
+
+function aplicarContadorMultiple() {
+    const mostrar = el.propMultiContador.checked;
+    state.elements.forEach(e => {
+        if (state.selectedIds.includes(e.id) && e.type === 'event' && !hojaDe(e)) e.mostrarContador = mostrar;
+    });
+    saveData();
+    renderElements();
+    mostrarInspectorMultiple();
 }
 
 function selectElement(id) {
@@ -1809,6 +1831,7 @@ function selectElement(id) {
         el.propEqColorB.value  = e.colorB  || '#dc2626';
     }
     if (el.propTamanoTexto) el.propTamanoTexto.value = String(parseInt(e.fontSize) || 18);
+    if (el.propMostrarContador) el.propMostrarContador.checked = !!e.mostrarContador;
     if (el.propEquipoEvento) {
         // Con los nombres de los equipos del botón de posesión, si hay uno.
         const nombres = nombresEquipos();
@@ -1977,6 +2000,9 @@ function updateSelected() {
         e.popups = el.propPopupDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
+    }
+    if (e.type === 'event' && el.propMostrarContador) {
+        e.mostrarContador = el.propMostrarContador.checked;
     }
     if (e.type === 'event' && el.propEquipoEvento && !hojaDe(e)) {
         e.equipo = el.propEquipoEvento.value || null;
@@ -2278,6 +2304,15 @@ function renderElements() {
             div.innerHTML = `<span>${e.name}</span>`;
         }
 
+        // Contador en el botón: cuántas veces lo marcaste. Cada toque ya
+        // redibuja, así que se actualiza solo sin tocar el reloj.
+        if (e.type === 'event' && e.mostrarContador && !enDetalle) {
+            const badge = document.createElement('span');
+            badge.className = 'ev-contador';
+            badge.textContent = String(vecesMarcado(e.id));
+            div.appendChild(badge);
+        }
+
         if (state.mode === 'setup') {
             ['se','e','s'].forEach(dir => {
                 const h = document.createElement('div');
@@ -2468,6 +2503,13 @@ function tiempoEnHielo(buttonId) {
     return unirTramos(tramos);
 }
 
+// Cuántas veces se marcó un botón: los clips archivados más el que esté
+// grabando. Los tramos de posesión no cuentan, son de otro botón.
+function vecesMarcado(buttonId) {
+    return state.events.filter(ev => ev.buttonId === buttonId && !ev.posesionDe).length +
+           (state.openEvents || []).filter(o => o.buttonId === buttonId).length;
+}
+
 // Para guardar con la sesión: el tiempo por botón, ya unido.
 function toiCalculado() {
     const mapa = {};
@@ -2644,6 +2686,8 @@ function handleLiveClick(e) {
         }
 
         // CASO B: Primer toque (iniciar evento)
+        // 0. Un evento de un equipo corta lo que siga corriendo del otro.
+        cortarRival(equipoDeBoton(e.id));
         // 1. Manejo de EXCLUSIVIDAD ESPECÍFICA POR EVENTOS: Cortar eventos si sus IDs están seleccionados como excluyentes
         if (state.openEvents && state.openEvents.length > 0) {
             for (let i = state.openEvents.length - 1; i >= 0; i--) {
@@ -3149,6 +3193,8 @@ function tocarPosesion(e, equipo) {
     if (actual) cerrarTramoPosesion(e);
     // El mismo lado otra vez: queda cortada. El otro lado: empieza su tramo.
     if (!actual || actual.equipo !== equipo) {
+        // Encender un lado corta lo que siga corriendo del otro equipo.
+        cortarRival(equipo);
         state.posesion[e.id] = { equipo: equipo, desde: state.time };
     }
     renderLivePanel();
@@ -3185,6 +3231,35 @@ function cerrarTramoPosesion(e) {
 function equipoDeBoton(buttonId) {
     const b = state.elements.find(x => x.id === buttonId);
     return (b && b.type === 'event' && (b.equipo === 'A' || b.equipo === 'B')) ? b.equipo : null;
+}
+
+// Los dos equipos se excluyen: cuando uno hace algo, todo lo del otro que
+// siga corriendo se corta en este momento. Sin configurar excluyentes a mano.
+//  - eventos manuales del rival que están grabando: se cierran ya, SIN tiempo
+//    posterior, que si no se volvería a pisar con lo que los cortó;
+//  - eventos de tiempo fijo del rival cuyo tiempo posterior todavía corre: se
+//    recortan a este momento;
+//  - el lado del rival en el botón de posesión, si estaba encendido.
+// Lo que no tiene equipo (una falta) ni se corta ni corta a nadie.
+function cortarRival(equipo) {
+    if (equipo !== 'A' && equipo !== 'B') return;
+    const rival = equipo === 'A' ? 'B' : 'A';
+    const ahora = state.time;
+
+    for (let i = state.openEvents.length - 1; i >= 0; i--) {
+        if (equipoDeBoton(state.openEvents[i].buttonId) === rival) closeOpenEventAt(i, true);
+    }
+    state.events.forEach(ev => {
+        if (!ev.posesionDe && ev.end != null && ev.start < ahora && ev.end > ahora &&
+            equipoDeBoton(ev.buttonId) === rival) {
+            ev.end = ahora;
+        }
+    });
+    Object.keys(state.posesion || {}).forEach(id => {
+        if (state.posesion[id].equipo !== rival) return;
+        const boton = state.elements.find(x => String(x.id) === id);
+        if (boton) cerrarTramoPosesion(boton);
+    });
 }
 
 // Nombres de los equipos para toda la botonera: de la tarjeta Equipos si hay
@@ -3263,8 +3338,15 @@ function tramosDePosesion(eventos, ahora, conAbiertos) {
 
 function tiemposPosesion() {
     const seg = tramosDePosesion(state.events, state.time, true);
-    const t = { A: 0, B: 0, tramos: seg.length };
-    seg.forEach(s => { t[s.eq] += s.b - s.a; });
+    // Lo que todavía no pasó (el tiempo posterior de un evento recién tocado)
+    // no cuenta hasta que pase: si no, los dos equipos sumaban más que el
+    // reloj. Con el reloj en cero (una sesión cargada para revisar) va todo.
+    const hasta = state.time > 0 ? state.time : Infinity;
+    const t = { A: 0, B: 0, tramos: 0 };
+    seg.forEach(s => {
+        const b = Math.min(s.b, hasta);
+        if (b > s.a) { t[s.eq] += b - s.a; t.tramos++; }
+    });
     const total = t.A + t.B;
     t.pctA = total > 0 ? Math.round(t.A / total * 100) : null;
     t.pctB = total > 0 ? 100 - t.pctA : null;

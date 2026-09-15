@@ -199,6 +199,11 @@
                     <select id="propMultiEquipo" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
                     <p id="multiAyuda" class="text-xs text-gray-400 mt-1"></p>
                 </div>
+                <div class="inspector-section-label">CONTADOR</div>
+                <div class="inspector-cell flex justify-between items-center">
+                    <span class="text-[#2a5b84] text-sm">Mostrar cuántas veces lo marqué</span>
+                    <input id="propMultiContador" type="checkbox" class="w-5 h-5">
+                </div>
             </div>
 
             <div id="inspectorContent" class="flex flex-col flex-1">
@@ -275,11 +280,17 @@
                         </div>
                     </div>
 
+                    <div class="inspector-section-label">CONTADOR</div>
+                    <div class="inspector-cell flex justify-between items-center">
+                        <span class="text-[#2a5b84] text-sm">Mostrar cuántas veces lo marqué</span>
+                        <input id="propMostrarContador" type="checkbox" class="w-5 h-5">
+                    </div>
+
                     <div id="propEquipoEventoSection">
                         <div class="inspector-section-label">SUMA A LA POSESIÓN DE</div>
                         <div class="inspector-cell">
                             <select id="propEquipoEvento" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
-                            <p class="text-xs text-gray-400 mt-1">Cada vez que toques este evento, su tiempo cuenta como posesión de ese equipo. Si se pisan eventos de los dos, el rato compartido es del que se marcó último.</p>
+                            <p class="text-xs text-gray-400 mt-1">Cada vez que toques este evento, su tiempo cuenta como posesión de ese equipo, y se corta todo lo que esté corriendo del equipo rival.</p>
                         </div>
                     </div>
                 </div>
