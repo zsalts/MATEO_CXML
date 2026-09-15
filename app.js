@@ -52,7 +52,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v39';
+const APP_VERSION = 'v40';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -171,6 +171,7 @@ const el = {
     propTransparencia:        D('propTransparencia'),
     propTransparenciaSection: D('propTransparenciaSection'),
     propMultiTransparencia:   D('propMultiTransparencia'),
+    menuTema:                 D('menuTema'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -1027,8 +1028,32 @@ async function readAppFile(kinds, etiqueta) {
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// MODO OSCURO
+// Para codificar en un lugar con poca luz. Se recuerda por dispositivo. El
+// atributo data-tema también lo pone un script en el <head> antes de dibujar,
+// así la app no abre en blanco para oscurecerse después.
+// ─────────────────────────────────────────────
+const temaOscuro = () => lsGet('tv_tema') === 'oscuro';
+
+function aplicarTema() {
+    const oscuro = temaOscuro();
+    if (oscuro) document.documentElement.setAttribute('data-tema', 'oscuro');
+    else document.documentElement.removeAttribute('data-tema');
+    if (el.menuTema) el.menuTema.classList.toggle('is-on', oscuro);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', oscuro ? '#111113' : '#1f2937');
+}
+
+function alternarTema() {
+    lsSet('tv_tema', temaOscuro() ? 'claro' : 'oscuro');
+    aplicarTema();
+    closeMainMenu();
+}
+
 function init() {
     setViewportHeight();
+    aplicarTema();
     if (el.appVersion) el.appVersion.textContent = APP_VERSION;
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -1301,6 +1326,7 @@ function bindEvents() {
     on(el.propOpacidadImagen, 'change', updateSelected);
     on(el.propTransparencia, 'change', updateSelected);
     on(el.propMultiTransparencia, 'change', aplicarTransparenciaMultiple);
+    on(el.menuTema, 'click', alternarTema);
     on(el.btnCambiarImagen, 'click', () => {
         const e = state.elements.find(x => x.id === state.selectedId);
         if (e && e.type === 'image') insertarImagen(e);
@@ -2424,8 +2450,10 @@ function renderElements() {
         if (e.type !== 'image' && opaco > 0 && opaco < 100) div.style.opacity = opaco / 100;
 
         if (e.type === 'text') {
-            // En un texto el color es el de la letra: no lleva fondo.
-            div.style.color = e.color || defaultColor('text');
+            // En un texto el color es el de la letra: no lleva fondo. Con el
+            // color por defecto no se fija en línea: así el modo oscuro lo
+            // aclara, en vez de dejar letra negra sobre fondo negro.
+            if (e.color && e.color.toLowerCase() !== defaultColor('text')) div.style.color = e.color;
         } else if (e.type === 'teams' || e.type === 'image') {
             // La tarjeta toma los colores de cada equipo, y la imagen no lleva
             // fondo: ninguna usa el color del botón.

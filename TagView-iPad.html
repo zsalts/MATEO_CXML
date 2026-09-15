@@ -45,6 +45,11 @@
     })();
     </script>
 
+    <!-- Modo oscuro antes de dibujar: sin esto la app abre en blanco y recién
+         después se oscurece, un destello molesto de noche. -->
+    <script>
+    try { if (localStorage.getItem('tv_tema') === 'oscuro') document.documentElement.setAttribute('data-tema', 'oscuro'); } catch (e) {}
+    </script>
     <style>
 /* Tailwind CSS — generado desde las clases que usa esta app.
    Reemplaza al compilador Play CDN, que necesitaba 400 KB de JS
@@ -944,6 +949,101 @@ body {
 }
 .menu-page.is-current .menu-check { visibility: visible; }
 .menu-page.is-current { font-weight: 700; }
+.menu-tema { justify-content: flex-start; }
+.menu-tema.is-on .menu-check { visibility: visible; }
+
+/* Texto libre sin color propio: toma el del tema (negro en claro). */
+.canvas-element[data-eltype="text"] { color: #1c1c1e; }
+
+/* ═══════════════════════════════════════════
+   MODO OSCURO
+   Todo cuelga de html[data-tema="oscuro"]: le gana a las clases de Tailwind
+   por especificidad, sin tocar el HTML ni el CSS precompilado.
+   ═══════════════════════════════════════════ */
+html[data-tema="oscuro"] { color-scheme: dark; }   /* selects y casillas nativos, oscuros */
+html[data-tema="oscuro"] body { background: #000; color: #f2f2f7; }
+
+/* Fondos */
+html[data-tema="oscuro"] .bg-white          { background-color: #1c1c1e; }
+html[data-tema="oscuro"] .bg-white\/95      { background-color: rgba(28,28,30,.95); }
+html[data-tema="oscuro"] .bg-\[\#f2f2f7\]   { background-color: #111113; }
+html[data-tema="oscuro"] .bg-gray-100       { background-color: #2c2c2e; }
+html[data-tema="oscuro"] .bg-gray-50\/80    { background-color: rgba(44,44,46,.8); }
+html[data-tema="oscuro"] .hover\:bg-gray-50:hover  { background-color: #2c2c2e; }
+html[data-tema="oscuro"] .hover\:bg-gray-200:hover { background-color: #3a3a3c; }
+html[data-tema="oscuro"] .bg-red-50         { background-color: rgba(239,68,68,.16); }
+html[data-tema="oscuro"] .bg-red-200        { background-color: rgba(239,68,68,.35); }
+
+/* Textos */
+html[data-tema="oscuro"] .text-black        { color: #f2f2f7; }
+html[data-tema="oscuro"] .text-gray-400     { color: #8e8e93; }
+html[data-tema="oscuro"] .text-gray-500     { color: #98989d; }
+html[data-tema="oscuro"] .text-gray-600     { color: #aeaeb2; }
+html[data-tema="oscuro"] .text-gray-700     { color: #c7c7cc; }
+html[data-tema="oscuro"] .text-red-800      { color: #fecaca; }
+html[data-tema="oscuro"] .text-\[\#2a5b84\] { color: #8ab4e8; }
+html[data-tema="oscuro"] .text-\[\#007aff\] { color: #0a84ff; }
+
+/* Bordes y divisores */
+html[data-tema="oscuro"] .border-gray-100,
+html[data-tema="oscuro"] .border-gray-100\/50,
+html[data-tema="oscuro"] .border-gray-200   { border-color: #2c2c2e; }
+html[data-tema="oscuro"] .border-gray-300   { border-color: #3a3a3c; }
+html[data-tema="oscuro"] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2c2c2e; }
+
+/* Lienzo */
+html[data-tema="oscuro"] .bg-grid {
+    background-color: #0b0b0c;
+    background-image:
+        linear-gradient(to right, #1d2330 1px, transparent 1px),
+        linear-gradient(to bottom, #1d2330 1px, transparent 1px);
+}
+
+/* Inspector y menús */
+html[data-tema="oscuro"] .inspector-section-label { background: #111113; color: #8e8e93; border-top-color: #38383a; }
+html[data-tema="oscuro"] .inspector-cell   { background: #1c1c1e; border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .ios-menu-row     { background: #1c1c1e; color: #f2f2f7; }
+html[data-tema="oscuro"] .ios-menu-row:active { background: #2c2c2e; }
+html[data-tema="oscuro"] .popup-dot::before { background: #1c1c1e; border-color: #f2f2f7; }
+
+/* Elementos del lienzo con fondo claro */
+html[data-tema="oscuro"] .canvas-element[data-eltype="counter"] { background: #2c2c2e; border-color: #636366; color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="container"],
+html[data-tema="oscuro"] .canvas-element.is-container { background: rgba(28,28,30,.85); border-color: #48484a !important; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="text"] { color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="text"],
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="image"] { border-color: #48484a; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="teams"] { background: #1c1c1e; border-color: #48484a; color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="possession"] { background: #1c1c1e; border-color: #636366; }
+html[data-tema="oscuro"] .resize-handle { background: #1c1c1e; }
+
+/* Barritas negras flotantes: sobre fondo negro se perdían */
+html[data-tema="oscuro"] .acciones-flotantes,
+html[data-tema="oscuro"] .barra-detalle { background: #3a3a3c; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+
+/* Pestañas de la botonera */
+html[data-tema="oscuro"] #hojasBar        { background: #111113; border-bottom-color: #38383a; }
+html[data-tema="oscuro"] .hoja-tab        { background: #2c2c2e; color: #f2f2f7; }
+html[data-tema="oscuro"] .hoja-tab.activa { background: #f2f2f7; color: #000; }
+html[data-tema="oscuro"] .hoja-etiquetas  { background: #1c1c1e; color: #f2f2f7; border-color: #48484a; }
+
+/* Panel en vivo: registro, tiempo en hielo, posesión */
+html[data-tema="oscuro"] .seg-control, html[data-tema="oscuro"] .page-nav { background: #2c2c2e; }
+html[data-tema="oscuro"] .seg-btn, html[data-tema="oscuro"] .page-nav-btn { color: #c7c7cc; }
+html[data-tema="oscuro"] .seg-btn.seg-active,
+html[data-tema="oscuro"] .page-nav-btn.nav-active { background: #636366; color: #fff; }
+html[data-tema="oscuro"] .event-row, html[data-tema="oscuro"] .toi-row { border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .event-row:nth-child(even),
+html[data-tema="oscuro"] .toi-row:nth-child(even) { background: #161618; }
+html[data-tema="oscuro"] .event-row .ev-name, html[data-tema="oscuro"] .toi-row .toi-name { color: #f2f2f7; }
+html[data-tema="oscuro"] .ev-tag-chip { background: #3a3a3c; color: #e5e5ea; }
+html[data-tema="oscuro"] .event-row .ev-time { color: #98989d; }
+html[data-tema="oscuro"] .toi-row .toi-shifts,
+html[data-tema="oscuro"] .toi-row .toi-total-cell { color: #c7c7cc; }
+html[data-tema="oscuro"] .toi-row.on-ice { background: rgba(239,68,68,.16); }
+html[data-tema="oscuro"] .pos-panel { border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
+html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
 </style>
     <meta name="theme-color" content="#1f2937">
@@ -976,6 +1076,10 @@ body {
                 </button>
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="xml">
                     <span class="menu-check">✓</span><span>XML</span>
+                </button>
+                <!-- Sin la clase menu-page: esas filas se conectan solas a las páginas -->
+                <button id="menuTema" class="menu-tema ios-menu-row border-t border-gray-300">
+                    <span class="menu-check">✓</span><span>Modo oscuro</span>
                 </button>
             </div>
         </div>
@@ -1554,7 +1658,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v39';
+const APP_VERSION = 'v40';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1673,6 +1777,7 @@ const el = {
     propTransparencia:        D('propTransparencia'),
     propTransparenciaSection: D('propTransparenciaSection'),
     propMultiTransparencia:   D('propMultiTransparencia'),
+    menuTema:                 D('menuTema'),
     btnPlayPause:   D('btnPlayPause'),
     timerLive:      D('timerLive'),
     btnStopCoding:  D('btnStopCoding'),
@@ -2529,8 +2634,32 @@ async function readAppFile(kinds, etiqueta) {
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// MODO OSCURO
+// Para codificar en un lugar con poca luz. Se recuerda por dispositivo. El
+// atributo data-tema también lo pone un script en el <head> antes de dibujar,
+// así la app no abre en blanco para oscurecerse después.
+// ─────────────────────────────────────────────
+const temaOscuro = () => lsGet('tv_tema') === 'oscuro';
+
+function aplicarTema() {
+    const oscuro = temaOscuro();
+    if (oscuro) document.documentElement.setAttribute('data-tema', 'oscuro');
+    else document.documentElement.removeAttribute('data-tema');
+    if (el.menuTema) el.menuTema.classList.toggle('is-on', oscuro);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', oscuro ? '#111113' : '#1f2937');
+}
+
+function alternarTema() {
+    lsSet('tv_tema', temaOscuro() ? 'claro' : 'oscuro');
+    aplicarTema();
+    closeMainMenu();
+}
+
 function init() {
     setViewportHeight();
+    aplicarTema();
     if (el.appVersion) el.appVersion.textContent = APP_VERSION;
     // Evita que iOS purgue plantillas y sesiones por falta de uso
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -2803,6 +2932,7 @@ function bindEvents() {
     on(el.propOpacidadImagen, 'change', updateSelected);
     on(el.propTransparencia, 'change', updateSelected);
     on(el.propMultiTransparencia, 'change', aplicarTransparenciaMultiple);
+    on(el.menuTema, 'click', alternarTema);
     on(el.btnCambiarImagen, 'click', () => {
         const e = state.elements.find(x => x.id === state.selectedId);
         if (e && e.type === 'image') insertarImagen(e);
@@ -3926,8 +4056,10 @@ function renderElements() {
         if (e.type !== 'image' && opaco > 0 && opaco < 100) div.style.opacity = opaco / 100;
 
         if (e.type === 'text') {
-            // En un texto el color es el de la letra: no lleva fondo.
-            div.style.color = e.color || defaultColor('text');
+            // En un texto el color es el de la letra: no lleva fondo. Con el
+            // color por defecto no se fija en línea: así el modo oscuro lo
+            // aclara, en vez de dejar letra negra sobre fondo negro.
+            if (e.color && e.color.toLowerCase() !== defaultColor('text')) div.style.color = e.color;
         } else if (e.type === 'teams' || e.type === 'image') {
             // La tarjeta toma los colores de cada equipo, y la imagen no lleva
             // fondo: ninguna usa el color del botón.

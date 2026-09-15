@@ -45,6 +45,11 @@
     })();
     </script>
 
+    <!-- Modo oscuro antes de dibujar: sin esto la app abre en blanco y recién
+         después se oscurece, un destello molesto de noche. -->
+    <script>
+    try { if (localStorage.getItem('tv_tema') === 'oscuro') document.documentElement.setAttribute('data-tema', 'oscuro'); } catch (e) {}
+    </script>
     <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="style.css">
     <meta name="theme-color" content="#1f2937">
@@ -77,6 +82,10 @@
                 </button>
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="xml">
                     <span class="menu-check">✓</span><span>XML</span>
+                </button>
+                <!-- Sin la clase menu-page: esas filas se conectan solas a las páginas -->
+                <button id="menuTema" class="menu-tema ios-menu-row border-t border-gray-300">
+                    <span class="menu-check">✓</span><span>Modo oscuro</span>
                 </button>
             </div>
         </div>
