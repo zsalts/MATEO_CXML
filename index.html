@@ -45,11 +45,6 @@
     })();
     </script>
 
-    <!-- Modo oscuro antes de dibujar: sin esto la app abre en blanco y recién
-         después se oscurece, un destello molesto de noche. -->
-    <script>
-    try { if (localStorage.getItem('tv_tema') === 'oscuro') document.documentElement.setAttribute('data-tema', 'oscuro'); } catch (e) {}
-    </script>
     <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="style.css">
     <meta name="theme-color" content="#1f2937">
@@ -83,17 +78,13 @@
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="xml">
                     <span class="menu-check">✓</span><span>XML</span>
                 </button>
-                <!-- Sin la clase menu-page: esas filas se conectan solas a las páginas -->
-                <button id="menuTema" class="menu-tema ios-menu-row border-t border-gray-300">
-                    <span class="menu-check">✓</span><span>Modo oscuro</span>
-                </button>
             </div>
         </div>
 
         <!-- Título centrado de verdad: absoluto, sin depender del ancho de los costados -->
         <div class="absolute inset-x-0 flex justify-center pointer-events-none">
             <div id="timerDisplay" class="font-mono text-xl font-bold hidden">00:00</div>
-            <span id="titleLogo" class="font-bold text-lg">Tag&View<span id="appVersion" class="font-mono font-normal text-xs text-gray-400" style="margin-left:6px;"></span></span>
+            <span id="titleLogo" class="font-bold text-lg">Tag&View</span>
         </div>
 
         <div class="ml-auto flex justify-end relative z-50">
@@ -107,9 +98,8 @@
     <div id="setupBar" class="bg-[#f2f2f7] border-b border-gray-300 z-30 relative">
         <div class="flex items-center justify-between px-4 py-2">
 
-            <!-- Insertar (flex-1, igual que el espaciador de la derecha: así
-                 "Iniciar Codificación" queda centrado de verdad) -->
-            <div class="relative flex-1">
+            <!-- Insertar -->
+            <div class="relative">
                 <button id="btnInsertMenu" class="text-[#007aff] text-base font-normal">Insertar ▼</button>
                 <div id="insertMenu" class="absolute top-full left-0 mt-2 w-56 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
                     <button class="tool-btn ios-menu-row" data-type="event">
@@ -124,10 +114,6 @@
                         <div class="swatch" style="background:#fef08a;border-color:#d6b30e;"></div>
                         <span>Etiqueta</span>
                     </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="sticky_label">
-                        <div class="swatch" style="background:#ffedd5;border:1.5px dashed #f97316;"></div>
-                        <span>Etiqueta fija</span>
-                    </button>
                     <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="container">
                         <div class="swatch" style="background:#fff;border:2px solid #aaa;border-radius:4px;"></div>
                         <span>Contenedor</span>
@@ -140,26 +126,6 @@
                         <div class="swatch" style="background:linear-gradient(to bottom,#7b83e8,#4c51bf);border-color:#363b8f;"></div>
                         <span>Línea (ToI)</span>
                     </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="image">
-                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#fff;border-color:#c7c7cc;">▣</div>
-                        <span>Imagen</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="text">
-                        <div class="swatch flex items-center justify-center text-xs font-bold text-gray-700" style="background:#fff;border-color:#c7c7cc;">T</div>
-                        <span>Texto</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="teams">
-                        <div class="swatch" style="background:linear-gradient(90deg,#3a8fd6 50%,#dc2626 50%);border-color:#555;border-radius:50%;"></div>
-                        <span>Equipos</span>
-                    </button>
-                    <button class="tool-btn ios-menu-row border-t border-gray-100" data-type="possession">
-                        <div class="swatch" style="background:linear-gradient(90deg,#3a8fd6 50%,#ef4444 50%);border-color:#555;"></div>
-                        <span>Posesión</span>
-                    </button>
-                    <button id="btnInsertHoja" class="ios-menu-row border-t border-gray-100">
-                        <div class="swatch" style="background:#1c1c1e;border-color:#1c1c1e;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;">⧉</div>
-                        <span>Pestaña nueva</span>
-                    </button>
                     <button id="btnStartCodingMenu" class="ios-menu-row border-t border-gray-300 text-[#2ca038] font-bold">
                         <span>▶ Iniciar Codificación</span>
                     </button>
@@ -171,17 +137,10 @@
                 ▶ Iniciar Codificación
             </button>
 
-            <!-- Duplicar y Eliminar salen flotando arriba del elemento
-                 seleccionado. Este lado (flex-1, igual que Insertar) mantiene
-                 "Iniciar Codificación" centrado, y lleva el ajuste de pantalla. -->
-            <div class="flex-1" style="text-align:right;">
-                <button id="btnAjustar" class="text-[#007aff] text-sm hidden">Tamaño real</button>
-            </div>
+            <!-- Eliminar -->
+            <button id="btnDeleteGlobal" class="text-red-400 text-sm">Eliminar</button>
         </div>
     </div>
-
-    <!-- PESTAÑAS de la botonera: solo en el editor, y solo si hay pestañas -->
-    <div id="hojasBar" class="hidden"></div>
 
     <!-- BARRA DE HERRAMIENTAS (Live) -->
     <div id="liveBar" class="hidden bg-[#f2f2f7] border-b border-gray-300 z-30">
@@ -208,31 +167,6 @@
                 <button id="btnHideInspector" class="text-[#007aff] font-bold text-base">Listo</button>
             </div>
             
-            <!-- Varios seleccionados: solo lo que se puede cambiar en todos a la vez -->
-            <div id="inspectorMulti" class="hidden flex-col flex-1">
-                <div id="multiResumen" class="inspector-section-label">VARIOS SELECCIONADOS</div>
-                <div class="inspector-section-label">SUMA A LA POSESIÓN DE</div>
-                <div class="inspector-cell">
-                    <select id="propMultiEquipo" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
-                    <p id="multiAyuda" class="text-xs text-gray-400 mt-1"></p>
-                </div>
-                <div class="inspector-section-label">CONTADOR</div>
-                <div class="inspector-cell flex justify-between items-center">
-                    <span class="text-[#2a5b84] text-sm">Mostrar cuántas veces lo marqué</span>
-                    <input id="propMultiContador" type="checkbox" class="w-5 h-5">
-                </div>
-                <div class="inspector-section-label">TRANSPARENCIA</div>
-                <div class="inspector-cell">
-                    <select id="propMultiTransparencia" class="w-full bg-transparent text-sm focus:outline-none text-black">
-                        <option value="100">Sólido</option>
-                        <option value="80">80% · un poco transparente</option>
-                        <option value="60">60%</option>
-                        <option value="40">40%</option>
-                        <option value="25">25% · casi transparente</option>
-                    </select>
-                </div>
-            </div>
-
             <div id="inspectorContent" class="flex flex-col flex-1">
                 <!-- Nombre -->
                 <div class="inspector-section-label">NOMBRE</div>
@@ -246,15 +180,10 @@
                     <select id="propType" class="w-full bg-transparent text-base focus:outline-none text-black">
                         <option value="event">Evento</option>
                         <option value="descriptor">Etiqueta</option>
-                        <option value="sticky_label">Etiqueta fija</option>
                         <option value="popup_label">Etiqueta emergente</option>
                         <option value="container">Contenedor</option>
                         <option value="counter">Contador</option>
                         <option value="line">Línea (ToI)</option>
-                        <option value="possession">Posesión</option>
-                        <option value="text">Texto</option>
-                        <option value="teams">Equipos</option>
-                        <option value="image">Imagen</option>
                     </select>
                 </div>
 
@@ -263,21 +192,6 @@
                 <div class="inspector-cell flex items-center space-x-3">
                     <input id="propColor" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
                     <span class="text-gray-500 text-sm">Color del botón</span>
-                </div>
-
-                <!-- Transparencia: para todos menos la imagen, que tiene su propia opacidad -->
-                <div id="propTransparenciaSection">
-                    <div class="inspector-section-label">TRANSPARENCIA</div>
-                    <div class="inspector-cell">
-                        <select id="propTransparencia" class="w-full bg-transparent text-sm focus:outline-none text-black">
-                            <option value="100">Sólido</option>
-                            <option value="80">80% · un poco transparente</option>
-                            <option value="60">60%</option>
-                            <option value="40">40%</option>
-                            <option value="25">25% · casi transparente</option>
-                        </select>
-                        <p class="text-xs text-gray-400 mt-1">Para ver lo que hay detrás, por ejemplo una cancha de fondo. En vivo se toca igual.</p>
-                    </div>
                 </div>
 
                 <!-- Opciones de evento (tiempos) -->
@@ -315,28 +229,6 @@
                         <input id="propDescriptors" type="text" class="w-full bg-transparent text-sm focus:outline-none text-black" placeholder="Ej: Pie derecho, Pie izquierdo">
                         <p class="text-xs text-gray-400 mt-1">Aparecerán como botones debajo del evento al tocarlo en vivo.</p>
                     </div>
-
-                    <div id="propDetalleSection">
-                        <div class="inspector-section-label">AL TOCARLO, ABRIR PESTAÑA</div>
-                        <div class="inspector-cell">
-                            <select id="propSubPlantilla" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
-                            <p class="text-xs text-gray-400 mt-1">Creala con Insertar ▼ → Pestaña nueva. En vivo: tocás un botón de la pestaña, queda como etiqueta del evento y vuelve sola.</p>
-                        </div>
-                    </div>
-
-                    <div class="inspector-section-label">CONTADOR</div>
-                    <div class="inspector-cell flex justify-between items-center">
-                        <span class="text-[#2a5b84] text-sm">Mostrar cuántas veces lo marqué</span>
-                        <input id="propMostrarContador" type="checkbox" class="w-5 h-5">
-                    </div>
-
-                    <div id="propEquipoEventoSection">
-                        <div class="inspector-section-label">SUMA A LA POSESIÓN DE</div>
-                        <div class="inspector-cell">
-                            <select id="propEquipoEvento" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
-                            <p class="text-xs text-gray-400 mt-1">Cada vez que toques este evento, su tiempo cuenta como posesión de ese equipo, y se corta todo lo que esté corriendo del equipo rival.</p>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Sub-etiquetas popup (para tipo popup_label standalone) -->
@@ -363,84 +255,10 @@
                     </div>
                 </div>
 
-                <!-- Imagen -->
-                <div id="propImagenSection" class="hidden">
-                    <div class="inspector-section-label">IMAGEN</div>
-                    <div class="inspector-cell">
-                        <button id="btnCambiarImagen" class="text-[#007aff] text-base font-normal w-full text-left">Cambiar imagen…</button>
-                    </div>
-                    <div class="inspector-cell border-t border-gray-200">
-                        <select id="propAjusteImagen" class="w-full bg-transparent text-sm focus:outline-none text-black">
-                            <option value="contain">Ajustar: se ve entera</option>
-                            <option value="cover">Rellenar: ocupa toda la caja</option>
-                        </select>
-                    </div>
-                    <div class="inspector-cell border-t border-gray-200">
-                        <select id="propOpacidadImagen" class="w-full bg-transparent text-sm focus:outline-none text-black">
-                            <option value="100">Opacidad 100%</option>
-                            <option value="70">Opacidad 70%</option>
-                            <option value="40">Opacidad 40%</option>
-                            <option value="20">Opacidad 20%</option>
-                        </select>
-                        <p class="text-xs text-gray-400 mt-1">Va detrás de los botones: sirve de fondo (una cancha, un escudo). En vivo se ve, pero no se toca.</p>
-                    </div>
-                </div>
-
-                <!-- Texto libre -->
-                <div id="propTextoSection" class="hidden">
-                    <div class="inspector-section-label">TAMAÑO DEL TEXTO</div>
-                    <div class="inspector-cell">
-                        <select id="propTamanoTexto" class="w-full bg-transparent text-sm focus:outline-none text-black">
-                            <option value="12">Chico</option>
-                            <option value="14">Mediano chico</option>
-                            <option value="18">Mediano</option>
-                            <option value="24">Grande</option>
-                            <option value="32">Muy grande</option>
-                            <option value="48">Título</option>
-                        </select>
-                        <p class="text-xs text-gray-400 mt-1">El texto se escribe en NOMBRE, y su color es el de COLOR. En vivo se ve, pero no se toca ni se registra.</p>
-                    </div>
-                </div>
-
-                <!-- Tarjeta de equipos -->
-                <div id="propEquiposSection" class="hidden">
-                    <div class="inspector-section-label">EQUIPOS</div>
-                    <div class="inspector-cell flex justify-between items-center">
-                        <input id="propEqColorA" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
-                        <select id="propEqNombreA" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:170px;"></select>
-                    </div>
-                    <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
-                        <input id="propEqColorB" type="color" class="w-10 h-8 rounded border border-gray-300 cursor-pointer flex-shrink-0">
-                        <select id="propEqNombreB" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:170px;"></select>
-                    </div>
-                    <div class="inspector-cell">
-                        <p class="text-xs text-gray-400">Elegí de los equipos cargados, o "＋ Cargar equipo…" para sumar uno nuevo: queda guardado con su color. Nombres y colores para toda la botonera: los usan la posesión, los eventos que le suman a un equipo, el panel y el XML.</p>
-                    </div>
-                </div>
-
-                <!-- Posesión -->
-                <div id="propPosesionSection" class="hidden">
-                    <div class="inspector-section-label">EQUIPOS</div>
-                    <div class="inspector-cell flex justify-between items-center">
-                        <span class="text-[#2a5b84] text-sm">Lado izquierdo</span>
-                        <select id="propEquipoA" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:150px;"></select>
-                    </div>
-                    <div class="inspector-cell flex justify-between items-center border-t border-gray-200">
-                        <span class="text-[#2a5b84] text-sm">Lado derecho</span>
-                        <select id="propEquipoB" class="bg-transparent text-[#007aff] text-sm focus:outline-none" style="width:150px;"></select>
-                    </div>
-                    <div class="inspector-cell">
-                        <p class="text-xs text-gray-400">Elegí los equipos de la lista, o "＋ Cargar equipo…" para sumar uno. En vivo: tocá el lado del equipo que tiene la pelota. Tocar otra vez el mismo lado corta la posesión (pelota muerta). Cada tramo queda como clip en el XML.</p>
-                    </div>
-                </div>
-
                 <!-- Acciones -->
                 <div class="inspector-section-label">ACCIONES</div>
                 <div class="inspector-cell">
                     <button id="btnStartLink" class="text-[#007aff] text-base font-normal w-full text-left">Crear enlace →</button>
-                </div>
-                <div class="inspector-cell border-t border-gray-200">
-                    <button id="btnDuplicateElement" class="text-[#007aff] text-base font-normal w-full text-left">Duplicar</button>
                 </div>
                 <div class="inspector-cell border-t border-gray-200">
                     <button id="btnDeleteElement" class="text-red-500 text-base font-normal w-full text-left">Eliminar elemento</button>
@@ -453,10 +271,7 @@
             <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-[#f2f2f7]">
                 <div class="seg-control">
                     <button id="tabLog" class="seg-btn seg-active">Registro</button>
-                    <!-- "En hielo" y no "Tiempo en hielo": con la pestaña Posesión la
-                         fila quedaba a 1 px de desbordar, y en el iPad la fuente es más ancha -->
-                    <button id="tabToi" class="seg-btn">En hielo</button>
-                    <button id="tabPos" class="seg-btn">Posesión</button>
+                    <button id="tabToi" class="seg-btn">Tiempo en hielo</button>
                 </div>
                 <button id="btnClearEvents" class="text-red-500 text-sm ml-2 flex-shrink-0">Borrar</button>
             </div>
@@ -474,10 +289,6 @@
                 </div>
                 <div id="toiList" class="flex-1 overflow-y-auto"></div>
                 <button id="btnExportToi" class="py-2.5 text-[#007aff] text-sm font-medium border-t border-gray-200 bg-[#f2f2f7]">Exportar ToI (CSV)</button>
-            </div>
-
-            <div id="posView" class="hidden flex-1 flex-col overflow-hidden">
-                <div id="posList" class="flex-1 overflow-y-auto"></div>
             </div>
         </aside>
 
@@ -510,23 +321,13 @@
 
         <div id="templatesList" class="flex-1 overflow-y-auto divide-y divide-gray-100 bg-white"></div>
 
-        <div class="border-t border-gray-300 bg-[#f2f2f7]">
-            <!-- Estado del respaldo automático. Oculto si la nube no está configurada. -->
-            <div id="nubeBarPlantillas" class="hidden px-3 pt-2 flex items-center justify-between">
-                <span id="nubeEstadoPlantillas" class="text-xs text-gray-500"></span>
-                <span class="flex-shrink-0" style="margin-left:12px;">
-                    <button id="btnSubirNube" class="text-[#007aff] text-xs font-medium">Subir a la nube</button>
-                    <button id="btnRestoreNube" class="text-[#007aff] text-xs font-medium" style="margin-left:16px;">Traer de la nube</button>
-                </span>
-            </div>
-            <div class="p-3 flex space-x-2">
-                <button id="btnBackupAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
-                    Copia de seguridad
-                </button>
-                <button id="btnRestoreAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
-                    Restaurar copia
-                </button>
-            </div>
+        <div class="p-3 border-t border-gray-300 flex space-x-2 bg-[#f2f2f7]">
+            <button id="btnBackupAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
+                Copia de seguridad
+            </button>
+            <button id="btnRestoreAll" class="flex-1 py-2 text-gray-500 text-xs font-medium">
+                Restaurar copia
+            </button>
         </div>
         <div id="infoVersion" class="px-3 pb-3 text-center text-gray-400 text-xs bg-[#f2f2f7]"></div>
     </div>
@@ -536,12 +337,6 @@
         <div class="px-4 py-3 bg-white border-b border-gray-300">
             <p class="text-xs text-gray-500 font-normal uppercase tracking-wide">XML</p>
             <p class="text-base font-bold text-black">Codificaciones guardadas</p>
-        </div>
-
-        <!-- Estado de la nube. Oculto mientras nube-config.js esté sin completar. -->
-        <div id="nubeBar" class="hidden px-4 py-2 bg-white border-b border-gray-300 flex items-center justify-between">
-            <span id="nubeEstado" class="text-xs text-gray-500"></span>
-            <button id="btnNube" class="text-[#007aff] text-xs font-medium flex-shrink-0" style="margin-left:12px;">Sincronizar</button>
         </div>
 
         <div class="p-3 bg-white border-b border-gray-300 flex flex-col space-y-2">
@@ -599,32 +394,12 @@
         </div>
     </div>
 
-    <script src="nube-config.js"></script>
     <script src="app.js"></script>
     <script>
         // Solo disponible sobre https:// o localhost. Con file:// se ignora sin romper nada.
         if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-            // El service worker sirve desde su caché sin preguntar al servidor.
-            // Cuando sube una versión nueva, la instala pero la página que ya
-            // está abierta sigue mostrando la vieja: hacía falta una segunda
-            // recarga que nadie sabe que tiene que hacer, y se veía un número
-            // de versión viejo en un dispositivo y el nuevo en otro.
-            // Con skipWaiting + clients.claim, el que instala toma el control
-            // enseguida y avisa acá: recargamos solos, una sola vez.
-            var habiaControlador = !!navigator.serviceWorker.controller;
-            var recargando = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                // La primera visita no tiene nada viejo en pantalla que reemplazar.
-                if (!habiaControlador || recargando) return;
-                recargando = true;
-                location.reload();
-            });
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js').then(function (reg) {
-                    // Buscar versión nueva en cada apertura, sin esperar a que
-                    // al navegador se le ocurra revisar.
-                    reg.update();
-                }).catch(function () {});
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
             });
         }
     </script>
