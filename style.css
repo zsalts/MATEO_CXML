@@ -118,6 +118,19 @@ body {
     color: #000;
     border-radius: 6px;
 }
+/* Etiqueta fija: borde punteado; en vivo se enciende mientras está puesta */
+.canvas-element[data-eltype="sticky_label"] {
+    background: #ffedd5;
+    border: 1.5px dashed #f97316;
+    color: #000;
+    border-radius: 6px;
+}
+.canvas-element[data-eltype="sticky_label"].fija-activa {
+    background: #f97316;
+    border-style: solid;
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(249,115,22,.45);
+}
 /* Counter */
 .canvas-element[data-eltype="counter"] {
     background: #f5f5f7;
@@ -173,6 +186,259 @@ body {
     z-index: 200;
 }
 .canvas-element.selected .resize-handle { display: block; }
+/* Parte de una selección de varios: se ven todos los que agarró el rectángulo. */
+.canvas-element.en-seleccion {
+    outline: 2px solid #007aff;
+    outline-offset: 2px;
+}
+
+/* Duplicar / Eliminar flotando encima del elemento seleccionado. Sueltos en
+   el lienzo, no adentro del botón: .canvas-element tiene overflow: hidden y
+   los cortaría. */
+.acciones-flotantes {
+    position: absolute;
+    z-index: 150;
+    transform: translateX(-50%);
+    display: flex;
+    border-radius: 999px;
+    background: #1c1c1e;
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    overflow: hidden;
+    white-space: nowrap;
+}
+.acciones-flotantes button {
+    padding: 6px 14px;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    cursor: pointer;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+}
+.acciones-flotantes button + button { border-left: 1px solid rgba(255,255,255,.18); }
+.acciones-flotantes .af-eliminar { color: #ff6b6b; }
+.acciones-flotantes button:active { background: #3a3a3c; }
+
+/* Los carteles escriben el mensaje con textContent y usan \n para separar
+   párrafos y listas. Sin esto el navegador los junta en una sola línea
+   corrida, y un "¿reemplazar estas plantillas?" se vuelve ilegible. */
+#customDialogMessage { white-space: pre-line; }
+
+/* Barra de la plantilla de detalle: qué evento se está detallando y la salida
+   sin elegir. Va fuera del lienzo para no achicarse con él. */
+.barra-detalle {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 6px 6px 14px;
+    border-radius: 999px;
+    background: #1c1c1e;
+    color: #fff;
+    font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,.28);
+    white-space: nowrap;
+}
+.barra-detalle .bd-cancelar {
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,.14);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+}
+.barra-detalle .bd-cancelar:active { background: rgba(255,255,255,.26); }
+
+/* Pestañas de la botonera en el editor. */
+#hojasBar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    overflow-x: auto;
+    background: #f2f2f7;
+    border-bottom: 1px solid #d1d5db;
+    position: relative;
+    z-index: 29;
+}
+/* El id le gana a la clase .hidden de Tailwind: sin esto la barra no se ocultaría. */
+#hojasBar.hidden { display: none; }
+.hoja-tab, .hoja-mas, .hoja-borrar {
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #e5e5ea;
+    color: #1c1c1e;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-appearance: none;
+    touch-action: manipulation;
+}
+.hoja-tab.activa { background: #1c1c1e; color: #fff; }
+.hoja-borrar { padding: 5px 8px; margin-left: -4px; background: transparent; color: #ef4444; }
+.hoja-mas { background: transparent; color: #007aff; }
+.hoja-etiquetas {
+    flex-shrink: 0;
+    border: 1px solid #d1d1d6;
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #fff;
+    color: #1c1c1e;
+    font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+/* Evento que suma posesión: una franja del color de su equipo. */
+.canvas-element.equipo-A { box-shadow: inset 6px 0 0 var(--equipo-a, #1e3a8a); }
+.canvas-element.equipo-B { box-shadow: inset 6px 0 0 var(--equipo-b, #dc2626); }
+
+/* Texto libre: se ve, pero no se toca ni se registra. */
+.canvas-element[data-eltype="text"] {
+    background: transparent;
+    border: 1.5px dashed transparent;
+    font-weight: 700;
+    line-height: 1.15;
+}
+/* En el editor, un borde tenue para poder agarrarlo; en vivo no se ve. */
+.canvas-element.mode-setup[data-eltype="text"] { border-color: #c7c7cc; }
+.texto-libre { white-space: nowrap; }
+
+/* Imagen: detrás de los botones, sin fondo propio. */
+.canvas-element[data-eltype="image"] {
+    background: transparent;
+    border: 1.5px dashed transparent;
+    padding: 0;
+    color: #8e8e93;
+}
+.canvas-element.mode-setup[data-eltype="image"] { border-color: #c7c7cc; }
+/* La imagen no captura el toque: así se arrastra y cambia de tamaño la caja. */
+.img-libre {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+}
+.canvas-element.mode-live[data-eltype="image"] { cursor: default; }
+.canvas-element.mode-live[data-eltype="image"]:active { transform: none; filter: none; }
+
+/* Tarjeta de equipos */
+.canvas-element[data-eltype="teams"] {
+    flex-direction: row;
+    gap: 10px;
+    padding: 0 12px;
+    background: #fff;
+    border: 1.5px solid #d1d1d6;
+    border-radius: 10px;
+    color: #1c1c1e;
+    font-size: 14px;
+    font-weight: 800;
+}
+.eq-lado { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.eq-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.eq-punto { width: 12px; height: 12px; border-radius: 999px; flex-shrink: 0; }
+.eq-a { background: var(--equipo-a, #3a8fd6); }
+.eq-b { background: var(--equipo-b, #dc2626); }
+.eq-vs { color: #8e8e93; font-size: 12px; font-weight: 600; }
+
+/* Texto y equipos son para leer: en vivo no reaccionan al toque. */
+.canvas-element.mode-live[data-eltype="text"],
+.canvas-element.mode-live[data-eltype="teams"] { cursor: default; }
+.canvas-element.mode-live[data-eltype="text"]:active,
+.canvas-element.mode-live[data-eltype="teams"]:active { transform: none; filter: none; }
+
+/* Contador en la esquina del botón: cuántas veces se marcó. Deja pasar el
+   toque al botón, así no molesta al tocar. */
+.ev-contador {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.38);
+    color: #fff;
+    font: 800 11px/18px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    text-shadow: none;
+    pointer-events: none;
+}
+
+/* Etiqueta ya elegida en una pestaña de detalle con varias por elegir. */
+.canvas-element.elegida {
+    outline: 3px solid #34c759 !important;
+    outline-offset: 2px;
+    filter: brightness(.92);
+}
+
+/* Botón de posesión: partido en dos, un equipo por mitad. */
+.canvas-element[data-eltype="possession"] {
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0;
+    border: 1.5px solid #555;
+    border-radius: 10px;
+    background: #fff;
+}
+.pos-lado {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: #fff;
+    transition: filter .1s;
+}
+/* Colores de los equipos: salen de la tarjeta Equipos (variables que pone app.js). */
+.pos-A { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--equipo-a, #3a8fd6); color: var(--equipo-a-texto, #fff); }
+.pos-B { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--equipo-b, #dc2626); color: var(--equipo-b-texto, #fff); }
+.pos-lado + .pos-lado { border-left: 1.5px solid rgba(0,0,0,.25); }
+.pos-nombre { font-size: 12px; font-weight: 700; line-height: 1.1; }
+.pos-pct { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+/* En vivo la mitad que no tiene la pelota se apaga; la que la tiene brilla. */
+.mode-live .pos-lado { filter: saturate(.35) brightness(.95); }
+.mode-live .pos-lado.activo { filter: none; box-shadow: inset 0 0 0 3px #fde047; }
+.mode-live .pos-lado:active { filter: brightness(.85); }
+
+/* Pestaña Posesión del panel en vivo. */
+.pos-panel { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+.pos-panel-barra {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    background: var(--equipo-b, #dc2626);
+}
+.pos-panel-barra .pos-A { width: 50%; transition: width .3s; }
+.pos-panel-barra .pos-B { flex: 1; }
+.pos-panel-fila {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+}
+.pos-panel-punto { width: 10px; height: 10px; border-radius: 999px; }
+.pos-panel-nombre { font-weight: 600; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-panel-pct { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.pos-panel-tiempo { color: #6b7280; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.pos-panel-pie { margin-top: 6px; font-size: 11px; color: #9ca3af; }
 .resize-se { bottom: -7px; right: -7px; cursor: se-resize; }
 .resize-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
 .resize-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
@@ -446,3 +712,98 @@ body {
 }
 .menu-page.is-current .menu-check { visibility: visible; }
 .menu-page.is-current { font-weight: 700; }
+.menu-tema { justify-content: flex-start; }
+.menu-tema.is-on .menu-check { visibility: visible; }
+
+/* Texto libre sin color propio: toma el del tema (negro en claro). */
+.canvas-element[data-eltype="text"] { color: #1c1c1e; }
+
+/* ═══════════════════════════════════════════
+   MODO OSCURO
+   Todo cuelga de html[data-tema="oscuro"]: le gana a las clases de Tailwind
+   por especificidad, sin tocar el HTML ni el CSS precompilado.
+   ═══════════════════════════════════════════ */
+html[data-tema="oscuro"] { color-scheme: dark; }   /* selects y casillas nativos, oscuros */
+html[data-tema="oscuro"] body { background: #000; color: #f2f2f7; }
+
+/* Fondos */
+html[data-tema="oscuro"] .bg-white          { background-color: #1c1c1e; }
+html[data-tema="oscuro"] .bg-white\/95      { background-color: rgba(28,28,30,.95); }
+html[data-tema="oscuro"] .bg-\[\#f2f2f7\]   { background-color: #111113; }
+html[data-tema="oscuro"] .bg-gray-100       { background-color: #2c2c2e; }
+html[data-tema="oscuro"] .bg-gray-50\/80    { background-color: rgba(44,44,46,.8); }
+html[data-tema="oscuro"] .hover\:bg-gray-50:hover  { background-color: #2c2c2e; }
+html[data-tema="oscuro"] .hover\:bg-gray-200:hover { background-color: #3a3a3c; }
+html[data-tema="oscuro"] .bg-red-50         { background-color: rgba(239,68,68,.16); }
+html[data-tema="oscuro"] .bg-red-200        { background-color: rgba(239,68,68,.35); }
+
+/* Textos */
+html[data-tema="oscuro"] .text-black        { color: #f2f2f7; }
+html[data-tema="oscuro"] .text-gray-400     { color: #8e8e93; }
+html[data-tema="oscuro"] .text-gray-500     { color: #98989d; }
+html[data-tema="oscuro"] .text-gray-600     { color: #aeaeb2; }
+html[data-tema="oscuro"] .text-gray-700     { color: #c7c7cc; }
+html[data-tema="oscuro"] .text-red-800      { color: #fecaca; }
+html[data-tema="oscuro"] .text-\[\#2a5b84\] { color: #8ab4e8; }
+html[data-tema="oscuro"] .text-\[\#007aff\] { color: #0a84ff; }
+
+/* Bordes y divisores */
+html[data-tema="oscuro"] .border-gray-100,
+html[data-tema="oscuro"] .border-gray-100\/50,
+html[data-tema="oscuro"] .border-gray-200   { border-color: #2c2c2e; }
+html[data-tema="oscuro"] .border-gray-300   { border-color: #3a3a3c; }
+html[data-tema="oscuro"] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2c2c2e; }
+
+/* Lienzo */
+html[data-tema="oscuro"] .bg-grid {
+    background-color: #0b0b0c;
+    background-image:
+        linear-gradient(to right, #1d2330 1px, transparent 1px),
+        linear-gradient(to bottom, #1d2330 1px, transparent 1px);
+}
+
+/* Inspector y menús */
+html[data-tema="oscuro"] .inspector-section-label { background: #111113; color: #8e8e93; border-top-color: #38383a; }
+html[data-tema="oscuro"] .inspector-cell   { background: #1c1c1e; border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .ios-menu-row     { background: #1c1c1e; color: #f2f2f7; }
+html[data-tema="oscuro"] .ios-menu-row:active { background: #2c2c2e; }
+html[data-tema="oscuro"] .popup-dot::before { background: #1c1c1e; border-color: #f2f2f7; }
+
+/* Elementos del lienzo con fondo claro */
+html[data-tema="oscuro"] .canvas-element[data-eltype="counter"] { background: #2c2c2e; border-color: #636366; color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="container"],
+html[data-tema="oscuro"] .canvas-element.is-container { background: rgba(28,28,30,.85); border-color: #48484a !important; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="text"] { color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="text"],
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="image"] { border-color: #48484a; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="teams"] { background: #1c1c1e; border-color: #48484a; color: #f2f2f7; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="possession"] { background: #1c1c1e; border-color: #636366; }
+html[data-tema="oscuro"] .resize-handle { background: #1c1c1e; }
+
+/* Barritas negras flotantes: sobre fondo negro se perdían */
+html[data-tema="oscuro"] .acciones-flotantes,
+html[data-tema="oscuro"] .barra-detalle { background: #3a3a3c; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+
+/* Pestañas de la botonera */
+html[data-tema="oscuro"] #hojasBar        { background: #111113; border-bottom-color: #38383a; }
+html[data-tema="oscuro"] .hoja-tab        { background: #2c2c2e; color: #f2f2f7; }
+html[data-tema="oscuro"] .hoja-tab.activa { background: #f2f2f7; color: #000; }
+html[data-tema="oscuro"] .hoja-etiquetas  { background: #1c1c1e; color: #f2f2f7; border-color: #48484a; }
+
+/* Panel en vivo: registro, tiempo en hielo, posesión */
+html[data-tema="oscuro"] .seg-control, html[data-tema="oscuro"] .page-nav { background: #2c2c2e; }
+html[data-tema="oscuro"] .seg-btn, html[data-tema="oscuro"] .page-nav-btn { color: #c7c7cc; }
+html[data-tema="oscuro"] .seg-btn.seg-active,
+html[data-tema="oscuro"] .page-nav-btn.nav-active { background: #636366; color: #fff; }
+html[data-tema="oscuro"] .event-row, html[data-tema="oscuro"] .toi-row { border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .event-row:nth-child(even),
+html[data-tema="oscuro"] .toi-row:nth-child(even) { background: #161618; }
+html[data-tema="oscuro"] .event-row .ev-name, html[data-tema="oscuro"] .toi-row .toi-name { color: #f2f2f7; }
+html[data-tema="oscuro"] .ev-tag-chip { background: #3a3a3c; color: #e5e5ea; }
+html[data-tema="oscuro"] .event-row .ev-time { color: #98989d; }
+html[data-tema="oscuro"] .toi-row .toi-shifts,
+html[data-tema="oscuro"] .toi-row .toi-total-cell { color: #c7c7cc; }
+html[data-tema="oscuro"] .toi-row.on-ice { background: rgba(239,68,68,.16); }
+html[data-tema="oscuro"] .pos-panel { border-bottom-color: #2c2c2e; }
+html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
+html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }

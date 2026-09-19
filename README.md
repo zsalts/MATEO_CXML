@@ -4,8 +4,8 @@ App web para **codificación de video deportivo**: armás un panel de botones,
 taggeás el partido en vivo y exportás un XML que se importa en Sportscode,
 Nacsport o LongoMatch.
 
-Sin backend, sin base de datos, sin dependencias de npm. Todo se guarda en el
-dispositivo.
+Sin dependencias de npm. Todo se guarda en el dispositivo; la copia a la nube
+es opcional y se apaga dejando `nube-config.js` vacío.
 
 ## Qué hace
 
@@ -19,15 +19,48 @@ dispositivo.
 - **Archivos** — plantillas, sesiones y copias de seguridad como `.json` que
   se guardan y se abren desde la app Archivos del iPad.
 
+## Pestañas de detalle
+
+Una botonera puede tener pestañas adentro: **Insertar ▼ → Pestaña nueva**. Si
+lo hacés con un evento seleccionado, la pestaña queda conectada a ese evento.
+También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
+
+- En el editor aparece la barra **Principal · Detalle… · + Pestaña**. Tocar la
+  pestaña que ya está abierta la renombra; la ✕ la elimina con sus botones.
+- En vivo se codifica siempre desde la Principal. Tocás el evento, se abre su
+  pestaña, tocás un botón y queda como etiqueta del evento; la pantalla vuelve
+  sola. "Volver sin elegir" sale sin etiquetar.
+- Cada pestaña define **cuántas etiquetas se eligen** antes de volver (de 1 a
+  5, en el selector al lado de su nombre). Por ejemplo, un ingreso al área con 2
+  y un tiro con 1. Tocar una ya elegida la desmarca, y "Listo" termina antes.
+- Todo queda en la misma plantilla: se guarda, se exporta y viaja por la nube
+  junto con la Principal.
+
+## Terminar, equipos y etiquetas fijas
+
+- **Terminar** guarda sola la codificación en la página XML y exporta el
+  archivo, los dos con el nombre `LOCAL vs VISITANTE 15-09-2026 20h30` (día y
+  hora del primer PLAY).
+- **Equipos cargados:** en la tarjeta Equipos y en el botón de Posesión los
+  equipos se eligen de una lista. "＋ Cargar equipo…" suma uno nuevo, con el
+  color que tenga ese lado de la tarjeta. La lista va en la copia de seguridad.
+- **Etiqueta fija** (Insertar ▼): en vivo, al tocarla queda encendida y se pega
+  a todo lo que marques. Tocar otra etiqueta fija apaga la anterior; tocar la
+  misma la saca. Sirve para el tiempo, el cuarto o una situación de juego.
+
 ## Dónde se guardan los datos
 
 En el dispositivo, siempre. El hosting solo sirve los archivos estáticos: nunca
 recibe ni almacena nada. Las plantillas y sesiones viven en el `localStorage`
 del navegador, y los respaldos son archivos `.json` que exportás vos.
 
+Lo único que sale del dispositivo es la copia de los XML a la nube, si la
+activaste — ver más abajo. Las plantillas y las sesiones no se suben.
+
 Como el navegador puede limpiar su almacenamiento, conviene exportar la sesión
 después de cada partido (**Historial ▾ → ⤓**) y hacer una copia completa cada
-tanto (**Plantillas ▾ → Copia de seguridad**).
+tanto (**Plantillas ▾ → Copia de seguridad**). Con la nube activada eso último
+pasa solo, en cada cambio.
 
 ## Instalar en el iPad
 
@@ -37,6 +70,71 @@ funciona en modo avión.
 
 Las rutas son relativas, así que anda igual en la raíz de un dominio que en un
 subdirectorio (`https://usuario.github.io/xml/`).
+
+## Nube (opcional)
+
+Hace dos cosas:
+
+- **Los XML.** Al exportar uno, la app sube una copia a Supabase Storage y la
+  bajás desde la compu abriendo `descargas.html`. Así no hay que pelear con la
+  descarga en el iPad.
+- **Las plantillas y las codificaciones.** Cada vez que guardás, borrás o
+  importás una, se sube un `respaldo.json` con todo. Se recupera desde
+  **Plantillas → Restaurar de la nube**, en el iPad o en otro dispositivo.
+
+### Armar la botonera en la PC
+
+La app es una web: abrís la misma dirección en el navegador de la PC, entrás a
+la nube con el mismo usuario, y armás el panel con mouse y teclado. Cuando
+después abrís el iPad, detecta que en la nube hay algo más nuevo y ofrece
+traerlo.
+
+Funciona en las dos direcciones, pero **no es una sincronización de verdad**:
+hay un solo `respaldo.json` y el último que guarda pisa al anterior. Mientras
+uses un dispositivo por vez no hay problema. Si editás en los dos sin abrir el
+otro en el medio, uno de los dos cambios se pierde.
+
+Dos cosas evitan los accidentes más comunes:
+
+- Al abrir la app se mira la nube **antes** de subir lo que haya quedado
+  pendiente. Al revés, un respaldo viejo que se quedó sin señal pisaría lo que
+  hiciste en la PC sin preguntar.
+- Si aceptás traer la copia de la nube, el respaldo local que estaba en la cola
+  se descarta: ya elegiste cuál vale.
+
+Aclaración por si preocupa: **actualizar la app no borra nada.** Subir una
+versión nueva cambia la caché del service worker, que no tiene relación con el
+`localStorage` donde viven las plantillas. Lo que sí las puede borrar es
+Safari: siete días sin abrir la app, un "borrar historial y datos de sitios", o
+cambiar de iPad. Para eso está el respaldo.
+
+Es **opcional y aditivo**. Con `nube-config.js` sin completar, la app funciona
+exactamente como antes y no sube nada. El XML se sigue guardando en el
+dispositivo siempre: la nube es una copia, nunca el único lugar donde está.
+
+Sin señal —una cancha sin wifi— el XML queda en una cola en el `localStorage` y
+sube solo cuando vuelve la conexión. La codificación nunca depende de la red.
+
+Para activarla:
+
+1. Creá un proyecto en Supabase.
+2. **SQL Editor** → pegá `supabase-setup.sql` y dale Run. Crea el bucket
+   privado y las tres políticas que Storage necesita.
+3. **Authentication → Users → Add user**: tu correo y contraseña. Es el
+   usuario con el que vas a entrar en el iPad y en la compu.
+4. **Project Settings → API**: copiá la *Project URL* y la clave *anon* a
+   `nube-config.js`.
+
+Conectar el repositorio a Supabase no reemplaza nada de esto: esa integración
+aplica migraciones que vos escribís, no deduce la configuración del código.
+
+La clave anon queda a la vista en el código de la página: es así por diseño y
+no es un secreto. La seguridad la dan las políticas del bucket y el login, por
+eso el bucket va privado. **Nunca pongas la clave `service_role` ahí**: esa da
+acceso total al proyecto.
+
+La primera vez, en cada dispositivo, la app pide entrar una sola vez. La sesión
+queda guardada y se renueva sola.
 
 ## Sin hosting
 
@@ -51,6 +149,17 @@ Para regenerarlo después de tocar el código:
 python3 build-ipad.py
 ```
 
+Sin Python (en Windows viene PowerShell de fábrica), `build-ipad.ps1` hace
+exactamente lo mismo:
+
+```bash
+powershell -ExecutionPolicy Bypass -File build-ipad.ps1
+```
+
+Ojo si lo editás: Windows PowerShell 5.1 lee el `.ps1` como Windows-1252, y
+un guion largo (—) escrito en UTF-8 se convierte en una comilla tipográfica que
+corta las cadenas. En el script no hay ninguno a propósito.
+
 ## Sobre los estilos
 
 `tailwind.css` es CSS estático, generado una vez a partir de las clases que la
@@ -63,8 +172,20 @@ Si solo tocás `style.css`, no hace falta.
 
 ## Al modificar el código
 
-Subí el número de `CACHE_VERSION` en `sw.js`. Si no, los dispositivos que ya
-tienen la app instalada siguen sirviendo la versión vieja desde el caché.
+Subí el número en los dos lugares, siempre juntos:
+
+- `CACHE_VERSION` en `sw.js` (`tagview-v12`). Si no, los dispositivos que ya
+  tienen la app instalada siguen sirviendo la versión vieja desde el caché.
+- `APP_VERSION` en `app.js` (`v12`). Es lo que la app muestra al lado del logo:
+  abrís la app y ves qué versión quedó servida de verdad. Si dice la vieja, el
+  caché no se renovó todavía.
+
+`build-ipad.py` corta si los dos números no coinciden.
+
+Desde v20 la app se actualiza sola: busca una versión nueva en cada apertura y,
+cuando el service worker nuevo toma el control, recarga una vez. Antes había que
+recargar dos veces a mano, y era fácil terminar con un dispositivo mostrando una
+versión y otro mostrando otra.
 
 ## Archivos
 
@@ -72,6 +193,9 @@ tienen la app instalada siguen sirviendo la versión vieja desde el caché.
 |---|---|
 | `index.html` | Estructura, paneles y modales |
 | `app.js` | Toda la lógica |
+| `nube-config.js` | Url y clave de Supabase. Vacío = sin nube |
+| `supabase-setup.sql` | Crea el bucket y sus políticas. Se corre una vez |
+| `descargas.html` | Lista y baja los XML subidos. Se abre en la compu |
 | `style.css` | Estilos propios (el resto es Tailwind) |
 | `tailwind.css` | Tailwind precompilado: solo las clases que la app usa |
 | `tailwind.js` | Compilador de Tailwind, solo para regenerar el CSS |
@@ -79,5 +203,6 @@ tienen la app instalada siguen sirviendo la versión vieja desde el caché.
 | `sw.js` | Service worker (caché offline) |
 | `manifest.json` | Metadatos de la PWA |
 | `build-ipad.py` | Genera el archivo único |
+| `build-ipad.ps1` | Lo mismo, con PowerShell, para cuando no hay Python |
 | `TagView-iPad.html` | Archivo único generado |
 # xml
