@@ -56,7 +56,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v45';
+const APP_VERSION = 'v46';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1529,6 +1529,8 @@ function canvasPos(cx, cy) {
 function onCanvasDown(e)  { if (state.mode !== 'setup') return; handleDown(e.clientX, e.clientY, e.target, e.shiftKey); }
 function onGlobalMove(e)  { if (state.mode !== 'setup') return; handleMove(e.clientX, e.clientY); }
 function onGlobalUp()     {
+    if (_moveRaf) { cancelAnimationFrame(_moveRaf); _moveRaf = null; }
+    aplicarMovePendiente();
     if (state.isMarquee) {
         finishMarquee();
         state.isMarquee = false;
@@ -1651,7 +1653,24 @@ function handleDown(cx, cy, target, shiftKey) {
     }
 }
 
+// El dedo (y más el trackpad) mandan movimientos mucho más seguido que los
+// cuadros que la pantalla puede dibujar: mover y redibujar en cada uno era
+// trabajo que nunca se llegaba a ver. Se guarda el último y se aplica uno por
+// cuadro, que es lo que el ojo recibe igual.
+let _moveRaf = null, _movePend = null;
 function handleMove(cx, cy) {
+    _movePend = { x: cx, y: cy };
+    if (_moveRaf) return;
+    _moveRaf = requestAnimationFrame(() => { _moveRaf = null; aplicarMovePendiente(); });
+}
+// Soltar con un movimiento sin aplicar dejaría el elemento un cuadro atrás de
+// donde quedó en el estado, y eso es lo que se guarda.
+function aplicarMovePendiente() {
+    const p = _movePend;
+    _movePend = null;
+    if (p) aplicarMove(p.x, p.y);
+}
+function aplicarMove(cx, cy) {
     const pos = canvasPos(cx, cy);
     state.mousePosCanvas = pos;
     if (state.isLinking) { renderLinks(); return; }
@@ -1665,14 +1684,16 @@ function handleMove(cx, cy) {
     if (state.isDragging && state.selectedIds.length > 0) {
         const dx = pos.x - state.dragStart.x;
         const dy = pos.y - state.dragStart.y;
+        const movidos = [];
         state.elStarts.forEach(s => {
             const e = state.elements.find(e => e.id === s.id);
             if (e) {
                 e.x = Math.max(0, snap(s.x + dx));
                 e.y = Math.max(0, snap(s.y + dy));
+                movidos.push(e);
             }
         });
-        updateElementPositions(); renderLinks();
+        updateElementPositions(movidos); renderLinks();
         return;
     }
 
@@ -1682,7 +1703,7 @@ function handleMove(cx, cy) {
             const dx = pos.x - state.dragStart.x, dy = pos.y - state.dragStart.y;
             if (state.resizeDir.includes('e')) e.w = Math.max(40, snap(state.elStart.w + dx));
             if (state.resizeDir.includes('s')) e.h = Math.max(24, snap(state.elStart.h + dy));
-            updateElementPositions(); renderLinks();
+            updateElementPositions([e]); renderLinks();
         }
     }
 }
@@ -2393,9 +2414,22 @@ function updateSelectionClasses() {
     posicionarAccionesFlotantes();
 }
 
-function updateElementPositions() {
-    state.elements.forEach(e => {
-        const nodo = el.canvas.querySelector('.canvas-element[data-id="' + e.id + '"]');
+// Los nodos del lienzo, por id. Arrastrando, buscar cada botón con
+// querySelector en cada cuadro obliga a recorrer el lienzo entero una vez por
+// botón; el mapa lo llena el repintado, que es el único que los crea. Si el
+// nodo ya no está en el documento, se vuelve a buscar.
+let _nodosPorId = new Map();
+function nodoDe(id) {
+    const guardado = _nodosPorId.get(id);
+    if (guardado && guardado.isConnected) return guardado;
+    const nodo = el.canvas.querySelector('.canvas-element[data-id="' + id + '"]');
+    if (nodo) _nodosPorId.set(id, nodo);
+    return nodo;
+}
+
+function updateElementPositions(lista) {
+    (lista || state.elements).forEach(e => {
+        const nodo = nodoDe(e.id);
         if (!nodo) return;
         nodo.style.left   = e.x + 'px';
         nodo.style.top    = e.y + 'px';
@@ -2492,8 +2526,13 @@ function escalaParaEntrar() {
     if (!ancho || !alto) return null;
 
     const MARGEN = 24;
-    const derecha = Math.max(...lista.map(e => e.x + e.w)) + MARGEN;
-    const abajo   = Math.max(...lista.map(e => e.y + e.h)) + MARGEN;
+    let derecha = 0, abajo = 0;
+    lista.forEach(e => {
+        if (e.x + e.w > derecha) derecha = e.x + e.w;
+        if (e.y + e.h > abajo)   abajo   = e.y + e.h;
+    });
+    derecha += MARGEN;
+    abajo   += MARGEN;
     // Solo achica: donde ya entra, se ve a tamaño real. Y con piso, para que
     // un panel enorme no deje botones imposibles de tocar.
     const escala = Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
@@ -2545,10 +2584,59 @@ function reajustarLienzo() {
     mostrarBarraDetalle();   // girar el iPad cambia el centro del lienzo
 }
 
+// ── Repintar sin rehacer el lienzo ───────────────────────────────
+// Tocar un botón en vivo no cambia QUÉ botones hay en pantalla: cambia cuál
+// está grabando, el contador y poco más. Rehacer el lienzo entero por eso
+// obliga al navegador a medir y ubicar cada botón de nuevo, y con la botonera
+// llena eso es justo lo que se siente como demora entre el toque y la marca.
+// Por eso se guarda una firma de lo dibujado: si coincide, se tocan solo las
+// clases y los números que cambiaron, sobre los nodos que ya están.
+//
+// El editor nunca entra por acá: ahí se cambian nombres, colores y tamaños, y
+// eso sí obliga a redibujar.
+let _firmaDibujo = null;
+
+function firmaDibujo(orden) {
+    if (state.mode !== 'live') return null;
+    const n = nombresEquipos(), c = coloresEquipos();
+    return (state.detalle ? state.detalle.plantilla : '') + '|'
+         + orden.map(e => e.id).join(',') + '|'
+         + (state.tempPopupButtons || []).map(b => b.name).join(',') + '|'
+         + n.A + '|' + n.B + '|' + c.A + '|' + c.B;
+}
+
+function repintarEnElLugar(orden) {
+    const enDetalle = !!state.detalle;
+    const grabando  = new Set(enDetalle ? [] : (state.openEvents || []).map(o => o.buttonId));
+    const fijas     = state.etiquetasFijas || [];
+    let _idx = null;
+    const idx = () => _idx || (_idx = indicePorBoton());
+
+    orden.forEach(e => {
+        const div = _nodosPorId.get(e.id);
+        if (!div || !div.isConnected) return;
+        div.classList.toggle('is-recording', grabando.has(e.id));
+        if (e.type === 'line') {
+            const prendida = (e.lineMemberIds || []).length > 0
+                && (e.lineMemberIds || []).every(id => grabando.has(id));
+            div.classList.toggle('is-line-active', prendida);
+        }
+        if (e.type === 'sticky_label') div.classList.toggle('fija-activa', fijas.includes(e.id));
+        if (enDetalle) div.classList.toggle('elegida', state.detalle.elegidas.includes(e.name));
+        if (e.type === 'counter') {
+            const sp = div.querySelector('span');
+            if (sp) ponerTexto(sp, String(state.counters[e.id] || 0));
+        }
+        if (e.type === 'event' && e.mostrarContador && !enDetalle) {
+            const badge = div.querySelector('.ev-contador');
+            if (badge) ponerTexto(badge, String(vecesMarcado(e.id, idx())));
+        }
+    });
+}
+
 function renderElements() {
     aplicarEscalaLienzo();
     aplicarColoresEquipos();
-    el.canvas.innerHTML = '';
 
     // Solo la pestaña a la vista: en vivo la Principal (o el detalle abierto),
     // en el editor la pestaña elegida.
@@ -2566,6 +2654,28 @@ function renderElements() {
         ? others.filter(e => e.type !== 'popup_label' || state.activePopupElementIds.includes(e.id))
         : others;
 
+    const orden = containers.concat(visible);
+
+    // Lo mismo que ya está en pantalla: se actualiza en el lugar y listo.
+    const firma = firmaDibujo(orden);
+    if (firma !== null && firma === _firmaDibujo && _nodosPorId.size) {
+        repintarEnElLugar(orden);
+        posicionarAccionesFlotantes();
+        updateLiveClocks();
+        return;
+    }
+    _firmaDibujo = firma;
+
+    el.canvas.innerHTML = '';
+    _nodosPorId.clear();
+    // Los botones se arman fuera del documento y entran en una sola tanda: así
+    // el navegador recalcula la pantalla una vez y no una por botón.
+    const frag = document.createDocumentFragment();
+    // Cuántas veces se marcó cada botón, de una sola pasada, y solo si hay
+    // algún botón que muestre el contador.
+    let _idx = null;
+    const idx = () => _idx || (_idx = indicePorBoton());
+
     // En el detalle no se marca nada como grabando: los ids de otra plantilla
     // pueden coincidir con los de la principal y se encenderían sin motivo.
     const openButtonIds = enDetalle ? [] : (state.openEvents || []).map(o => o.buttonId);
@@ -2573,7 +2683,7 @@ function renderElements() {
         && (e.lineMemberIds || []).length > 0
         && (e.lineMemberIds || []).every(id => openButtonIds.includes(id));
 
-    [...containers, ...visible].forEach((e) => {
+    orden.forEach((e) => {
         const isContainer = e.type === 'container';
         const isRecording = state.mode === 'live' && openButtonIds.includes(e.id);
 
@@ -2667,7 +2777,7 @@ function renderElements() {
         if (e.type === 'event' && e.mostrarContador && !enDetalle) {
             const badge = document.createElement('span');
             badge.className = 'ev-contador';
-            badge.textContent = String(vecesMarcado(e.id));
+            badge.textContent = String(vecesMarcado(e.id, idx()));
             div.appendChild(badge);
         }
 
@@ -2700,7 +2810,8 @@ function renderElements() {
             }
         }
 
-        el.canvas.appendChild(div);
+        frag.appendChild(div);
+        _nodosPorId.set(e.id, div);
     });
 
     // Renderizar botones temporales dinámicos creados para eventos con popups directos en Live Mode
@@ -2716,10 +2827,11 @@ function renderElements() {
             div.style.zIndex = 20;
             div.innerHTML = `<span>${btnInfo.name}</span>`;
             div.addEventListener('click', () => handlePopupLabelClick(btnInfo.name));
-            el.canvas.appendChild(div);
+            frag.appendChild(div);
         });
     }
 
+    el.canvas.appendChild(frag);
     posicionarAccionesFlotantes();   // innerHTML = '' se lo llevó: se vuelve a poner
     updateLiveClocks();
 }
@@ -2729,8 +2841,19 @@ function centerOf(id) {
     return e ? { x: e.x+e.w/2, y: e.y+e.h/2 } : { x:0, y:0 };
 }
 
+let _flechasDibujadas = false;
 function renderLinks() {
+    // Arrastrando un botón esto corre en cada cuadro: sin enlaces (el caso
+    // normal) no hay por qué barrer el SVG ni recorrer las pestañas.
+    if (!state.links.length && !state.isLinking) {
+        if (_flechasDibujadas) {
+            el.svgArrows.querySelectorAll('path, circle').forEach(n => n.remove());
+            _flechasDibujadas = false;
+        }
+        return;
+    }
     el.svgArrows.querySelectorAll('path, circle').forEach(n => n.remove());
+    _flechasDibujadas = true;
     if (state.mode !== 'setup') return;
 
     // Solo los enlaces entre botones de la pestaña a la vista. Las pestañas
@@ -2795,6 +2918,7 @@ function getContainerSiblingPopups(eventEl) {
 function toggleTimer() { state.isPlaying ? pauseTimer() : startTimer(); }
 function startTimer() {
     acquireWakeLock();
+    _segundoPintado = -1;
     if (!state.sessionStartedAt) state.sessionStartedAt = new Date();
     state.isPlaying = true; state.lastTick = Date.now();
     state.timerInterval = setInterval(tick, 100);
@@ -2807,8 +2931,16 @@ function pauseTimer() {
     el.btnPlayPause.textContent = '▶ PLAY';
     el.btnPlayPause.classList.replace('bg-gray-500','bg-[#2ca038]');
 }
+// El reloj sigue avanzando cada 100 ms — el tiempo de cada clip depende de
+// eso —, pero todo lo que se ve es mm:ss y porcentajes enteros: repintarlo
+// diez veces por segundo era tirar nueve décimas partes del trabajo. Ahora la
+// pantalla se toca solo cuando cambia el segundo.
+let _segundoPintado = -1;
 function tick() {
     const now = Date.now(); state.time += (now - state.lastTick)/1000; state.lastTick = now;
+    const seg = Math.floor(state.time);
+    if (seg === _segundoPintado) return;
+    _segundoPintado = seg;
     updateTimerUI();
     updateLiveClocks();
 }
@@ -2833,10 +2965,12 @@ let _evSeq = 0;
 // fijo se pisan por el tiempo previo y posterior, y el posterior de un turno
 // se pisa con el previo del siguiente. Tramos que se tocan quedan como uno.
 function unirTramos(tramos) {
-    const ordenados = tramos
-        .map(([a, b]) => [Math.max(0, a), b])
-        .filter(([a, b]) => b > a)
-        .sort((x, y) => x[0] - y[0]);
+    const ordenados = [];
+    for (let i = 0; i < tramos.length; i++) {
+        const a = Math.max(0, tramos[i][0]), b = tramos[i][1];
+        if (b > a) ordenados.push([a, b]);
+    }
+    ordenados.sort((x, y) => x[0] - y[0]);
     let total = 0, cantidad = 0, ini = null, fin = null;
     ordenados.forEach(([a, b]) => {
         if (ini === null || a > fin) {
@@ -2851,12 +2985,45 @@ function unirTramos(tramos) {
     return { total: total, cantidad: cantidad };
 }
 
+// Tramos y toques agrupados por botón, de UNA sola pasada por la lista de
+// eventos. Antes cada botón filtraba state.events entero, así que pedir el
+// tiempo de toda la botonera recorría la lista una vez por botón: con 40
+// botones y un partido largo eran decenas de miles de comparaciones en cada
+// repintado, y en el iPad eso se sentía como tirones.
+function indicePorBoton() {
+    const idx = new Map();
+    const fila = id => {
+        let f = idx.get(id);
+        if (!f) { f = { tramos: [], toques: 0 }; idx.set(id, f); }
+        return f;
+    };
+    state.events.forEach(ev => {
+        if (ev.posesionDe) return;
+        const f = fila(ev.buttonId);
+        f.toques++;
+        if (ev.end != null) f.tramos.push([ev.start, ev.end]);
+    });
+    (state.openEvents || []).forEach(o => {
+        const f = fila(o.buttonId);
+        f.toques++;
+        f.tramos.push([o.start, state.time]);
+    });
+    return idx;
+}
+
 // Tiempo de un botón: sus clips archivados más el que esté abierto, unidos.
 // Los clips de posesión quedan afuera: tienen su propia cuenta por equipo.
-function tiempoEnHielo(buttonId) {
-    const tramos = state.events
-        .filter(ev => ev.buttonId === buttonId && !ev.posesionDe && ev.end != null)
-        .map(ev => [ev.start, ev.end]);
+// `idx` es el índice de arriba, para cuando se piden varios botones seguidos;
+// sin él se juntan los tramos de este botón solo.
+function tiempoEnHielo(buttonId, idx) {
+    if (idx) {
+        const f = idx.get(buttonId);
+        return unirTramos(f ? f.tramos : []);
+    }
+    const tramos = [];
+    state.events.forEach(ev => {
+        if (ev.buttonId === buttonId && !ev.posesionDe && ev.end != null) tramos.push([ev.start, ev.end]);
+    });
     (state.openEvents || []).forEach(o => {
         if (o.buttonId === buttonId) tramos.push([o.start, state.time]);
     });
@@ -2865,7 +3032,11 @@ function tiempoEnHielo(buttonId) {
 
 // Cuántas veces se marcó un botón: los clips archivados más el que esté
 // grabando. Los tramos de posesión no cuentan, son de otro botón.
-function vecesMarcado(buttonId) {
+function vecesMarcado(buttonId, idx) {
+    if (idx) {
+        const f = idx.get(buttonId);
+        return f ? f.toques : 0;
+    }
     return state.events.filter(ev => ev.buttonId === buttonId && !ev.posesionDe).length +
            (state.openEvents || []).filter(o => o.buttonId === buttonId).length;
 }
@@ -2873,8 +3044,9 @@ function vecesMarcado(buttonId) {
 // Para guardar con la sesión: el tiempo por botón, ya unido.
 function toiCalculado() {
     const mapa = {};
+    const idx = indicePorBoton();
     state.elements.filter(e => e.type === 'event').forEach(e => {
-        const t = tiempoEnHielo(e.id).total;
+        const t = tiempoEnHielo(e.id, idx).total;
         if (t > 0) mapa[e.id] = t;
     });
     return mapa;
@@ -3003,49 +3175,68 @@ function handleLineClick(lineEl) {
 }
 
 // Refresca relojes y acumulados sin volver a construir el DOM
+// Escribir textContent invalida el renglón aunque el texto sea el mismo. En
+// una tabla de ToI llena, la mayoría de los números no cambia de un segundo
+// al otro: comparar antes de escribir le ahorra al navegador ese trabajo.
+function ponerTexto(nodo, texto) {
+    if (nodo.textContent !== texto) nodo.textContent = texto;
+}
+
 function updateLiveClocks() {
     if (state.mode !== 'live') return;
 
     const openMap = {};
     (state.openEvents || []).forEach(o => { openMap[o.buttonId] = o; });
-    const liveOf = id => openMap[id] ? Math.max(0, state.time - openMap[id].start) : 0;
 
     document.querySelectorAll('[data-clock-for]').forEach(node => {
-        const id = parseInt(node.dataset.clockFor);
-        node.textContent = openMap[id] ? fmt(liveOf(id)) : '';
-    });
-    // Tiempo en hielo con los tramos unidos, calculado una vez por botón por tick.
-    const hieloDe = {};
-    const hielo = id => hieloDe[id] || (hieloDe[id] = tiempoEnHielo(id));
-    document.querySelectorAll('[data-toi-for]').forEach(node => {
-        const total = hielo(parseInt(node.dataset.toiFor)).total;
-        node.textContent = total > 0 ? 'Σ ' + fmt(total) : '';
-    });
-    document.querySelectorAll('[data-toirow-for]').forEach(node => {
-        node.textContent = fmt(hielo(parseInt(node.dataset.toirowFor)).total);
+        const abierto = openMap[parseInt(node.dataset.clockFor)];
+        ponerTexto(node, abierto ? fmt(Math.max(0, state.time - abierto.start)) : '');
     });
 
+    // Tiempo en hielo con los tramos unidos. El índice se arma una sola vez
+    // por repintado y lo comparten todos los botones y todos los renglones.
+    const nodosToi    = document.querySelectorAll('[data-toi-for]');
+    const nodosToiRow = document.querySelectorAll('[data-toirow-for]');
+    if (nodosToi.length || nodosToiRow.length) {
+        const idx = indicePorBoton();
+        const hieloDe = {};
+        const hielo = id => hieloDe[id] || (hieloDe[id] = tiempoEnHielo(id, idx));
+        nodosToi.forEach(node => {
+            const total = hielo(parseInt(node.dataset.toiFor)).total;
+            ponerTexto(node, total > 0 ? 'Σ ' + fmt(total) : '');
+        });
+        nodosToiRow.forEach(node => {
+            ponerTexto(node, fmt(hielo(parseInt(node.dataset.toirowFor)).total));
+        });
+    }
+
     // Posesión: el % y los tiempos corren con el reloj, sin redibujar nada.
-    // Es un reparto único de toda la botonera: se calcula una vez por tick.
-    let tPos = null;
-    const tiempos = () => tPos || (tPos = tiemposPosesion());
-    const lados = document.querySelectorAll('.pos-lado');
+    // Es un reparto único de toda la botonera: los tramos se recorren una vez
+    // y de ahí salen tanto quién tiene la pelota como los porcentajes.
+    const lados     = document.querySelectorAll('.pos-lado');
+    const nodosPos  = document.querySelectorAll('[data-pos-for]');
+    if (!lados.length && !nodosPos.length) return;
+
+    const segPos = tramosDePosesion(state.events, state.time, true);
     if (lados.length) {
         // La mitad del equipo con la pelota se enciende, también cuando la
         // posesión viene de los eventos y no de tocar el botón.
-        const conPelota = equipoConPelota();
+        const conPelota = equipoConPelota(segPos);
         lados.forEach(n => n.classList.toggle('activo', n.dataset.equipo === conPelota));
     }
-    document.querySelectorAll('[data-pos-for]').forEach(node => {
-        const t = tiempos();
+    if (!nodosPos.length) return;
+
+    const t = tiemposPosesion(segPos);
+    nodosPos.forEach(node => {
         const eq = node.dataset.equipo;
         if (node.dataset.campo === 'tiempo') {
-            node.textContent = fmt(t[eq]);
+            ponerTexto(node, fmt(t[eq]));
         } else if (node.dataset.campo === 'barra') {
-            node.style.width = (t.pctA === null ? 50 : t.pctA) + '%';
+            const ancho = (t.pctA === null ? 50 : t.pctA) + '%';
+            if (node.style.width !== ancho) node.style.width = ancho;
         } else {
             const pct = eq === 'A' ? t.pctA : t.pctB;
-            node.textContent = pct === null ? '–' : pct + '%';
+            ponerTexto(node, pct === null ? '–' : pct + '%');
         }
     });
 }
@@ -3834,8 +4025,8 @@ function tramosDePosesion(eventos, ahora, conAbiertos, tramos) {
     return segmentos;
 }
 
-function tiemposPosesion() {
-    const seg = tramosDePosesion(state.events, state.time, true);
+function tiemposPosesion(seg) {
+    seg = seg || tramosDePosesion(state.events, state.time, true);
     // Lo que todavía no pasó (el tiempo posterior de un evento recién tocado)
     // no cuenta hasta que pase: si no, los dos equipos sumaban más que el
     // reloj. Con el reloj en cero (una sesión cargada para revisar) va todo.
@@ -3858,9 +4049,9 @@ function resumenPosesion() {
 }
 
 // Quién tiene la pelota ahora mismo, según el reparto.
-function equipoConPelota() {
+function equipoConPelota(seg) {
     const ahora = state.time;
-    const seg = tramosDePosesion(state.events, ahora, true);
+    seg = seg || tramosDePosesion(state.events, ahora, true);
     for (let i = seg.length - 1; i >= 0; i--) {
         if (seg[i].a <= ahora && seg[i].b >= ahora) return seg[i].eq;
     }
@@ -3901,13 +4092,14 @@ function toiRows() {
     const openMap = {};
     (state.openEvents || []).forEach(o => { openMap[o.buttonId] = o; });
 
+    const idx = indicePorBoton();
     const rows = state.elements
         .filter(e => e.type === 'event')
         .map(e => {
             const onIce = !!openMap[e.id];
             // Tramos unidos: lo que se pisa cuenta una vez, y dos toques que se
             // superponen son un solo turno, no dos.
-            const hielo = tiempoEnHielo(e.id);
+            const hielo = tiempoEnHielo(e.id, idx);
             return { id: e.id, name: e.name, onIce, shifts: hielo.cantidad, total: hielo.total };
         })
         .filter(r => r.total > 0 || r.onIce);
@@ -3926,6 +4118,7 @@ function renderToiList() {
         return;
     }
 
+    const frag = document.createDocumentFragment();
     rows.forEach(r => {
         const row = document.createElement('div');
         row.className = 'toi-row' + (r.onIce ? ' on-ice' : '');
@@ -3933,8 +4126,9 @@ function renderToiList() {
             <div class="toi-name">${r.onIce ? '<span class="toi-dot"></span>' : ''}${r.name}</div>
             <div class="toi-shifts">${r.shifts}</div>
             <div class="toi-total-cell" data-toirow-for="${r.id}">${fmt(r.total)}</div>`;
-        el.toiList.appendChild(row);
+        frag.appendChild(row);
     });
+    el.toiList.appendChild(frag);
 }
 
 function exportToiCSV() {
@@ -3965,6 +4159,9 @@ function exportPosesionCSV() {
 // ─────────────────────────────────────────────
 function renderEventList() {
     el.eventList.innerHTML = '';
+    // Un partido entero son cientos de renglones y se rehacen en cada toque:
+    // armados fuera del documento, el navegador los mide una vez sola.
+    const frag = document.createDocumentFragment();
 
     // Mostrar primero eventos abiertos (en curso)
     if (state.openEvents && state.openEvents.length > 0) {
@@ -3976,7 +4173,7 @@ function renderEventList() {
                 <div class="ev-name text-red-600 flex items-center"><span class="w-2 h-2 rounded-full bg-red-500 animate-ping mr-1.5 inline-block"></span>${ev.name}</div>
                 <div class="ev-tags">${tags}</div>
                 <div class="ev-time text-red-500 font-mono" data-clock-for="${ev.buttonId}"></div>`;
-            el.eventList.appendChild(row);
+            frag.appendChild(row);
         });
     }
 
@@ -3989,8 +4186,9 @@ function renderEventList() {
             <div class="ev-name">${ev.name}</div>
             <div class="ev-tags">${tags}</div>
             <div class="ev-time">${ev.start.toFixed(1)}-${(ev.end !== null && ev.end !== undefined) ? ev.end.toFixed(1) : ''}</div>`;
-        el.eventList.appendChild(row);
+        frag.appendChild(row);
     });
+    el.eventList.appendChild(frag);
 }
 
 // ─────────────────────────────────────────────
