@@ -131,6 +131,15 @@ body {
     color: #fff;
     box-shadow: 0 0 0 3px rgba(249,115,22,.45);
 }
+/* Codificando, el lienzo queda quieto: sin scroll ni rebote de iOS, así un
+   toque al costado de un botón no corre la botonera y todo cae siempre en el
+   mismo lugar. En el editor sigue scrolleando normal. */
+#canvasContainer.sin-scroll {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+}
+
 /* Panel de historial: flota sobre el lienzo en vez de robarle ancho.
    Abrirlo con la botonera cargada ya no achica los botones a mitad de
    codificación: entra y sale por la derecha, encima de todo. */

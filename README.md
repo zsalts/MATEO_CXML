@@ -54,6 +54,17 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
   codificás. El botón **Historial** de la barra (al lado de Terminar) lo abre
   por encima del lienzo, con Registro, En hielo y Posesión, y "Listo" lo
   cierra. El número del botón es la cuenta de eventos marcados.
+- **La pantalla no se mueve mientras codificás**: la botonera se ajusta sola
+  para entrar entera y el lienzo queda sin scroll, así un toque al costado de
+  un botón no corre nada y cada botón está siempre en el mismo lugar. Si la
+  botonera es tan grande que no entra ni achicada al máximo, el scroll vuelve
+  solo para poder llegar a todos los botones. En el editor no cambia nada.
+- **La posesión es estadística, no eventos**: los tramos que tocás en el botón
+  de Posesión ya no se guardan como clips. No aparecen en el Registro ni salen
+  en el XML: alimentan el panel **Posesión** (porcentaje y tiempo por equipo) y
+  su botón **Exportar posesión (CSV)**. Los números quedan guardados con la
+  codificación, y al abrirla con "Ver" se ven igual. Las codificaciones viejas,
+  que tenían la posesión como evento, se convierten solas al abrirlas.
 
 ## Dónde se guardan los datos
 

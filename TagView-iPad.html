@@ -381,6 +381,15 @@ body {
     color: #fff;
     box-shadow: 0 0 0 3px rgba(249,115,22,.45);
 }
+/* Codificando, el lienzo queda quieto: sin scroll ni rebote de iOS, así un
+   toque al costado de un botón no corre la botonera y todo cae siempre en el
+   mismo lugar. En el editor sigue scrolleando normal. */
+#canvasContainer.sin-scroll {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+}
+
 /* Panel de historial: flota sobre el lienzo en vez de robarle ancho.
    Abrirlo con la botonera cargada ya no achica los botones a mitad de
    codificación: entra y sale por la derecha, encima de todo. */
@@ -1523,6 +1532,7 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
             <div id="posView" class="hidden flex-1 flex-col overflow-hidden">
                 <div id="posList" class="flex-1 overflow-y-auto"></div>
+                <button id="btnExportPos" class="py-2.5 text-[#007aff] text-sm font-medium border-t border-gray-200 bg-[#f2f2f7]">Exportar posesión (CSV)</button>
             </div>
         </aside>
 
@@ -1706,6 +1716,7 @@ const state = {
     hojaActiva: null,          // Pestaña que se está editando (null = Principal)
     detalle: null,             // Pestaña de detalle abierta en vivo
     posesion: {},              // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
+    tramosPos: [],             // Tramos de posesión cerrados: { buttonId, equipo, start, end }. Estadística, no eventos: no van al registro ni al XML
     etiquetasFijas: [],        // Ids de las etiquetas fijas encendidas: se pegan solas a todo lo que se marca
     logAbierto: false,         // El historial en vivo arranca cerrado: se abre con el botón Historial
     sesionCargada: null        // Nombre de la codificación guardada abierta con "Ver", si es eso lo que hay
@@ -1717,7 +1728,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v43';
+const APP_VERSION = 'v44';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1798,6 +1809,7 @@ const el = {
     livePanel:      D('livePanel'),
     eventList:      D('eventList'),
     btnClearEvents: D('btnClearEvents'),
+    btnExportPos:   D('btnExportPos'),
     btnToggleLog:     D('btnToggleLog'),
     btnHideLivePanel: D('btnHideLivePanel'),
 
@@ -2878,7 +2890,7 @@ function setMode(mode) {
 
         // Al terminar: la codificación queda guardada sola en la página XML y
         // el archivo sale con el día y la hora del partido en el nombre.
-        if (isExitingLive && state.events.length > 0) {
+        if (isExitingLive && (state.events.length > 0 || (state.tramosPos || []).length > 0)) {
             guardarPartidoAlTerminar();
         }
     } else {
@@ -2896,6 +2908,7 @@ function setMode(mode) {
         state.time = 0; state.isPlaying = false;
         state.events = []; state.counters = {}; state.toi = {};
         state.posesion = {};
+        state.tramosPos = [];
         state.etiquetasFijas = [];
         state.sesionCargada = null;
         state.sessionStartedAt = null;
@@ -2948,7 +2961,7 @@ function bindEvents() {
     on(el.btnClearEvents, 'click', async () => {
         if (await customConfirm('¿Borrar todos los eventos y el tiempo acumulado?', 'Limpiar Eventos', true, 'Borrar')) {
             state.events = []; state.counters = {}; state.toi = {}; state.openEvents = [];
-            state.posesion = {};
+            state.posesion = {}; state.tramosPos = [];
             renderLivePanel(); renderElements();
         }
     });
@@ -2975,6 +2988,7 @@ function bindEvents() {
     on(el.tabLog, 'click', () => setLiveTab('log'));
     on(el.tabToi, 'click', () => setLiveTab('toi'));
     on(el.btnExportToi, 'click', exportToiCSV);
+    on(el.btnExportPos, 'click', exportPosesionCSV);
     on(el.btnCloseExclusiveModal, 'click', closeExclusiveModal);
     if (el.propTimeMode)  on(el.propTimeMode, 'change', updateSelected);
     on(el.propLead, 'input', updateSelected);
@@ -4047,8 +4061,9 @@ let escalaLienzo = 1;
 
 const ajustarActivo = () => lsGet('tv_ajustar') !== '0';
 
-// Cuánto hay que achicar para que entre todo. null si el lienzo no está a la
-// vista (otra página): ahí no se puede medir, y se recalcula al volver.
+// Cuánto hay que achicar para que entre todo, y cuánto ocupa la botonera.
+// null si el lienzo no está a la vista (otra página): ahí no se puede medir,
+// y se recalcula al volver.
 function escalaParaEntrar() {
     // Solo lo que está en pantalla: cada pestaña se ajusta por su cuenta.
     const lista = elementosEnPantalla();
@@ -4066,13 +4081,17 @@ function escalaParaEntrar() {
     const abajo   = Math.max(...lista.map(e => e.y + e.h)) + MARGEN;
     // Solo achica: donde ya entra, se ve a tamaño real. Y con piso, para que
     // un panel enorme no deje botones imposibles de tocar.
-    return Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
+    const escala = Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
+    return { escala: escala, ancho: ancho, alto: alto, derecha: derecha, abajo: abajo };
 }
 
 function aplicarEscalaLienzo() {
-    const necesaria = escalaParaEntrar();
-    if (necesaria === null) return;
-    escalaLienzo = ajustarActivo() ? necesaria : 1;
+    const medida = escalaParaEntrar();
+    if (medida === null) return;
+    const necesaria = medida.escala;
+    // Codificando se ajusta siempre: la pantalla queda quieta, sin scroll, y
+    // cada botón siempre en el mismo lugar. El "Tamaño real" es del editor.
+    escalaLienzo = (state.mode === 'live' || ajustarActivo()) ? necesaria : 1;
 
     // Flechas y botones con la misma escala y el mismo origen, o los enlaces
     // dejarían de apuntar a sus botones.
@@ -4080,6 +4099,17 @@ function aplicarEscalaLienzo() {
         nodo.style.transformOrigin = '0 0';
         nodo.style.transform = escalaLienzo === 1 ? '' : `scale(${escalaLienzo})`;
     });
+
+    // Lienzo quieto mientras codificás: sin scroll ni rebote, salvo que la
+    // botonera sea tan grande que ni achicada al máximo entre en la pantalla
+    // (ahí sin scroll quedarían botones afuera, imposibles de tocar).
+    if (el.canvasContainer) {
+        const entra = medida.derecha * escalaLienzo <= medida.ancho + 1
+                   && medida.abajo   * escalaLienzo <= medida.alto  + 1;
+        const quieto = state.mode === 'live' && entra;
+        el.canvasContainer.classList.toggle('sin-scroll', quieto);
+        if (quieto) { el.canvasContainer.scrollTop = 0; el.canvasContainer.scrollLeft = 0; }
+    }
 
     if (el.btnAjustar) {
         // Si el panel ya entra, el botón no haría nada: mejor no mostrarlo.
@@ -5162,8 +5192,9 @@ function renderLivePanel() {
 // cierra el tramo del otro y empieza el suyo. Tocar el lado que ya la tiene
 // corta la posesión (pelota muerta, lateral, tiempo muerto) y ese rato no
 // cuenta para ninguno.
-// Cada tramo es un clip más en state.events, así llega al XML y a la sesión
-// guardada sin nada extra; los porcentajes salen de sumar esos clips.
+// Los tramos NO son eventos: no ensucian el registro ni salen como clips en el
+// XML. Quedan aparte, en state.tramosPos, y solo alimentan la estadística del
+// panel Posesión (y su CSV). Se guardan con la sesión para poder revisarla.
 // ─────────────────────────────────────────────
 function tocarPosesion(e, equipo) {
     if (!state.isPlaying) startTimer();
@@ -5184,22 +5215,14 @@ function cerrarTramoPosesion(e) {
     if (!tramo) return;
     delete state.posesion[e.id];
     const fin = state.time;
-    // Un doble toque sin querer no deja un clip de medio segundo en el XML.
+    // Un doble toque sin querer no deja medio segundo sumando.
     if (fin - tramo.desde < 0.5) return;
-    state.events.unshift({
-        id: Date.now() + (++_evSeq),
+    if (!state.tramosPos) state.tramosPos = [];
+    state.tramosPos.push({
         buttonId: e.id,
-        name: 'Posesión ' + nombresEquipos()[tramo.equipo],
-        posesionDe: e.id,
-        equipo: tramo.equipo,           // los totales van por equipo, no por nombre:
-        start: tramo.desde,             // así renombrar un equipo no parte la cuenta
-        end: fin,
-        timestamp: fmt(tramo.desde),
-        lead: 0, lag: 0,
-        exclusiveIds: [], isExclusive: false,
-        timeMode: 'manual',
-        line: null,
-        descriptors: etiquetasFijasActivas()
+        equipo: tramo.equipo,   // los totales van por equipo, no por nombre:
+        start: tramo.desde,     // así renombrar un equipo no parte la cuenta
+        end: fin
     });
 }
 
@@ -5347,12 +5370,21 @@ function aplicarColoresEquipos() {
 // Recorre los cortes en orden con los tramos activos, en vez de comparar
 // todos contra todos: se recalcula en cada tick y no puede ponerse lento con
 // cientos de eventos en un iPad.
-function tramosDePosesion(eventos, ahora, conAbiertos) {
+// `tramos` son los tocados en el botón de Posesión (estadística pura); si no
+// se pasan, los de la codificación que está a la vista.
+function tramosDePosesion(eventos, ahora, conAbiertos, tramos) {
     const marcas = [];
     eventos.forEach(ev => {
+        // posesionDe: clips de posesión de codificaciones viejas, de cuando
+        // cada tramo era un evento más. Siguen contando igual.
         const eq = ev.posesionDe ? ev.equipo : equipoDeBoton(ev.buttonId);
         if ((eq === 'A' || eq === 'B') && ev.end != null && ev.end > ev.start) {
             marcas.push({ a: Math.max(0, ev.start), b: ev.end, eq: eq });
+        }
+    });
+    (tramos === undefined ? (state.tramosPos || []) : (tramos || [])).forEach(t => {
+        if ((t.equipo === 'A' || t.equipo === 'B') && t.end > t.start) {
+            marcas.push({ a: Math.max(0, t.start), b: t.end, eq: t.equipo });
         }
     });
     if (conAbiertos) {
@@ -5402,6 +5434,12 @@ function tiemposPosesion() {
     t.pctA = total > 0 ? Math.round(t.A / total * 100) : null;
     t.pctB = total > 0 ? 100 - t.pctA : null;
     return t;
+}
+
+// Los números de posesión listos para guardar o exportar.
+function resumenPosesion() {
+    const t = tiemposPosesion();
+    return { A: t.A, B: t.B, pctA: t.pctA, pctB: t.pctB, tramos: t.tramos };
 }
 
 // Quién tiene la pelota ahora mismo, según el reparto.
@@ -5492,6 +5530,18 @@ function exportToiCSV() {
         csv += `"${String(r.name).replace(/"/g, '""')}",${r.shifts},${r.total.toFixed(1)},${fmt(r.total)}\n`;
     });
     saveBlobToFiles(`ToI_${new Date().toISOString().slice(0,10)}.csv`,
+                    new Blob([csv], { type: 'text/csv' }));
+}
+
+function exportPosesionCSV() {
+    const t = tiemposPosesion();
+    if (!t.tramos) { customAlert('Todavía no hay posesión acumulada.', 'Exportar posesión'); return; }
+    const nombres = nombresEquipos();
+    let csv = 'Equipo,Posesión (%),Tiempo (s),Tiempo (mm:ss)\n';
+    ['A', 'B'].forEach(eq => {
+        csv += `"${String(nombres[eq]).replace(/"/g, '""')}",${t['pct' + eq] === null ? '' : t['pct' + eq]},${t[eq].toFixed(1)},${fmt(t[eq])}\n`;
+    });
+    saveBlobToFiles(`Posesion_${new Date().toISOString().slice(0,10)}.csv`,
                     new Blob([csv], { type: 'text/csv' }));
 }
 
@@ -5596,8 +5646,21 @@ function armarSesion(nombre) {
         startedAt: state.sessionStartedAt ? state.sessionStartedAt.toISOString() : null,
         events: JSON.parse(JSON.stringify(state.events)),
         counters: JSON.parse(JSON.stringify(state.counters)),
-        toi: toiCalculado()
+        toi: toiCalculado(),
+        // La posesión viaja como tramos (para recalcular al abrirla) y como
+        // números ya hechos, para leerla sin la botonera que la generó.
+        tramosPos: JSON.parse(JSON.stringify(state.tramosPos || [])),
+        posesion: resumenPosesion()
     };
+}
+
+// Los tramos de posesión de una sesión guardada. Las viejas los traen como
+// eventos (posesionDe): se convierten al vuelo.
+function tramosDeSesion(s) {
+    if (s && s.tramosPos && s.tramosPos.length) return JSON.parse(JSON.stringify(s.tramosPos));
+    return (s && s.events || []).filter(ev => ev.posesionDe).map(ev => ({
+        buttonId: ev.posesionDe, equipo: ev.equipo, start: ev.start, end: ev.end
+    }));
 }
 
 // Al tocar Terminar: sin preguntar nada, la codificación queda en la página
@@ -5611,6 +5674,9 @@ function guardarPartidoAlTerminar() {
         sessions.unshift(armarSesion(nombre));
         saveSessions(sessions);
     }
+    // Sin eventos no hay XML que sacar: una codificación de pura posesión
+    // queda guardada igual, con su estadística.
+    if (!state.events.length) return;
     try {
         exportCustomXML(state.events, nombre, state.sessionStartedAt);
     } catch (err) {
@@ -5924,7 +5990,9 @@ function renderSessionsList() {
         row.querySelector('.btn-load-sess').addEventListener('click', () => {
             // setMode('live') resetea state.events, asi que hay que entrar al modo ANTES de cargar
             if (state.mode !== 'live') setMode('live');
-            state.events   = JSON.parse(JSON.stringify(s.events || []));
+            // Los tramos de posesión salen del registro: son estadística.
+            state.tramosPos = tramosDeSesion(s);
+            state.events   = JSON.parse(JSON.stringify(s.events || [])).filter(ev => !ev.posesionDe);
             state.counters = JSON.parse(JSON.stringify(s.counters || {}));
             state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
             state.sesionCargada = s.name;
@@ -5952,7 +6020,7 @@ function renderSessionsList() {
 }
 
 async function saveCurrentSession() {
-    if (!state.events.length) {
+    if (!state.events.length && !(state.tramosPos || []).length) {
         customAlert('No hay eventos grabados en la sesión actual.', 'Sin Eventos');
         return;
     }
@@ -5968,18 +6036,11 @@ async function saveCurrentSession() {
 function exportCustomXML(eventsList, title, inicio) {
     if (!eventsList || !eventsList.length) { customAlert('No hay eventos para exportar.', 'Exportar XML'); return; }
 
-    // Posesión: sus clips salen del reparto (eventos con equipo y lados del
-    // botón), con la misma regla de no contar dos veces. Los tramos tocados en
-    // el botón ya entran en ese reparto: se reemplazan para no ir repetidos.
-    const reparto = tramosDePosesion(eventsList, 0, false);
-    if (reparto.length) {
-        const nombres = nombresEquipos();
-        eventsList = eventsList.filter(ev => !ev.posesionDe).concat(reparto.map(s => ({
-            name: 'Posesión ' + nombres[s.eq],
-            start: s.a, end: s.b, equipo: s.eq,
-            buttonId: null, descriptors: [], line: null
-        })));
-    }
+    // La posesión es estadística, no clips: va en el panel Posesión y en su
+    // CSV, no en el XML. Una codificación vieja puede traer sus tramos como
+    // eventos: se dejan afuera para que el archivo no los repita.
+    eventsList = eventsList.filter(ev => !ev.posesionDe);
+    if (!eventsList.length) { customAlert('No hay eventos para exportar.', 'Exportar XML'); return; }
 
     // Los IDs se numeran por orden cronologico, pero el archivo va agrupado
     // por codigo: asi lo escribe Sportscode.
