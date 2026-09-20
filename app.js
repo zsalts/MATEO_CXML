@@ -56,7 +56,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v44';
+const APP_VERSION = 'v45';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -580,6 +580,57 @@ function nubeSesion() {
 }
 function guardarNubeSesion(s) { lsSet('tv_nube_sesion', s ? JSON.stringify(s) : ''); }
 
+// ── Entrar sola ──
+// La sesión de Supabase se guarda, pero no es para siempre: Safari limpia el
+// almacenamiento del iPad si pasás días sin abrir la app, y el token también
+// se puede caer. Ahí había que volver a escribir correo y contraseña, justo
+// cuando estás por empezar a codificar. Con "Recordar en este dispositivo" los
+// datos quedan acá y la app entra sola cuando hace falta.
+//
+// Quedan en este dispositivo y en ningún otro lado: no van al respaldo de la
+// nube ni salen en la copia de seguridad. El base64 no es cifrado, solo evita
+// que la contraseña se lea de un vistazo: en un dispositivo compartido, mejor
+// destildar la opción.
+function b64(texto)   { return btoa(unescape(encodeURIComponent(texto))); }
+function deB64(texto) { return decodeURIComponent(escape(atob(texto))); }
+
+function credencialesNube() {
+    const raw = lsGet('tv_nube_login');
+    if (!raw) return null;
+    try {
+        const c = JSON.parse(deB64(raw));
+        return (c && c.email && c.pass) ? c : null;
+    } catch (err) { return null; }
+}
+
+function guardarCredencialesNube(email, pass) {
+    lsSet('tv_nube_login', (email && pass) ? b64(JSON.stringify({ email: email, pass: pass })) : '');
+}
+
+const recordarNube = () => lsGet('tv_nube_recordar') !== '0';
+const ultimoCorreoNube = () => lsGet('tv_nube_email') || '';
+
+// Deja lista una sesión sin molestar a nadie: si ya hay, no hace nada; si no,
+// prueba con lo guardado. Devuelve si quedó una sesión para usar.
+// Sin red no borra nada: se reintenta cuando vuelva.
+async function asegurarSesionNube() {
+    if (!nubeActiva()) return false;
+    if (nubeSesion()) return true;
+    const c = credencialesNube();
+    if (!c) return false;
+    try {
+        await nubeEntrar(c.email, c.pass, true);
+        renderEstadoNube();
+        return true;
+    } catch (err) {
+        if (err && err.red) return false;
+        // El servidor la rechazó: la contraseña cambió. Guardarla no sirve más
+        // y reintentar tampoco: se pide de nuevo cuando haga falta.
+        guardarCredencialesNube(null, null);
+        return false;
+    }
+}
+
 function guardarTokens(data) {
     guardarNubeSesion({
         access:  data.access_token,
@@ -612,20 +663,31 @@ async function nubeFetch(ruta, opciones) {
     throw new Error(detalle || ('HTTP ' + r.status));
 }
 
-async function nubeEntrar(email, password) {
+async function nubeEntrar(email, password, recordar) {
     const r = await nubeFetch('/auth/v1/token?grant_type=password', {
         method: 'POST',
         headers: { apikey: NUBE.anonKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email, password: password })
     });
     guardarTokens(await r.json());
+    // El correo se recuerda siempre: escribirlo de nuevo no protege nada.
+    lsSet('tv_nube_email', email || '');
+    lsSet('tv_nube_recordar', recordar ? '1' : '0');
+    if (recordar) guardarCredencialesNube(email, password);
+    else          guardarCredencialesNube(null, null);
 }
 
-function nubeSalir() { guardarNubeSesion(null); renderEstadoNube(); }
+function nubeSalir() {
+    guardarNubeSesion(null);
+    guardarCredencialesNube(null, null);
+    renderEstadoNube();
+}
 
 // Devuelve un access_token válido, renovándolo si hizo falta.
 async function nubeToken() {
-    const s = nubeSesion();
+    let s = nubeSesion();
+    // Sin sesión pero con la contraseña guardada: entra sola y sigue de largo.
+    if (!s && await asegurarSesionNube()) s = nubeSesion();
     if (!s || !s.refresh) throw new Error('Todavía no entraste a la nube');
     if (Date.now() < s.vence) return s.access;
 
@@ -644,8 +706,10 @@ async function nubeToken() {
         // partido sin wifi.
         if (err && err.red) throw err;
         // Esto sí es el servidor rechazando el refresh, y no se arregla
-        // reintentando: hay que volver a entrar.
+        // reintentando. Con la contraseña guardada se entra de nuevo sin
+        // molestar; si no, hay que volver a entrar a mano.
         guardarNubeSesion(null);
+        if (await asegurarSesionNube()) return nubeSesion().access;
         throw new Error('La sesión de la nube venció, entrá de nuevo');
     }
 }
@@ -748,7 +812,8 @@ function respaldarEnNube() {
 // ofrece traerlo. Calla la boca si no hay nada, no hay sesión o no hay red:
 // esto no puede molestar a alguien que solo quiere codificar.
 async function revisarRespaldoRemoto() {
-    if (!nubeActiva() || !nubeSesion()) return;
+    if (!nubeActiva()) return;
+    if (!nubeSesion() && !await asegurarSesionNube()) return;
     let data;
     try {
         data = JSON.parse(await nubeBajar(ARCHIVO_RESPALDO));
@@ -798,7 +863,7 @@ function armarRespaldo() {
 
 async function restaurarDesdeNube() {
     if (!nubeActiva())  { customAlert('La nube no está configurada.', 'Restaurar de la nube'); return; }
-    if (!nubeSesion())  { dialogoEntrarNube(); return; }
+    if (!nubeSesion() && !await asegurarSesionNube()) { dialogoEntrarNube(); return; }
 
     let data;
     try {
@@ -830,7 +895,7 @@ async function subirLaCola(avisar) {
     if (!nubeActiva()) return;
     if (!colaNube().length) { renderEstadoNube(); return; }
 
-    if (!nubeSesion()) {
+    if (!nubeSesion() && !await asegurarSesionNube()) {
         if (avisar) dialogoEntrarNube();
         else renderEstadoNube();
         return;
@@ -869,7 +934,7 @@ async function subirLaCola(avisar) {
 // el próximo arranque. Arma la copia al toque, la manda y avisa cómo fue.
 async function subirAhoraALaNube() {
     if (!nubeActiva()) { customAlert('La nube no está configurada.', 'Subir a la nube'); return; }
-    if (!nubeSesion()) { dialogoEntrarNube(); return; }
+    if (!nubeSesion() && !await asegurarSesionNube()) { dialogoEntrarNube(); return; }
 
     clearTimeout(_respaldoDemorado);
     const payload = armarRespaldo();
@@ -939,10 +1004,25 @@ function dialogoEntrarNube() {
     const email = document.createElement('input');
     email.type = 'email'; email.placeholder = 'Correo';
     email.autocomplete = 'username'; email.style.cssText = estiloCampo;
+    // El correo de la última vez ya viene puesto: solo queda la contraseña.
+    email.value = ultimoCorreoNube();
 
     const pass = document.createElement('input');
     pass.type = 'password'; pass.placeholder = 'Contraseña';
     pass.autocomplete = 'current-password'; pass.style.cssText = estiloCampo;
+
+    // Tildado: el caso normal es tu propio iPad, y es lo que evita tener que
+    // entrar de nuevo cada vez que Safari limpia el almacenamiento.
+    const recuerdo = document.createElement('label');
+    recuerdo.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;color:#3a3a3c;' +
+        'margin:2px 0 10px;cursor:pointer;';
+    const check = document.createElement('input');
+    check.type = 'checkbox'; check.checked = recordarNube();
+    check.style.cssText = 'width:18px;height:18px;flex-shrink:0;';
+    const textoRecuerdo = document.createElement('span');
+    textoRecuerdo.textContent = 'Recordar en este dispositivo (entra sola)';
+    recuerdo.appendChild(check);
+    recuerdo.appendChild(textoRecuerdo);
 
     const aviso = document.createElement('div');
     aviso.style.cssText = 'font-size:11px;color:#b91c1c;min-height:14px;margin-bottom:10px;line-height:1.4;';
@@ -960,7 +1040,7 @@ function dialogoEntrarNube() {
         btnEntrar.disabled = true;
         btnEntrar.textContent = 'Entrando…';
         try {
-            await nubeEntrar(email.value.trim(), pass.value);
+            await nubeEntrar(email.value.trim(), pass.value, check.checked);
             overlay.remove();
             renderEstadoNube();
             // Entrar por primera vez en un dispositivo es justo el momento de
@@ -976,12 +1056,14 @@ function dialogoEntrarNube() {
 
     card.appendChild(email);
     card.appendChild(pass);
+    card.appendChild(recuerdo);
     card.appendChild(aviso);
     card.appendChild(btnEntrar);
     card.appendChild(btnCerrar);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-    email.focus();
+    // Con el correo ya puesto, el cursor va derecho a la contraseña.
+    (email.value ? pass : email).focus();
 }
 
 // Abre el selector de Archivos y devuelve { name, text } o null si se canceló
@@ -1075,9 +1157,14 @@ function init() {
     setMode('setup');
     setPage('botonera');
     renderEstadoNube();
-    // Mirar la nube ANTES de subir lo pendiente. Al revés, un respaldo local
-    // que quedó en la cola pisaría lo que hiciste en la PC sin preguntar.
-    revisarRespaldoRemoto().then(() => sincronizarNube(false));
+    // Entrar sola con lo guardado y recién ahí mirar la nube: así abrir la app
+    // no pide nada. Mirar la nube va ANTES de subir lo pendiente, porque al
+    // revés un respaldo local de la cola pisaría lo hecho en la PC sin
+    // preguntar.
+    asegurarSesionNube()
+        .catch(() => {})
+        .then(() => revisarRespaldoRemoto())
+        .then(() => sincronizarNube(false));
     reportarFaltantes();
 }
 

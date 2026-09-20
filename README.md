@@ -120,6 +120,29 @@ Dos cosas evitan los accidentes más comunes:
 - Si aceptás traer la copia de la nube, el respaldo local que estaba en la cola
   se descarta: ya elegiste cuál vale.
 
+### Entrar una sola vez
+
+La app **entra sola a la nube**: al tocar "Entrar" viene tildado *Recordar en
+este dispositivo*, y con eso el correo y la contraseña quedan guardados acá. Si
+Safari limpia el almacenamiento (siete días sin abrir la app), si la sesión
+vence o si el token se cae, vuelve a entrar sola al abrirse, sin pedir nada. La
+página de descargas hace lo mismo en la compu.
+
+Queda todo en el dispositivo: no viaja al respaldo de la nube ni a la copia de
+seguridad. El guardado usa base64, que **no es cifrado** —solo evita que la
+contraseña se lea de un vistazo—, así que en un iPad o una compu compartida
+conviene destildar la casilla: ahí sigue pidiendo la contraseña cada vez, pero
+el correo ya viene puesto. "Salir" en la página de descargas olvida las dos
+cosas.
+
+Si cambiás la contraseña en Supabase, el primer intento falla, la guardada se
+borra sola y te pide la nueva una vez. Sin señal no se borra nada: reintenta
+cuando vuelva.
+
+Un detalle del iPad: abrir `TagView-iPad.html` suelto desde Archivos puede
+dejar a Safari sin almacenamiento, y ahí no se recuerda nada entre aperturas.
+Con la app en la web (o agregada a la pantalla de inicio) sí se guarda.
+
 Aclaración por si preocupa: **actualizar la app no borra nada.** Subir una
 versión nueva cambia la caché del service worker, que no tiene relación con el
 `localStorage` donde viven las plantillas. Lo que sí las puede borrar es
