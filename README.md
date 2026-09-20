@@ -44,9 +44,16 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
 - **Equipos cargados:** en la tarjeta Equipos y en el botón de Posesión los
   equipos se eligen de una lista. "＋ Cargar equipo…" suma uno nuevo, con el
   color que tenga ese lado de la tarjeta. La lista va en la copia de seguridad.
-- **Etiqueta fija** (Insertar ▼): en vivo, al tocarla queda encendida y se pega
-  a todo lo que marques. Tocar otra etiqueta fija apaga la anterior; tocar la
-  misma la saca. Sirve para el tiempo, el cuarto o una situación de juego.
+- **Etiqueta fija / automática** (Insertar ▼): en vivo, al tocarla queda
+  encendida y se pega sola a todo lo que marques, hasta que la apagues. Se
+  pueden tener **varias encendidas a la vez** (período + zona + rival, por
+  ejemplo): todas entran como etiquetas de cada evento. Si dos no pueden
+  convivir, marcalas como excluyentes en el Inspector ("Etiquetas que se
+  apagan") y encender una apaga la otra.
+- **Historial**: el registro en vivo ya no ocupa la pantalla mientras
+  codificás. El botón **Historial** de la barra (al lado de Terminar) lo abre
+  por encima del lienzo, con Registro, En hielo y Posesión, y "Listo" lo
+  cierra. El número del botón es la cuenta de eventos marcados.
 
 ## Dónde se guardan los datos
 

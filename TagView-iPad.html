@@ -381,6 +381,23 @@ body {
     color: #fff;
     box-shadow: 0 0 0 3px rgba(249,115,22,.45);
 }
+/* Panel de historial: flota sobre el lienzo en vez de robarle ancho.
+   Abrirlo con la botonera cargada ya no achica los botones a mitad de
+   codificación: entra y sale por la derecha, encima de todo. */
+.panel-flotante {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: -8px 0 24px rgba(0,0,0,.14);
+}
+/* Botón Historial de la barra de herramientas, encendido con el panel abierto */
+#btnToggleLog.log-abierto {
+    background: #007aff;
+    border-color: #007aff;
+    color: #fff;
+}
+
 /* Counter */
 .canvas-element[data-eltype="counter"] {
     background: #f5f5f7;
@@ -1195,7 +1212,12 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
         <div class="flex items-center justify-between px-4 py-2">
             <button id="btnPlayPause" class="bg-[#2ca038] text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">▶ PLAY</button>
             <div id="timerLive" class="font-mono text-xl font-bold">00:00</div>
-            <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
+            <div class="flex items-center" style="gap:8px;">
+                <!-- El registro tapaba media pantalla mientras codificás: ahora
+                     se abre solo cuando lo pedís con este botón. -->
+                <button id="btnToggleLog" class="bg-white text-[#007aff] font-bold text-sm px-4 py-1.5 rounded-full shadow border border-gray-300">Historial</button>
+                <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
+            </div>
         </div>
     </div>
 
@@ -1308,15 +1330,6 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
                         </div>
                     </div>
 
-                    <div class="inspector-section-label">EVENTOS EXCLUYENTES</div>
-                    <div class="inspector-cell">
-                        <button id="btnOpenExclusiveModal" class="w-full py-2 px-3 text-left text-sm text-[#007aff] bg-white border border-gray-300 rounded-lg flex justify-between items-center">
-                            <span>Seleccionar excluyentes...</span>
-                            <span id="exclusiveBadge" class="text-xs text-gray-500 font-normal bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-                        </button>
-                        <p class="text-xs text-gray-400 mt-1">Al activar este evento, se cortarán los eventos seleccionados.</p>
-                    </div>
-
                     <div class="inspector-section-label">ETIQUETAS EMERGENTES (separadas por coma)</div>
                     <div class="inspector-cell">
                         <input id="propDescriptors" type="text" class="w-full bg-transparent text-sm focus:outline-none text-black" placeholder="Ej: Pie derecho, Pie izquierdo">
@@ -1343,6 +1356,27 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
                             <select id="propEquipoEvento" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
                             <p class="text-xs text-gray-400 mt-1">Cada vez que toques este evento, su tiempo cuenta como posesión de ese equipo, y se corta todo lo que esté corriendo del equipo rival.</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Excluyentes: eventos que se cortan entre sí, o etiquetas
+                     automáticas de las que solo puede haber una encendida -->
+                <div id="propExclusiveSection">
+                    <div id="propExclusiveLabel" class="inspector-section-label">EVENTOS EXCLUYENTES</div>
+                    <div class="inspector-cell">
+                        <button id="btnOpenExclusiveModal" class="w-full py-2 px-3 text-left text-sm text-[#007aff] bg-white border border-gray-300 rounded-lg flex justify-between items-center">
+                            <span>Seleccionar excluyentes...</span>
+                            <span id="exclusiveBadge" class="text-xs text-gray-500 font-normal bg-gray-100 px-2 py-0.5 rounded-full">0</span>
+                        </button>
+                        <p id="propExclusiveHelp" class="text-xs text-gray-400 mt-1">Al activar este evento, se cortarán los eventos seleccionados.</p>
+                    </div>
+                </div>
+
+                <!-- Etiqueta automática (etiqueta fija) -->
+                <div id="propFijaSection" class="hidden">
+                    <div class="inspector-section-label">ETIQUETA AUTOMÁTICA</div>
+                    <div class="inspector-cell">
+                        <p class="text-xs text-gray-400">En vivo la tocás y queda encendida: se pega sola a cada evento que marques, hasta que la apagues. Podés tener varias encendidas a la vez (período, zona, rival). Si dos no pueden convivir, ponelas como excluyentes acá arriba y encender una apaga la otra.</p>
                     </div>
                 </div>
 
@@ -1456,7 +1490,11 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
         </aside>
 
         <!-- PANEL REGISTRO (Live) -->
-        <aside id="livePanel" class="hidden w-72 bg-white border-l border-gray-300 flex flex-col z-30">
+        <aside id="livePanel" class="hidden w-72 bg-white border-l border-gray-300 flex flex-col z-30 panel-flotante">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-300 bg-[#f2f2f7]">
+                <h2 class="font-bold text-base text-black">Historial</h2>
+                <button id="btnHideLivePanel" class="text-[#007aff] font-bold text-base">Listo</button>
+            </div>
             <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-[#f2f2f7]">
                 <div class="seg-control">
                     <button id="tabLog" class="seg-btn seg-active">Registro</button>
@@ -1668,7 +1706,8 @@ const state = {
     hojaActiva: null,          // Pestaña que se está editando (null = Principal)
     detalle: null,             // Pestaña de detalle abierta en vivo
     posesion: {},              // Tramo de posesión en curso por botón: { [id]: { equipo, desde } }
-    etiquetaFija: null,        // Id de la etiqueta fija puesta en vivo: se pega a todo lo que se marca
+    etiquetasFijas: [],        // Ids de las etiquetas fijas encendidas: se pegan solas a todo lo que se marca
+    logAbierto: false,         // El historial en vivo arranca cerrado: se abre con el botón Historial
     sesionCargada: null        // Nombre de la codificación guardada abierta con "Ver", si es eso lo que hay
 };
 
@@ -1678,7 +1717,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v42';
+const APP_VERSION = 'v43';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1748,6 +1787,10 @@ const el = {
     propDescriptors:       D('propDescriptors'),
     propPopupDescriptors:  D('propPopupDescriptors'),
     propTimesSection:      D('propTimesSection'),
+    propExclusiveSection:  D('propExclusiveSection'),
+    propExclusiveLabel:    D('propExclusiveLabel'),
+    propExclusiveHelp:     D('propExclusiveHelp'),
+    propFijaSection:       D('propFijaSection'),
     propPopupSection:      D('propPopupSection'),
     btnStartLink:          D('btnStartLink'),
     btnDeleteElement:      D('btnDeleteElement'),
@@ -1755,6 +1798,8 @@ const el = {
     livePanel:      D('livePanel'),
     eventList:      D('eventList'),
     btnClearEvents: D('btnClearEvents'),
+    btnToggleLog:     D('btnToggleLog'),
+    btnHideLivePanel: D('btnHideLivePanel'),
 
     setupBar:       D('setupBar'),
     liveBar:        D('liveBar'),
@@ -2825,7 +2870,7 @@ function setMode(mode) {
         el.timerDisplay.classList.add('hidden');
         el.btnExport.classList.add('hidden');
         el.inspectorPanel.classList.add('hidden');
-        el.livePanel.classList.add('hidden');
+        cerrarLivePanel();
         el.setupBar.classList.remove('hidden');
         el.liveBar.classList.add('hidden');
         if (state.isPlaying) pauseTimer();
@@ -2843,14 +2888,15 @@ function setMode(mode) {
         el.timerDisplay.classList.add('hidden');
         el.btnExport.classList.remove('hidden');
         el.inspectorPanel.classList.add('hidden');
-        el.livePanel.classList.remove('hidden');
+        // El registro tapaba la botonera todo el partido: ahora se abre a pedido.
+        cerrarLivePanel();
         el.setupBar.classList.add('hidden');
         el.liveBar.classList.remove('hidden');
 
         state.time = 0; state.isPlaying = false;
         state.events = []; state.counters = {}; state.toi = {};
         state.posesion = {};
-        state.etiquetaFija = null;
+        state.etiquetasFijas = [];
         state.sesionCargada = null;
         state.sessionStartedAt = null;
         setLiveTab('log');
@@ -2883,6 +2929,8 @@ function bindEvents() {
     on(el.btnStartCoding, 'click',() => setMode('live'));
     on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
+    on(el.btnToggleLog, 'click', alternarLivePanel);
+    on(el.btnHideLivePanel, 'click', cerrarLivePanel);
 
     on(el.btnNube, 'click', subirAhoraALaNube);
     on(el.btnSubirNube, 'click', subirAhoraALaNube);
@@ -3675,19 +3723,23 @@ function selectElement(id) {
 function openExclusiveModal() {
     if (!state.selectedId) return;
     const current = state.elements.find(e => e.id === state.selectedId);
-    if (!current || current.type !== 'event') return;
+    if (!current || (current.type !== 'event' && current.type !== 'sticky_label')) return;
+    // Un evento se cruza con eventos, y una etiqueta automática con etiquetas.
+    const esFija = current.type === 'sticky_label';
 
     if (!current.exclusiveIds) current.exclusiveIds = [];
 
-    el.exclusiveModalTitle.textContent = `Excluyentes con "${current.name}"`;
+    el.exclusiveModalTitle.textContent = esFija
+        ? `Se apagan al encender "${current.name}"`
+        : `Excluyentes con "${current.name}"`;
     el.exclusiveEventsList.innerHTML = '';
 
     // Solo de la misma pestaña: excluir contra un botón de otra no tiene sentido.
-    const otherEvents = state.elements.filter(item => item.type === 'event' && item.id !== current.id
+    const otherEvents = state.elements.filter(item => item.type === current.type && item.id !== current.id
                                                    && hojaDe(item) === hojaDe(current));
 
     if (otherEvents.length === 0) {
-        el.exclusiveEventsList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500">No hay otros eventos en la plantilla.</div>`;
+        el.exclusiveEventsList.innerHTML = `<div class="p-4 text-center text-sm text-gray-500">${esFija ? 'No hay otras etiquetas automáticas en la plantilla.' : 'No hay otros eventos en la plantilla.'}</div>`;
     } else {
         otherEvents.forEach(other => {
             const row = document.createElement('div');
@@ -3784,6 +3836,22 @@ function closeLineModal() {
 
 function syncSections(type) {
     el.propTimesSection.style.display = (type === 'event')       ? 'block' : 'none';
+    // Los excluyentes son de los eventos y de las etiquetas automáticas: en
+    // unos cortan el turno abierto, en otras apagan la etiqueta encendida.
+    if (el.propExclusiveSection) {
+        const conExcluyentes = (type === 'event' || type === 'sticky_label');
+        el.propExclusiveSection.style.display = conExcluyentes ? 'block' : 'none';
+        if (el.propExclusiveLabel) {
+            el.propExclusiveLabel.textContent = (type === 'sticky_label')
+                ? 'ETIQUETAS QUE SE APAGAN' : 'EVENTOS EXCLUYENTES';
+        }
+        if (el.propExclusiveHelp) {
+            el.propExclusiveHelp.textContent = (type === 'sticky_label')
+                ? 'Al encender esta etiqueta, se apagan las seleccionadas.'
+                : 'Al activar este evento, se cortarán los eventos seleccionados.';
+        }
+    }
+    if (el.propFijaSection) el.propFijaSection.style.display = (type === 'sticky_label') ? 'block' : 'none';
     el.propPopupSection.style.display = (type === 'popup_label') ? 'block' : 'none';
     if (el.propLineSection) el.propLineSection.style.display = (type === 'line') ? 'block' : 'none';
     if (el.propPosesionSection) el.propPosesionSection.style.display = (type === 'possession') ? 'block' : 'none';
@@ -4074,7 +4142,7 @@ function renderElements() {
         div.dataset.id     = e.id;
         // Evento que suma posesión: franja del color de su equipo.
         if (e.type === 'event' && (e.equipo === 'A' || e.equipo === 'B')) div.classList.add('equipo-' + e.equipo);
-        if (state.mode === 'live' && e.type === 'sticky_label' && state.etiquetaFija === e.id) div.classList.add('fija-activa');
+        if (state.mode === 'live' && e.type === 'sticky_label' && (state.etiquetasFijas || []).includes(e.id)) div.classList.add('fija-activa');
         div.style.left   = e.x + 'px';
         div.style.top    = e.y + 'px';
         div.style.width  = e.w + 'px';
@@ -4383,20 +4451,35 @@ function makeEventInstance(e) {
         isExclusive: !!e.isExclusive,
         timeMode: e.timeMode || 'fixed',
         line: null,
-        descriptors: etiquetasFijas()
+        descriptors: etiquetasFijasActivas()
     };
 }
 
-// La etiqueta fija que esté puesta, lista para pegarle a un evento nuevo.
-function etiquetasFijas() {
-    const fija = state.etiquetaFija && state.elements.find(x => x.id === state.etiquetaFija);
-    return fija ? [fija.name] : [];
+// Las etiquetas fijas encendidas, listas para pegarse solas a un evento nuevo.
+// Van en el orden en que las encendiste, sin repetir nombres.
+function etiquetasFijasActivas() {
+    const nombres = [];
+    (state.etiquetasFijas || []).forEach(id => {
+        const fija = state.elements.find(x => x.id === id);
+        if (fija && !nombres.includes(fija.name)) nombres.push(fija.name);
+    });
+    return nombres;
 }
 
-// Tocar una etiqueta fija la pone; tocar otra la reemplaza, y tocar la misma
-// la saca. No arranca el reloj: se puede dejar puesta antes del PLAY.
+// Tocar una etiqueta fija la enciende; tocarla otra vez la apaga. Se pueden
+// tener varias encendidas a la vez (período + zona + rival, por ejemplo) y
+// todas se pegan solas a cada evento que marques. No arranca el reloj: se
+// pueden dejar puestas antes del PLAY.
 function tocarEtiquetaFija(e) {
-    state.etiquetaFija = state.etiquetaFija === e.id ? null : e.id;
+    const activas = state.etiquetasFijas || (state.etiquetasFijas = []);
+    const i = activas.indexOf(e.id);
+    if (i >= 0) activas.splice(i, 1);
+    else        activas.push(e.id);
+    // Etiquetas del mismo grupo excluyente: encender una apaga a las otras,
+    // así "1er tiempo" y "2do tiempo" no quedan las dos puestas.
+    if (i < 0 && (e.exclusiveIds || []).length > 0) {
+        state.etiquetasFijas = activas.filter(id => id === e.id || !e.exclusiveIds.includes(id));
+    }
     renderElements();
 }
 
@@ -5015,6 +5098,38 @@ function llenarSelectorDetalle(e) {
 // ─────────────────────────────────────────────
 // PANEL LIVE: REGISTRO / TIEMPO EN HIELO
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PANEL DE HISTORIAL (Registro / En hielo / Posesión)
+// Mientras codificás molesta tener la lista al lado comiéndose el ancho de la
+// botonera, así que arranca cerrado y se abre con el botón Historial.
+// ─────────────────────────────────────────────
+function abrirLivePanel() {
+    state.logAbierto = true;
+    if (el.livePanel) el.livePanel.classList.remove('hidden');
+    actualizarBotonLog();
+    renderLivePanel();
+}
+
+function cerrarLivePanel() {
+    state.logAbierto = false;
+    if (el.livePanel) el.livePanel.classList.add('hidden');
+    actualizarBotonLog();
+}
+
+function alternarLivePanel() {
+    if (state.logAbierto) cerrarLivePanel();
+    else abrirLivePanel();
+}
+
+// El botón lleva la cuenta de lo marcado: con el panel cerrado sigue siendo la
+// señal de que el evento entró.
+function actualizarBotonLog() {
+    if (!el.btnToggleLog) return;
+    const n = (state.events || []).length;
+    el.btnToggleLog.textContent = n > 0 ? `Historial (${n})` : 'Historial';
+    el.btnToggleLog.classList.toggle('log-abierto', !!state.logAbierto);
+}
+
 function setLiveTab(tab) {
     state.liveTab = tab;
     if (el.tabLog) el.tabLog.classList.toggle('seg-active', tab === 'log');
@@ -5033,6 +5148,9 @@ function setLiveTab(tab) {
 }
 
 function renderLivePanel() {
+    actualizarBotonLog();
+    // Cerrado no hay nada que dibujar: al abrirlo se dibuja de una.
+    if (!state.logAbierto) return;
     if (state.liveTab === 'toi') renderToiList();
     else if (state.liveTab === 'pos') renderPosesionPanel();
     else renderEventList();
@@ -5081,7 +5199,7 @@ function cerrarTramoPosesion(e) {
         exclusiveIds: [], isExclusive: false,
         timeMode: 'manual',
         line: null,
-        descriptors: etiquetasFijas()
+        descriptors: etiquetasFijasActivas()
     });
 }
 
@@ -5937,6 +6055,6 @@ init();
 
 // Marca para la trampa de errores de index.html
 window.__tagviewOk = true;
-</script>
+</script>
 </body>
 </html>

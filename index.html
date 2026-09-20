@@ -188,7 +188,12 @@
         <div class="flex items-center justify-between px-4 py-2">
             <button id="btnPlayPause" class="bg-[#2ca038] text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">▶ PLAY</button>
             <div id="timerLive" class="font-mono text-xl font-bold">00:00</div>
-            <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
+            <div class="flex items-center" style="gap:8px;">
+                <!-- El registro tapaba media pantalla mientras codificás: ahora
+                     se abre solo cuando lo pedís con este botón. -->
+                <button id="btnToggleLog" class="bg-white text-[#007aff] font-bold text-sm px-4 py-1.5 rounded-full shadow border border-gray-300">Historial</button>
+                <button id="btnStopCoding" class="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full shadow">■ Terminar</button>
+            </div>
         </div>
     </div>
 
@@ -301,15 +306,6 @@
                         </div>
                     </div>
 
-                    <div class="inspector-section-label">EVENTOS EXCLUYENTES</div>
-                    <div class="inspector-cell">
-                        <button id="btnOpenExclusiveModal" class="w-full py-2 px-3 text-left text-sm text-[#007aff] bg-white border border-gray-300 rounded-lg flex justify-between items-center">
-                            <span>Seleccionar excluyentes...</span>
-                            <span id="exclusiveBadge" class="text-xs text-gray-500 font-normal bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-                        </button>
-                        <p class="text-xs text-gray-400 mt-1">Al activar este evento, se cortarán los eventos seleccionados.</p>
-                    </div>
-
                     <div class="inspector-section-label">ETIQUETAS EMERGENTES (separadas por coma)</div>
                     <div class="inspector-cell">
                         <input id="propDescriptors" type="text" class="w-full bg-transparent text-sm focus:outline-none text-black" placeholder="Ej: Pie derecho, Pie izquierdo">
@@ -336,6 +332,27 @@
                             <select id="propEquipoEvento" class="w-full bg-transparent text-sm focus:outline-none text-black"></select>
                             <p class="text-xs text-gray-400 mt-1">Cada vez que toques este evento, su tiempo cuenta como posesión de ese equipo, y se corta todo lo que esté corriendo del equipo rival.</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Excluyentes: eventos que se cortan entre sí, o etiquetas
+                     automáticas de las que solo puede haber una encendida -->
+                <div id="propExclusiveSection">
+                    <div id="propExclusiveLabel" class="inspector-section-label">EVENTOS EXCLUYENTES</div>
+                    <div class="inspector-cell">
+                        <button id="btnOpenExclusiveModal" class="w-full py-2 px-3 text-left text-sm text-[#007aff] bg-white border border-gray-300 rounded-lg flex justify-between items-center">
+                            <span>Seleccionar excluyentes...</span>
+                            <span id="exclusiveBadge" class="text-xs text-gray-500 font-normal bg-gray-100 px-2 py-0.5 rounded-full">0</span>
+                        </button>
+                        <p id="propExclusiveHelp" class="text-xs text-gray-400 mt-1">Al activar este evento, se cortarán los eventos seleccionados.</p>
+                    </div>
+                </div>
+
+                <!-- Etiqueta automática (etiqueta fija) -->
+                <div id="propFijaSection" class="hidden">
+                    <div class="inspector-section-label">ETIQUETA AUTOMÁTICA</div>
+                    <div class="inspector-cell">
+                        <p class="text-xs text-gray-400">En vivo la tocás y queda encendida: se pega sola a cada evento que marques, hasta que la apagues. Podés tener varias encendidas a la vez (período, zona, rival). Si dos no pueden convivir, ponelas como excluyentes acá arriba y encender una apaga la otra.</p>
                     </div>
                 </div>
 
@@ -449,7 +466,11 @@
         </aside>
 
         <!-- PANEL REGISTRO (Live) -->
-        <aside id="livePanel" class="hidden w-72 bg-white border-l border-gray-300 flex flex-col z-30">
+        <aside id="livePanel" class="hidden w-72 bg-white border-l border-gray-300 flex flex-col z-30 panel-flotante">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-300 bg-[#f2f2f7]">
+                <h2 class="font-bold text-base text-black">Historial</h2>
+                <button id="btnHideLivePanel" class="text-[#007aff] font-bold text-base">Listo</button>
+            </div>
             <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-[#f2f2f7]">
                 <div class="seg-control">
                     <button id="tabLog" class="seg-btn seg-active">Registro</button>

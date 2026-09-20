@@ -131,6 +131,23 @@ body {
     color: #fff;
     box-shadow: 0 0 0 3px rgba(249,115,22,.45);
 }
+/* Panel de historial: flota sobre el lienzo en vez de robarle ancho.
+   Abrirlo con la botonera cargada ya no achica los botones a mitad de
+   codificación: entra y sale por la derecha, encima de todo. */
+.panel-flotante {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: -8px 0 24px rgba(0,0,0,.14);
+}
+/* Botón Historial de la barra de herramientas, encendido con el panel abierto */
+#btnToggleLog.log-abierto {
+    background: #007aff;
+    border-color: #007aff;
+    color: #fff;
+}
+
 /* Counter */
 .canvas-element[data-eltype="counter"] {
     background: #f5f5f7;
