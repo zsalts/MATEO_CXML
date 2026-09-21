@@ -56,7 +56,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v46';
+const APP_VERSION = 'v47';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1303,8 +1303,10 @@ function setMode(mode) {
         if (state.isPlaying) pauseTimer();
         releaseWakeLock();
 
-        // Al terminar: la codificación queda guardada sola en la página XML y
-        // el archivo sale con el día y la hora del partido en el nombre.
+        // Al terminar: se pide el nombre del partido, y con él la codificación
+        // queda guardada en la página XML y sale el archivo. Corre aparte —el
+        // modo ya cambió y la codificación espera quieta en memoria— así el
+        // cartel no traba el resto del cambio de modo.
         if (isExitingLive && (state.events.length > 0 || (state.tramosPos || []).length > 0)) {
             guardarPartidoAlTerminar();
         }
@@ -2510,6 +2512,35 @@ let escalaLienzo = 1;
 
 const ajustarActivo = () => lsGet('tv_ajustar') !== '0';
 
+// Codificando, el lienzo se achica justo hasta el último botón más este
+// margen, y el contenedor queda sin scroll: lo que se dibuje más abajo o más
+// a la derecha de esa caja no se ve ni se puede alcanzar.
+const MARGEN_LIENZO = 24;
+
+// La caja que ocupa lo que está en pantalla, con el margen incluido.
+function cajaLienzo() {
+    let derecha = 0, abajo = 0;
+    elementosEnPantalla().forEach(e => {
+        if (e.x + e.w > derecha) derecha = e.x + e.w;
+        if (e.y + e.h > abajo)   abajo   = e.y + e.h;
+    });
+    return { w: derecha + MARGEN_LIENZO, h: abajo + MARGEN_LIENZO };
+}
+
+// Hasta dónde se puede dibujar y seguir viéndose. Es la caja de la botonera o,
+// si la pantalla da para más (la botonera entra sin achicarse), lo que entra
+// en el contenedor al zoom de ahora.
+function cajaVisible() {
+    const caja = cajaLienzo();
+    const cont = el.canvasContainer;
+    if (!cont || !cont.clientWidth || !cont.clientHeight) return caja;
+    const esc = escalaLienzo || 1;
+    return {
+        w: Math.max(caja.w, cont.clientWidth  / esc),
+        h: Math.max(caja.h, cont.clientHeight / esc)
+    };
+}
+
 // Cuánto hay que achicar para que entre todo, y cuánto ocupa la botonera.
 // null si el lienzo no está a la vista (otra página): ahí no se puede medir,
 // y se recalcula al volver.
@@ -2525,14 +2556,8 @@ function escalaParaEntrar() {
     const alto  = el.canvasContainer.clientHeight;
     if (!ancho || !alto) return null;
 
-    const MARGEN = 24;
-    let derecha = 0, abajo = 0;
-    lista.forEach(e => {
-        if (e.x + e.w > derecha) derecha = e.x + e.w;
-        if (e.y + e.h > abajo)   abajo   = e.y + e.h;
-    });
-    derecha += MARGEN;
-    abajo   += MARGEN;
+    const caja = cajaLienzo();
+    const derecha = caja.w, abajo = caja.h;
     // Solo achica: donde ya entra, se ve a tamaño real. Y con piso, para que
     // un panel enorme no deje botones imposibles de tocar.
     const escala = Math.max(0.35, Math.min(1, ancho / derecha, alto / abajo));
@@ -2601,7 +2626,10 @@ function firmaDibujo(orden) {
     const n = nombresEquipos(), c = coloresEquipos();
     return (state.detalle ? state.detalle.plantilla : '') + '|'
          + orden.map(e => e.id).join(',') + '|'
-         + (state.tempPopupButtons || []).map(b => b.name).join(',') + '|'
+         // Con el lugar, no solo el nombre: dos eventos distintos pueden tener
+         // las mismas emergentes, y sin esto quedaban dibujadas bajo el que
+         // tocaste antes.
+         + (state.tempPopupButtons || []).map(b => b.name + '@' + b.x + ',' + b.y).join(',') + '|'
          + n.A + '|' + n.B + '|' + c.A + '|' + c.B;
 }
 
@@ -3241,6 +3269,35 @@ function updateLiveClocks() {
     });
 }
 
+// Dónde se dibujan las etiquetas emergentes que el evento trae escritas en el
+// Inspector. Van debajo del botón, pero siempre adentro de lo que se ve: en
+// vivo el lienzo se achica justo hasta el último botón y queda sin scroll, así
+// que las de un evento de la fila de abajo —o una lista larga, que se iba de
+// ancho— caían afuera de la pantalla y no había con qué alcanzarlas. Si abajo
+// no hay lugar se pasan arriba del evento, y si no entran en una fila se
+// parten en varias.
+function ubicarEmergentes(evento, nombres) {
+    const GAP = 10, SEP = 12;
+    const caja = cajaVisible();
+    const paso = DEFAULT_W + GAP;
+    const porFila = Math.max(1, Math.min(nombres.length, Math.floor((caja.w + GAP) / paso)));
+    const ancho = porFila * paso - GAP;
+    const alto  = Math.ceil(nombres.length / porFila) * (DEFAULT_H + GAP) - GAP;
+
+    let y = evento.y + evento.h + SEP;
+    if (y + alto > caja.h) y = evento.y - SEP - alto;
+    y = Math.max(0, Math.min(y, Math.max(0, caja.h - alto)));
+    const x = Math.max(0, Math.min(evento.x, Math.max(0, caja.w - ancho)));
+
+    return nombres.map((nombre, i) => ({
+        name: nombre,
+        x: x + (i % porFila) * paso,
+        y: y + Math.floor(i / porFila) * (DEFAULT_H + GAP),
+        w: DEFAULT_W,
+        h: DEFAULT_H
+    }));
+}
+
 // ─────────────────────────────────────────────
 // LIVE CLICK (MANUAL TOGGLE / EXCLUYENTES / POPUPS)
 // ─────────────────────────────────────────────
@@ -3307,15 +3364,7 @@ function handleLiveClick(e) {
 
         // 3. Etiquetas emergentes definidas directo en el evento (botones emergentes en pantalla)
         if (e.popups && e.popups.length > 0) {
-            e.popups.forEach((labelName, idx) => {
-                state.tempPopupButtons.push({
-                    name: labelName,
-                    x: e.x + (idx * (DEFAULT_W + 10)),
-                    y: e.y + e.h + 12,
-                    w: DEFAULT_W,
-                    h: DEFAULT_H
-                });
-            });
+            state.tempPopupButtons = ubicarEmergentes(e, e.popups);
         }
 
         // 4. Plantilla de detalle: si el evento tiene una asignada, se abre en
@@ -4241,13 +4290,24 @@ function xmlEsc(v) {
         .replace(/"/g, '&quot;');
 }
 
-// "LOMAS vs GEBA 15-09-2026 20h30": día y hora del primer PLAY. Con "h" y no
-// ":" porque el nombre del archivo no admite los dos puntos.
-function nombrePartido() {
-    const d = state.sessionStartedAt || new Date();
-    const p = n => String(n).padStart(2, '0');
+// "LOMAS vs GEBA": los equipos de la botonera. Es lo que viene propuesto
+// cuando se pide el nombre del partido.
+function equiposDelPartido() {
     const eq = nombresEquipos();
-    return `${eq.A} vs ${eq.B} ${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}h${p(d.getMinutes())}`;
+    return `${eq.A} vs ${eq.B}`;
+}
+
+// "15-09-2026 20h30": día y hora del primer PLAY. Con "h" y no ":" porque el
+// nombre del archivo no admite los dos puntos.
+function fechaPartido(cuando) {
+    const d = cuando || state.sessionStartedAt || new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}h${p(d.getMinutes())}`;
+}
+
+// "LOMAS vs GEBA 15-09-2026 20h30"
+function nombrePartido() {
+    return `${equiposDelPartido()} ${fechaPartido()}`;
 }
 
 function armarSesion(nombre) {
@@ -4276,22 +4336,44 @@ function tramosDeSesion(s) {
     }));
 }
 
-// Al tocar Terminar: sin preguntar nada, la codificación queda en la página
-// XML y se exporta el archivo, los dos con el día y la hora del partido.
-function guardarPartidoAlTerminar() {
-    // Una codificación abierta desde la página XML ya está guardada: solo
-    // sale su XML, con su nombre, sin sumarla otra vez a la lista.
-    const nombre = state.sesionCargada || nombrePartido();
-    if (!state.sesionCargada) {
-        const sessions = getSavedSessions();
-        sessions.unshift(armarSesion(nombre));
-        saveSessions(sessions);
+// Al tocar Terminar: se pide el nombre del partido y con ese nombre queda
+// guardada la codificación en la página XML y sale el archivo. La fecha y la
+// hora del primer PLAY se agregan solas al final: no hay que escribirlas, y
+// así dos partidos del mismo cruce nunca se confunden.
+async function guardarPartidoAlTerminar() {
+    // Una codificación abierta desde la página XML ya está guardada y ya tiene
+    // nombre: solo sale su XML, sin preguntar ni sumarla otra vez a la lista.
+    if (state.sesionCargada) {
+        exportarPartido(state.events, state.sesionCargada, state.sessionStartedAt);
+        return;
     }
+
+    // Todo lo que se va a guardar, tomado ahora: mientras el cartel espera el
+    // nombre se puede arrancar otra codificación, y eso vacía el registro.
+    const sesion = armarSesion('');
+    const inicio = state.sessionStartedAt;
+    const fecha  = fechaPartido(inicio);
+
+    const puesto = await customPrompt(
+        'Nombre del partido (la fecha y la hora se agregan solas):',
+        equiposDelPartido(), 'Terminar codificación');
+    // Cancelar no pierde nada: queda guardado con los equipos de la botonera.
+    const nombre = ((puesto || '').trim() || equiposDelPartido()) + ' ' + fecha;
+
+    sesion.name = nombre;
+    const sessions = getSavedSessions();
+    sessions.unshift(sesion);
+    saveSessions(sessions);
+
     // Sin eventos no hay XML que sacar: una codificación de pura posesión
     // queda guardada igual, con su estadística.
-    if (!state.events.length) return;
+    if (!sesion.events.length) return;
+    exportarPartido(sesion.events, nombre, inicio);
+}
+
+function exportarPartido(eventos, nombre, inicio) {
     try {
-        exportCustomXML(state.events, nombre, state.sessionStartedAt);
+        exportCustomXML(eventos, nombre, inicio);
     } catch (err) {
         customAlert('La codificación quedó guardada, pero no se pudo generar el XML: ' + ((err && err.message) || err), 'Exportar XML');
     }

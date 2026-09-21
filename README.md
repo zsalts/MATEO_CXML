@@ -19,6 +19,21 @@ es opcional y se apaga dejando `nube-config.js` vacío.
 - **Archivos** — plantillas, sesiones y copias de seguridad como `.json` que
   se guardan y se abren desde la app Archivos del iPad.
 
+## Etiquetas emergentes
+
+Aparecen al tocar el evento en vivo, y lo que toques ahí queda como etiqueta
+suya. Hay tres formas de armarlas:
+
+- **Escritas en el evento**: Inspector → "Etiquetas emergentes (separadas por
+  coma)". Salen como botones debajo del evento. Si abajo no entran, se acomodan
+  arriba o en varias filas: nunca quedan fuera de la pantalla.
+- **Un botón "Etiqueta emergente" en el mismo contenedor** que el evento: no se
+  ve hasta que tocás el evento.
+- **Un botón "Etiqueta emergente" enlazado con flecha** desde el evento.
+
+Un botón de etiqueta emergente suelto en el lienzo, sin contenedor ni flecha,
+no se muestra nunca en vivo.
+
 ## Pestañas de detalle
 
 Una botonera puede tener pestañas adentro: **Insertar ▼ → Pestaña nueva**. Si
@@ -38,9 +53,12 @@ También se conecta desde el Inspector, en **"Al tocarlo, abrir pestaña"**.
 
 ## Terminar, equipos y etiquetas fijas
 
-- **Terminar** guarda sola la codificación en la página XML y exporta el
-  archivo, los dos con el nombre `LOCAL vs VISITANTE 15-09-2026 20h30` (día y
-  hora del primer PLAY).
+- **Terminar** pregunta el nombre del partido —viene propuesto
+  `LOCAL vs VISITANTE`, y podés escribir el que quieras— y con ese nombre
+  guarda la codificación en la página XML y exporta el archivo. El día y la
+  hora del primer PLAY se agregan solos al final:
+  `Final Copa 15-09-2026 20h30`. Cancelar no pierde nada: queda con los
+  equipos de la botonera.
 - **Equipos cargados:** en la tarjeta Equipos y en el botón de Posesión los
   equipos se eligen de una lista. "＋ Cargar equipo…" suma uno nuevo, con el
   color que tenga ese lado de la tarjeta. La lista va en la copia de seguridad.
