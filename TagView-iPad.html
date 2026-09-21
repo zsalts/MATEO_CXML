@@ -361,6 +361,31 @@ body {
     border: 1.5px solid #333;
     border-radius: 50%;
 }
+/* Las etiquetas emergentes del evento seleccionado, en el editor: se ven donde
+   van a salir en vivo y se arrastran para dejarlas en otro lado. Punteadas y
+   un poco transparentes, para no confundirlas con un botón del lienzo. */
+.emergente-fantasma {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    background: linear-gradient(180deg, #ffe55a 0%, #f8d022 100%);
+    border: 2px dashed #c49a00;
+    color: #000;
+    opacity: 0.8;
+    cursor: move;
+    user-select: none;
+    overflow: hidden;
+    z-index: 30;
+}
+.emergente-fantasma span { pointer-events: none; }
+
 /* Descriptor – plain yellow */
 .canvas-element[data-eltype="descriptor"] {
     background: #fff9c4;
@@ -1342,7 +1367,8 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
                     <div class="inspector-section-label">ETIQUETAS EMERGENTES (separadas por coma)</div>
                     <div class="inspector-cell">
                         <input id="propDescriptors" type="text" class="w-full bg-transparent text-sm focus:outline-none text-black" placeholder="Ej: Pie derecho, Pie izquierdo">
-                        <p class="text-xs text-gray-400 mt-1">Aparecerán como botones debajo del evento al tocarlo en vivo.</p>
+                        <p class="text-xs text-gray-400 mt-1">Aparecerán como botones debajo del evento al tocarlo en vivo. Con el evento seleccionado se ven en el lienzo en amarillo punteado: arrastralas para dejarlas donde quieras.</p>
+                        <button id="btnAcomodarEmergentes" class="mt-2 text-xs text-[#007aff] font-medium hover:underline">Acomodarlas solas de nuevo</button>
                     </div>
 
                     <div id="propDetalleSection">
@@ -1687,6 +1713,7 @@ const state = {
     elStart:   { x: 0, y: 0, w: 0, h: 0 },
     elStarts:  [],            // Posiciones iniciales de todos los seleccionados al arrastrar
     resizeDir: null,
+    arrastrePopup: null,      // Fantasma de etiqueta emergente que se está moviendo en el editor
 
     // Marquee (rectángulo de selección arrastrado en área vacía)
     isMarquee: false,
@@ -1796,6 +1823,7 @@ const el = {
     propLead:              D('propLead'),
     propLag:               D('propLag'),
     propDescriptors:       D('propDescriptors'),
+    btnAcomodarEmergentes: D('btnAcomodarEmergentes'),
     propPopupDescriptors:  D('propPopupDescriptors'),
     propTimesSection:      D('propTimesSection'),
     propExclusiveSection:  D('propExclusiveSection'),
@@ -3083,6 +3111,7 @@ function bindEvents() {
     on(el.propLead, 'input', updateSelected);
     on(el.propLag, 'input', updateSelected);
     on(el.propDescriptors, 'input', updateSelected);
+    on(el.btnAcomodarEmergentes, 'click', acomodarEmergentesSolas);
     on(el.propPopupDescriptors, 'input', updateSelected);
     
     on(el.btnStartLink, 'click', startLinking);
@@ -3212,6 +3241,11 @@ function onGlobalUp()     {
         renderElements(); renderLinks();
         return;
     }
+    if (state.arrastrePopup) {
+        state.arrastrePopup = null;
+        saveData();
+        return;
+    }
     if (state.isDragging || state.isResizing) {
         state.isDragging = state.isResizing = false;
         saveData();
@@ -3226,12 +3260,12 @@ function onTouchStart(e) {
     if (!el.canvasContainer.contains(e.target)) return;    // fuera del lienzo, no tocamos nada
     const t = e.touches[0];
     handleDown(t.clientX, t.clientY, e.target, false);
-    if (state.isDragging || state.isResizing || state.isMarquee) e.preventDefault();
+    if (state.isDragging || state.isResizing || state.isMarquee || state.arrastrePopup) e.preventDefault();
 }
 function onTouchMove(e) {
     if (state.mode !== 'setup') return;
     if (e.touches.length > 1) return;
-    if (!(state.isDragging || state.isResizing || state.isMarquee)) return;
+    if (!(state.isDragging || state.isResizing || state.isMarquee || state.arrastrePopup)) return;
     e.preventDefault();
     const t = e.touches[0];
     handleMove(t.clientX, t.clientY);
@@ -3245,6 +3279,26 @@ function handleDown(cx, cy, target, shiftKey) {
     if (target.closest && target.closest('.acciones-flotantes')) return;
 
     const pos = canvasPos(cx, cy);
+
+    // Fantasma de una etiqueta emergente: se arrastra para dejarla donde uno
+    // quiere. Va antes que todo lo demás porque no es un elemento del lienzo:
+    // si no, contaría como tocar el vacío, se perdería la selección del evento
+    // y el fantasma desaparecería justo cuando lo estás agarrando.
+    const fantasma = target.closest && target.closest('.emergente-fantasma');
+    if (fantasma) {
+        const evento = state.elements.find(x => x.id === state.selectedId);
+        if (evento) {
+            const idx = parseInt(fantasma.dataset.idx);
+            const puestas = fijarEmergentes(evento);
+            state.arrastrePopup = {
+                idx: idx,
+                nodo: fantasma,
+                inicio: { dx: puestas[idx].dx, dy: puestas[idx].dy }
+            };
+            state.dragStart = pos;
+        }
+        return;
+    }
 
     if (target.classList.contains('resize-handle')) {
         state.isResizing = true;
@@ -3349,6 +3403,22 @@ function aplicarMove(cx, cy) {
     state.mousePosCanvas = pos;
     if (state.isLinking) { renderLinks(); return; }
 
+    if (state.arrastrePopup) {
+        const evento = state.elements.find(x => x.id === state.selectedId);
+        const p = evento && (evento.popupPos || [])[state.arrastrePopup.idx];
+        if (p) {
+            const a = state.arrastrePopup;
+            p.dx = snap(a.inicio.dx + pos.x - state.dragStart.x);
+            p.dy = snap(a.inicio.dy + pos.y - state.dragStart.y);
+            // Fuera del lienzo no se podría volver a agarrar.
+            if (evento.x + p.dx < 0) p.dx = -evento.x;
+            if (evento.y + p.dy < 0) p.dy = -evento.y;
+            a.nodo.style.left = (evento.x + p.dx) + 'px';
+            a.nodo.style.top  = (evento.y + p.dy) + 'px';
+        }
+        return;
+    }
+
     if (state.isMarquee) {
         state.marqueeEnd = pos;
         drawMarqueeEl();
@@ -3367,7 +3437,8 @@ function aplicarMove(cx, cy) {
                 movidos.push(e);
             }
         });
-        updateElementPositions(movidos); renderLinks();
+        // Las emergentes van pegadas al evento: se mueven con él.
+        updateElementPositions(movidos); refrescarFantasmas(); renderLinks();
         return;
     }
 
@@ -3377,7 +3448,7 @@ function aplicarMove(cx, cy) {
             const dx = pos.x - state.dragStart.x, dy = pos.y - state.dragStart.y;
             if (state.resizeDir.includes('e')) e.w = Math.max(40, snap(state.elStart.w + dx));
             if (state.resizeDir.includes('s')) e.h = Math.max(24, snap(state.elStart.h + dy));
-            updateElementPositions([e]); renderLinks();
+            updateElementPositions([e]); refrescarFantasmas(); renderLinks();
         }
     }
 }
@@ -4015,6 +4086,11 @@ function updateSelected() {
     } else if (e.type === 'event' && el.propDescriptors) {
         e.popups = el.propDescriptors.value.split(',').map(s=>s.trim()).filter(s=>s);
     }
+    // Borrar un nombre no tiene que dejar su lugar guardado colgado: las que
+    // quedan siguen donde estaban y las nuevas se acomodan solas.
+    if (e.popupPos && e.popupPos.length > (e.popups || []).length) {
+        e.popupPos.length = (e.popups || []).length;
+    }
     if (e.type !== 'image' && el.propTransparencia) {
         e.transparencia = parseInt(el.propTransparencia.value) || 100;
     }
@@ -4085,6 +4161,7 @@ function updateSelectionClasses() {
         nodo.classList.toggle('selected', id === state.selectedId);
         nodo.classList.toggle('en-seleccion', grupo && state.selectedIds.includes(id));
     });
+    refrescarFantasmas();
     posicionarAccionesFlotantes();
 }
 
@@ -4192,9 +4269,19 @@ const MARGEN_LIENZO = 24;
 // La caja que ocupa lo que está en pantalla, con el margen incluido.
 function cajaLienzo() {
     let derecha = 0, abajo = 0;
+    const mirar = (x, y, w, h) => {
+        if (x + w > derecha) derecha = x + w;
+        if (y + h > abajo)   abajo   = y + h;
+    };
     elementosEnPantalla().forEach(e => {
-        if (e.x + e.w > derecha) derecha = e.x + e.w;
-        if (e.y + e.h > abajo)   abajo   = e.y + e.h;
+        mirar(e.x, e.y, e.w, e.h);
+        // Una emergente que se dejó puesta a mano cuenta como un botón más: si
+        // no, la que pusiste debajo del último quedaría fuera de la pantalla en
+        // vivo. Las que se acomodan solas no entran acá: su lugar sale de esta
+        // misma caja.
+        (e.popupPos || []).forEach(p => {
+            if (p) mirar(e.x + p.dx, e.y + p.dy, DEFAULT_W, DEFAULT_H);
+        });
     });
     return { w: derecha + MARGEN_LIENZO, h: abajo + MARGEN_LIENZO };
 }
@@ -4531,9 +4618,67 @@ function renderElements() {
         });
     }
 
+    // En el editor, las emergentes del evento seleccionado se ven como quedan
+    // en vivo, y se arrastran para dejarlas donde uno quiere.
+    if (state.mode === 'setup') dibujarFantasmasEmergentes(frag);
+
     el.canvas.appendChild(frag);
     posicionarAccionesFlotantes();   // innerHTML = '' se lo llevó: se vuelve a poner
     updateLiveClocks();
+}
+
+// Las etiquetas emergentes escritas en el Inspector, dibujadas en el editor
+// solo para el evento seleccionado: con las de todos los botones a la vez el
+// lienzo no se entendería. Se ven en amarillo punteado, para no confundirlas
+// con un botón de verdad.
+function dibujarFantasmasEmergentes(frag) {
+    if (state.selectedIds.length > 1) return;   // con un grupo agarrado, estorban
+    const e = state.elements.find(x => x.id === state.selectedId);
+    if (!e || e.type !== 'event' || !(e.popups || []).length) return;
+
+    ubicarEmergentes(e, e.popups).forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = 'emergente-fantasma';
+        div.dataset.idx  = i;
+        div.style.left   = b.x + 'px';
+        div.style.top    = b.y + 'px';
+        div.style.width  = b.w + 'px';
+        div.style.height = b.h + 'px';
+        div.innerHTML = `<span>${b.name}</span>`;
+        frag.appendChild(div);
+    });
+}
+
+// Los fantasmas cuelgan de qué hay seleccionado, y seleccionar no redibuja el
+// lienzo entero (arrastrando, rehacerlo cortaría el gesto). Se sacan y se
+// vuelven a poner acá, que es por donde pasan los cambios de selección y de
+// posición del evento.
+function refrescarFantasmas() {
+    el.canvas.querySelectorAll('.emergente-fantasma').forEach(n => n.remove());
+    if (state.mode !== 'setup') return;
+    const frag = document.createDocumentFragment();
+    dibujarFantasmasEmergentes(frag);
+    el.canvas.appendChild(frag);
+}
+
+// Deja fijas todas las emergentes del evento donde están ahora. Se llama antes
+// de arrastrar una: si las otras siguieran acomodándose solas, saltarían de
+// lugar al mover la primera.
+function fijarEmergentes(e) {
+    const puestas = e.popupPos || [];
+    e.popupPos = ubicarEmergentesAuto(e, e.popups).map((b, i) => {
+        return puestas[i] || { dx: b.x - e.x, dy: b.y - e.y };
+    });
+    return e.popupPos;
+}
+
+// El botón del Inspector: las vuelve a repartir solas debajo del evento.
+function acomodarEmergentesSolas() {
+    const e = state.elements.find(x => x.id === state.selectedId);
+    if (!e) return;
+    delete e.popupPos;
+    saveData();
+    renderElements();
 }
 
 function centerOf(id) {
@@ -4942,13 +5087,27 @@ function updateLiveClocks() {
 }
 
 // Dónde se dibujan las etiquetas emergentes que el evento trae escritas en el
-// Inspector. Van debajo del botón, pero siempre adentro de lo que se ve: en
-// vivo el lienzo se achica justo hasta el último botón y queda sin scroll, así
-// que las de un evento de la fila de abajo —o una lista larga, que se iba de
-// ancho— caían afuera de la pantalla y no había con qué alcanzarlas. Si abajo
-// no hay lugar se pasan arriba del evento, y si no entran en una fila se
-// parten en varias.
+// Inspector. Las que se arrastraron en el editor van donde las dejaste, y el
+// resto se acomodan solas.
 function ubicarEmergentes(evento, nombres) {
+    const puestas = evento.popupPos || [];
+    return ubicarEmergentesAuto(evento, nombres).map((b, i) => {
+        const p = puestas[i];
+        if (!p) return b;
+        // Guardadas como distancia al evento: moviendo el botón, sus
+        // emergentes lo siguen y no hay que reacomodarlas.
+        return { name: b.name, w: b.w, h: b.h,
+                 x: Math.max(0, evento.x + p.dx), y: Math.max(0, evento.y + p.dy) };
+    });
+}
+
+// El reparto automático: debajo del botón, pero siempre adentro de lo que se
+// ve. En vivo el lienzo se achica justo hasta el último botón y queda sin
+// scroll, así que las de un evento de la fila de abajo —o una lista larga, que
+// se iba de ancho— caían afuera de la pantalla y no había con qué alcanzarlas.
+// Si abajo no hay lugar se pasan arriba del evento, y si no entran en una fila
+// se parten en varias.
+function ubicarEmergentesAuto(evento, nombres) {
     const GAP = 10, SEP = 12;
     const caja = cajaVisible();
     const paso = DEFAULT_W + GAP;

@@ -27,6 +27,11 @@ suya. Hay tres formas de armarlas:
 - **Escritas en el evento**: Inspector → "Etiquetas emergentes (separadas por
   coma)". Salen como botones debajo del evento. Si abajo no entran, se acomodan
   arriba o en varias filas: nunca quedan fuera de la pantalla.
+  **Se pueden mover**: con el evento seleccionado se ven en el lienzo en
+  amarillo punteado, y arrastrando cada una queda donde la dejes. Se guardan
+  como distancia al evento, así que si después movés el botón, sus emergentes
+  lo siguen. "Acomodarlas solas de nuevo", en el Inspector, vuelve al reparto
+  automático.
 - **Un botón "Etiqueta emergente" en el mismo contenedor** que el evento: no se
   ve hasta que tocás el evento.
 - **Un botón "Etiqueta emergente" enlazado con flecha** desde el evento.
