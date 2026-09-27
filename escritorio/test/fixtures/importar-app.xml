@@ -1,0 +1,51 @@
+<file>
+	<SESSION_INFO>
+		<start_time>2026-09-15 23:30:00 +0000</start_time>
+	</SESSION_INFO>
+	<ALL_INSTANCES>
+		<instance>
+			<ID>2</ID>
+			<start>30.00</start>
+			<end>36.50</end>
+			<code>Ataque &amp; contra</code>
+			<label>
+				<group>Linea</group>
+				<text>L1</text>
+			</label>
+			<label>
+				<group>Etiqueta</group>
+				<text>Área &lt;chica&gt;</text>
+			</label>
+		</instance>
+		<instance>
+			<ID>1</ID>
+			<start>12.40</start>
+			<end>18.40</end>
+			<code>Corner</code>
+		</instance>
+		<instance>
+			<ID>3</ID>
+			<start>95.10</start>
+			<end>101.10</end>
+			<code>Corner</code>
+			<label>
+				<group>Etiqueta</group>
+				<text>Gol</text>
+			</label>
+		</instance>
+	</ALL_INSTANCES>
+	<ROWS>
+		<row>
+			<code>Ataque &amp; contra</code>
+			<R>14906</R>
+			<G>36751</G>
+			<B>54998</B>
+		</row>
+		<row>
+			<code>Corner</code>
+			<R>56540</R>
+			<G>9766</G>
+			<B>9766</B>
+		</row>
+	</ROWS>
+</file>

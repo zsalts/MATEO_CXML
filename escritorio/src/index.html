@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+    <meta charset="utf-8">
+    <!-- Todo sale de la app misma (app://tagview): nada se carga de internet.
+         blob: y mediastream: son para el video (preview de la cámara y
+         archivos elegidos); data: para miniaturas e íconos embebidos. -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self' app:; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data: blob:; media-src 'self' app: blob: mediastream:; connect-src 'self' app: blob:; font-src 'self' app: data:; object-src 'none'; base-uri 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <title>Tag &amp; View Pro</title>
+    <link rel="stylesheet" href="estilos/tokens.css">
+    <link rel="stylesheet" href="estilos/base.css">
+    <link rel="stylesheet" href="estilos/componentes.css">
+    <link rel="stylesheet" href="estilos/carcasa.css">
+    <script type="module" src="app.js"></script>
+</head>
+<body>
+    <header class="tv-app-barra">
+        <div class="tv-app-marca">
+            <!-- Marca propia: un visor con una muesca de etiqueta. -->
+            <svg class="tv-app-marca__logo" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="4" fill="var(--tv-acento)"/>
+                <path d="M9.5 8.5v7l6-3.5z" fill="var(--tv-acento-texto)"/>
+            </svg>
+            <span class="tv-app-marca__nombre">Tag &amp; View Pro</span>
+        </div>
+        <nav class="tv-app-miga" aria-label="Ubicación"></nav>
+        <div class="tv-app-barra__espacio"></div>
+        <button type="button" class="tv-app-buscar" title="Buscar partidos y plantillas (Ctrl+K)">
+            <span class="tv-app-buscar__icono"></span>
+            <span class="tv-app-buscar__texto">Buscar</span>
+            <span class="tv-tecla">Ctrl K</span>
+        </button>
+        <button type="button" class="tv-app-rec" hidden title="Ir a la grabación">
+            <span class="tv-app-rec__punto"></span>
+            <span>REC</span>
+            <span class="tv-app-rec__reloj tv-numeros">00:00:00</span>
+        </button>
+        <!-- Lugar de los botones nativos de Windows (minimizar, maximizar,
+             cerrar), que Electron dibuja arriba de la página. -->
+        <div class="tv-app-botones-nativos" aria-hidden="true"></div>
+    </header>
+
+    <div class="tv-app-cuerpo">
+        <nav class="tv-app-lateral" aria-label="Ramas"></nav>
+        <main class="tv-app-rama" id="tv-rama" tabindex="-1"></main>
+    </div>
+</body>
+</html>

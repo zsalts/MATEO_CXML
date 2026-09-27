@@ -1,0 +1,213 @@
+/* ─────────────────────────────────────────────
+   RAMA INICIO — menú principal
+   ─────────────────────────────────────────────
+   Pensado para entrar entero en 1024×680 sin scroll: las tarjetas arriba y
+   las dos listas se reparten el alto que queda, cada una con su scroll. */
+
+.tv-inicio {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-esp-4);
+    height: 100%;
+    min-height: 560px;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: var(--tv-esp-5) var(--tv-esp-5) var(--tv-esp-4);
+}
+
+.tv-inicio-cabecera h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.tv-inicio-cabecera p { margin-top: 2px; }
+
+/* ── Tarjetas de acción ── */
+.tv-inicio-acciones {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(120px, .6fr);
+    gap: var(--tv-esp-3);
+}
+
+.tv-inicio-tarjeta {
+    --tono: var(--tv-acento);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--tv-esp-1);
+    min-height: 148px;
+    padding: var(--tv-esp-4);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio-2);
+    background: var(--tv-panel);
+    color: var(--tv-texto);
+    text-align: left;
+    overflow: hidden;
+    transition: border-color .12s, background-color .12s, transform .12s;
+}
+/* Franja del color de la tarjeta arriba: la identidad de cada camino. */
+.tv-inicio-tarjeta::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: var(--tono);
+    opacity: .9;
+}
+.tv-inicio-tarjeta:hover {
+    border-color: var(--tono);
+    background: color-mix(in srgb, var(--tono) 7%, var(--tv-panel));
+}
+.tv-inicio-tarjeta:active { transform: translateY(1px); }
+.tv-inicio-tarjeta--rec    { --tono: var(--tv-rec); }
+.tv-inicio-tarjeta--acento { --tono: var(--tv-acento); }
+.tv-inicio-tarjeta--aviso  { --tono: var(--tv-aviso); }
+.tv-inicio-tarjeta--ok     { --tono: var(--tv-ok); }
+
+.tv-inicio-tarjeta__icono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px; height: 44px;
+    margin-bottom: var(--tv-esp-2);
+    border-radius: var(--tv-radio-2);
+    background: color-mix(in srgb, var(--tono) 16%, transparent);
+    color: var(--tono);
+}
+.tv-inicio-tarjeta__icono .tv-icono { width: 24px; height: 24px; }
+.tv-inicio-tarjeta__titulo { font-size: var(--tv-letra-grande); font-weight: 600; }
+.tv-inicio-tarjeta__texto { color: var(--tv-texto-2); line-height: 1.35; }
+.tv-inicio-tarjeta__tecla {
+    position: absolute;
+    top: var(--tv-esp-3); right: var(--tv-esp-3);
+    opacity: 0;
+    transition: opacity .12s;
+}
+.tv-inicio-tarjeta:hover .tv-inicio-tarjeta__tecla,
+.tv-inicio-tarjeta:focus-visible .tv-inicio-tarjeta__tecla { opacity: 1; }
+
+/* Ajustes: la chica, gris, sin franja. */
+.tv-inicio-tarjeta--chica { --tono: var(--tv-texto-2); background: transparent; border-style: dashed; }
+.tv-inicio-tarjeta--chica::before { display: none; }
+.tv-inicio-tarjeta--chica .tv-inicio-tarjeta__icono { width: 36px; height: 36px; background: var(--tv-panel-2); }
+.tv-inicio-tarjeta--chica .tv-inicio-tarjeta__titulo { font-size: var(--tv-letra); }
+.tv-inicio-tarjeta--chica .tv-inicio-tarjeta__texto { font-size: var(--tv-letra-chica); }
+
+/* ── Primera vez: los tres pasos ── */
+.tv-inicio-pasos {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-5);
+    padding: var(--tv-esp-4) var(--tv-esp-5);
+    border: 1px solid var(--tv-acento);
+    border-radius: var(--tv-radio-2);
+    background: var(--tv-acento-suave);
+}
+.tv-inicio-pasos[hidden] { display: none; }
+.tv-inicio-pasos__texto { flex: 1; }
+.tv-inicio-pasos h2 { font-size: var(--tv-letra-grande); margin-bottom: var(--tv-esp-2); }
+.tv-inicio-pasos ol { display: flex; flex-wrap: wrap; gap: var(--tv-esp-2) var(--tv-esp-5); color: var(--tv-texto-2); }
+.tv-inicio-pasos li { display: flex; align-items: center; gap: var(--tv-esp-2); }
+.tv-inicio-pasos li span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border: 1px solid var(--tv-borde-fuerte);
+    border-radius: 50%;
+    font-size: var(--tv-letra-chica); font-weight: 700;
+}
+.tv-inicio-pasos li.es-actual { color: var(--tv-texto); font-weight: 600; }
+.tv-inicio-pasos li.es-actual span { background: var(--tv-acento); border-color: var(--tv-acento); color: var(--tv-acento-texto); }
+.tv-inicio-pasos__boton { height: 40px; padding: 0 var(--tv-esp-5); font-size: var(--tv-letra-grande); }
+
+/* ── Las dos listas ── */
+.tv-inicio-columnas {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--tv-esp-3);
+}
+.tv-inicio-bloque {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.tv-inicio-bloque__cabecera {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-4);
+    min-height: 46px;
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-inicio-bloque__cabecera h2 { font-size: var(--tv-letra); text-transform: uppercase; letter-spacing: .06em; color: var(--tv-texto-2); }
+.tv-inicio-bloque__lista { flex: 1; min-height: 0; }
+.tv-inicio-bloque__lista .tv-vacio { flex: 1; padding: var(--tv-esp-5); }
+
+.tv-inicio-fila__texto { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.tv-inicio-fila__nombre { font-weight: 500; }
+
+.tv-inicio-plantilla { min-height: 60px; }
+.tv-inicio-plantilla__mini {
+    flex: none;
+    width: 76px; height: 44px;
+    padding: 4px;
+    border-radius: 4px;
+    background: var(--tv-fondo);
+    border: 1px solid var(--tv-borde);
+}
+.tv-inicio-fila__ir {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-1);
+    color: var(--tv-acento);
+    font-size: var(--tv-letra-chica);
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity .12s;
+}
+.tv-inicio-fila__ir .tv-icono { width: 14px; height: 14px; }
+.tv-inicio-plantilla:hover .tv-inicio-fila__ir,
+.tv-inicio-plantilla:focus-visible .tv-inicio-fila__ir { opacity: 1; }
+
+.tv-inicio-partido { min-height: 52px; }
+.tv-inicio-partido__origen {
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    color: var(--tv-texto-2);
+}
+.tv-inicio-partido__datos { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.tv-inicio-partido__archivos { display: flex; gap: 2px; color: var(--tv-texto-3); }
+.tv-inicio-partido__archivos .tv-icono { width: 16px; height: 16px; opacity: .35; }
+.tv-inicio-partido__archivos .es-si { color: var(--tv-ok); }
+.tv-inicio-partido__archivos .es-si .tv-icono { opacity: 1; }
+
+.tv-inicio-login__error { display: flex; align-items: center; gap: var(--tv-esp-2); color: var(--tv-peligro); }
+
+/* Cargando: tres renglones grises que laten, en vez de un spinner. */
+.tv-inicio-cargando { display: flex; flex-direction: column; gap: var(--tv-esp-2); padding: var(--tv-esp-3); }
+.tv-inicio-cargando span {
+    height: 36px;
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    animation: tv-inicio-latir 1.2s ease-in-out infinite;
+}
+.tv-inicio-cargando span:nth-child(2) { animation-delay: .15s; }
+.tv-inicio-cargando span:nth-child(3) { animation-delay: .3s; }
+@keyframes tv-inicio-latir { 50% { opacity: .45; } }
+
+/* Ventana chica (1024 de ancho): tarjetas más bajas, ajustes angosta. */
+@media (max-width: 1180px) {
+    .tv-inicio { padding: var(--tv-esp-4); gap: var(--tv-esp-3); }
+    .tv-inicio-tarjeta { min-height: 128px; padding: var(--tv-esp-3); }
+    .tv-inicio-tarjeta__icono { width: 38px; height: 38px; }
+    .tv-inicio-acciones { grid-template-columns: repeat(4, minmax(0, 1fr)) 104px; gap: var(--tv-esp-2); }
+    .tv-inicio-tarjeta--chica .tv-inicio-tarjeta__texto { display: none; }
+    .tv-inicio-bloque__cabecera .tv-btn { padding: 0 6px; }
+}
+@media (max-height: 720px) {
+    .tv-inicio-cabecera { display: none; }
+}

@@ -1,0 +1,81 @@
+# Arma la app de escritorio para Mac en Macs de GitHub: corre las pruebas y
+# genera el .dmg y el .zip para Apple Silicon (arm64) e Intel (x64).
+#
+# Cada arquitectura en su propia maquina: ffmpeg-static baja el ffmpeg de la
+# maquina donde corre npm install, y un .dmg x64 armado en una Mac M1
+# llevaria ffmpeg arm64 (build/mac/firmar-adhoc.js corta el build si pasa).
+#
+# Sin firma de Apple ni notarizacion, sin secretos y sin publicar nada: los
+# instaladores quedan como "artifacts" de la corrida (ver escritorio/README.md).
+
+name: Escritorio Mac
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'escritorio/**'
+      - '.github/workflows/escritorio-mac.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14        # Apple Silicon
+            arch: arm64
+            lipo: arm64
+          - runner: macos-15-intel  # Intel (macos-13 ya no existe en GitHub)
+            arch: x64
+            lipo: x86_64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: escritorio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas
+        run: npm test
+
+      - name: Armar .dmg y .zip
+        run: npm run dist:mac -- --${{ matrix.arch }}
+        env:
+          # Sin certificado: que electron-builder no busque uno en el llavero.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verificar ffmpeg y ffprobe adentro de la .app
+        run: |
+          app="$(find dist -maxdepth 2 -name '*.app' -type d | head -n 1)"
+          echo "App: $app"
+          test -n "$app"
+          fallo=0
+          for bin in $(find "$app/Contents/Resources/app.asar.unpacked" -type f \( -name ffmpeg -o -name ffprobe \)); do
+            archs="$(lipo -archs "$bin")"
+            echo "$bin → $archs"
+            codesign -dv "$bin" 2>&1 | head -n 3 || true
+            case " $archs " in *" ${{ matrix.lipo }} "*) ;; *) echo "::error::$bin es $archs, se esperaba ${{ matrix.lipo }}"; fallo=1 ;; esac
+          done
+          exit $fallo
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tagview-mac-${{ matrix.arch }}
+          path: |
+            escritorio/dist/*.dmg
+            escritorio/dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- Sin zoom: un doble toque rapido sobre dos botones no tiene que agrandar
+     la botonera en el medio del partido. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TV Remoto">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#0e1014">
+<title>Tag &amp; View — iPad</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="icon" href="icono-192.png">
+<link rel="stylesheet" href="estilo.css">
+<!-- Si el nucleo trae estilos propios para la botonera, se cargan; si no
+     existe, es un 404 que no rompe nada. -->
+<link rel="stylesheet" href="/nucleo/botonera-vista.css">
+</head>
+<body>
+
+<!-- Franja fina de arriba: reloj, REC, conexion, ultimo evento -->
+<header class="franja" id="franja" hidden>
+  <span class="franja__reloj" id="reloj">00:00</span>
+  <span class="franja__rec" id="rec" hidden>● REC</span>
+  <span class="franja__conexion" id="conexion" data-nivel="rojo" title="Conexión">
+    <i></i><b id="conexionTexto">Sin conexión</b>
+  </span>
+  <span class="franja__cola" id="cola" hidden></span>
+  <span class="franja__ultimo" id="ultimo"></span>
+  <span class="franja__botones">
+    <button class="boton" id="btnVolver" type="button" hidden>✕ Cerrar pestaña</button>
+    <button class="boton" id="btnPlay" type="button">▶ PLAY</button>
+    <button class="boton boton--peligro" id="btnTerminar" type="button">Terminar</button>
+  </span>
+</header>
+
+<main class="botonera" id="botonera" hidden></main>
+
+<!-- Pantalla del PIN -->
+<section class="pantalla" id="pantallaPin">
+  <div class="pin">
+    <h1>Tag &amp; View</h1>
+    <p class="pin__ayuda">Escribí el PIN que muestra la compu</p>
+    <div class="pin__puntos" id="pinPuntos"><i></i><i></i><i></i><i></i></div>
+    <p class="pin__error" id="pinError" role="alert"></p>
+    <div class="pin__teclado" id="teclado">
+      <button type="button" data-t="1">1</button><button type="button" data-t="2">2</button><button type="button" data-t="3">3</button>
+      <button type="button" data-t="4">4</button><button type="button" data-t="5">5</button><button type="button" data-t="6">6</button>
+      <button type="button" data-t="7">7</button><button type="button" data-t="8">8</button><button type="button" data-t="9">9</button>
+      <button type="button" data-t="borrar" aria-label="Borrar">⌫</button><button type="button" data-t="0">0</button><span></span>
+    </div>
+  </div>
+</section>
+
+<!-- Mensajes a pantalla completa: conectando, esperando, otro iPad, guardado -->
+<section class="pantalla" id="pantallaMensaje" hidden>
+  <div class="mensaje">
+    <h2 id="mensajeTitulo"></h2>
+    <p id="mensajeTexto"></p>
+    <button class="boton boton--primario" id="mensajeBoton" type="button" hidden></button>
+  </div>
+</section>
+
+<div class="aviso" id="aviso" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

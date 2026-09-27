@@ -1,0 +1,54 @@
+{
+  "app": "tagview",
+  "kind": "backup",
+  "version": 1,
+  "dispositivo": "el iPad",
+  "date": "2026-09-16T01:00:00.000Z",
+  "current": {
+    "elements": [
+      { "id": 5, "type": "event", "name": "Otro", "color": "#000000", "x": 0, "y": 0, "w": 120, "h": 52 }
+    ],
+    "links": [],
+    "hojas": []
+  },
+  "templates": [
+    {
+      "id": 1726000000000,
+      "name": "Hockey 5v5",
+      "date": "1/9/26",
+      "elements": [
+        { "id": 1726000000001, "type": "event", "name": "Ataque", "color": "#16a34a", "equipo": "A", "x": 20, "y": 20, "w": 120, "h": 52 },
+        { "id": 1726000000002, "type": "event", "name": "Corner", "color": "#f59e0b", "x": 160, "y": 20, "w": 120, "h": 52 }
+      ],
+      "links": [],
+      "hojas": []
+    }
+  ],
+  "sessions": [
+    {
+      "id": 1726100000000,
+      "name": "Partido A",
+      "date": "15/9/26, 20:30",
+      "duration": "02:10",
+      "startedAt": "2026-09-15T23:30:00.000Z",
+      "events": [
+        { "id": 1, "buttonId": 1726000000001, "name": "Ataque", "start": 5, "end": 11, "line": null, "descriptors": [] },
+        { "id": 2, "buttonId": 1726000000002, "name": "Corner", "start": 60, "end": 66, "line": null, "descriptors": [] }
+      ],
+      "counters": {},
+      "toi": {},
+      "tramosPos": [ { "buttonId": 1726000000009, "equipo": "B", "start": 3, "end": 30 } ]
+    },
+    {
+      "id": 1726200000000,
+      "name": "Partido B",
+      "date": "20/9/26, 18:00",
+      "duration": "00:30",
+      "events": [
+        { "id": 1, "buttonId": 1726000000002, "name": "Corner", "start": 1, "end": 7, "line": null, "descriptors": [] }
+      ]
+    },
+    { "nombre": "esto no es una sesión" }
+  ],
+  "equipos": []
+}

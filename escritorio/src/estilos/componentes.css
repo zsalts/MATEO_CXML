@@ -1,0 +1,221 @@
+/* ─────────────────────────────────────────────
+   COMPONENTES de src/ui/: avisos, modales, elegir plantilla, miniaturas
+   ───────────────────────────────────────────── */
+
+/* ── Avisos (toasts), abajo a la derecha ── */
+.tv-avisos {
+    position: fixed;
+    right: var(--tv-esp-4);
+    bottom: var(--tv-esp-4);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--tv-esp-2);
+    pointer-events: none;
+}
+.tv-aviso {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    min-width: 260px;
+    max-width: 440px;
+    padding: var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-left: 3px solid var(--tv-acento);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    box-shadow: var(--tv-sombra);
+    pointer-events: auto;
+    animation: tv-aviso-entra .18s ease-out;
+}
+.tv-aviso.es-saliendo { opacity: 0; transform: translateX(12px); transition: opacity .15s, transform .15s; }
+@keyframes tv-aviso-entra { from { opacity: 0; transform: translateY(8px); } }
+.tv-aviso__icono { color: var(--tv-acento); }
+.tv-aviso__texto { flex: 1; white-space: pre-line; }
+.tv-aviso--ok     { border-left-color: var(--tv-ok); }
+.tv-aviso--ok     .tv-aviso__icono { color: var(--tv-ok); }
+.tv-aviso--error  { border-left-color: var(--tv-peligro); }
+.tv-aviso--error  .tv-aviso__icono { color: var(--tv-peligro); }
+.tv-aviso--aviso  { border-left-color: var(--tv-aviso); }
+.tv-aviso--aviso  .tv-aviso__icono { color: var(--tv-aviso); }
+
+/* ── Modal ── */
+.tv-modal-fondo {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--tv-esp-5);
+    background: rgba(0, 0, 0, .5);
+    animation: tv-fundido .12s ease-out;
+}
+.tv-modal-fondo.es-saliendo { opacity: 0; transition: opacity .12s; }
+@keyframes tv-fundido { from { opacity: 0; } }
+
+.tv-modal {
+    display: flex;
+    flex-direction: column;
+    width: min(520px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    border: 1px solid var(--tv-borde-fuerte);
+    border-radius: var(--tv-radio-2);
+    background: var(--tv-panel);
+    box-shadow: var(--tv-sombra);
+    animation: tv-modal-entra .14s ease-out;
+}
+@keyframes tv-modal-entra { from { opacity: 0; transform: scale(.97); } }
+/* Clic afuera: el diálogo "llama la atención" en vez de cerrarse. */
+.tv-modal.es-llamando { animation: tv-llamar .25s; }
+@keyframes tv-llamar { 30% { transform: scale(1.015); } }
+
+.tv-modal__cabecera {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-3) var(--tv-esp-3) var(--tv-esp-2) var(--tv-esp-4);
+}
+.tv-modal__titulo { flex: 1; font-size: var(--tv-letra-grande); }
+.tv-modal__cuerpo {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: var(--tv-esp-2) var(--tv-esp-4) var(--tv-esp-4);
+}
+.tv-modal__texto { white-space: pre-line; color: var(--tv-texto-2); }
+.tv-modal__pie {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-3) var(--tv-esp-4);
+    border-top: 1px solid var(--tv-borde);
+    background: var(--tv-panel-2);
+    border-radius: 0 0 var(--tv-radio-2) var(--tv-radio-2);
+}
+/* Botón primario peligroso (Borrar): relleno rojo. */
+.tv-modal__peligro {
+    background: var(--tv-peligro);
+    border-color: var(--tv-peligro);
+    color: var(--tv-acento-texto);
+}
+[data-tema="claro"] .tv-modal__peligro { color: #fff; }
+.tv-modal__peligro:hover { background: var(--tv-peligro); border-color: var(--tv-peligro); filter: brightness(1.08); }
+
+.tv-campo.es-invalido { border-color: var(--tv-peligro); animation: tv-sacudir .25s; }
+@keyframes tv-sacudir { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+/* Formularios dentro de un modal: etiqueta arriba, campos apilados. */
+.tv-form { display: flex; flex-direction: column; gap: var(--tv-esp-3); }
+
+/* ── Miniatura de botonera ── */
+.tv-miniatura { width: 100%; height: 100%; color: var(--tv-texto-2); }
+
+/* ── Elegir plantilla ── */
+.tv-modal--elegir .tv-modal__cuerpo { padding: 0; display: flex; }
+.tv-elegir {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    width: 100%;
+    height: min(440px, calc(100vh - 200px));
+    border-top: 1px solid var(--tv-borde);
+}
+.tv-elegir__izq {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--tv-borde);
+}
+.tv-elegir__buscar {
+    position: relative;
+    padding: var(--tv-esp-3);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-elegir__buscar .tv-icono {
+    position: absolute;
+    left: 22px; top: 50%;
+    width: 15px; height: 15px;
+    transform: translateY(-50%);
+    color: var(--tv-texto-3);
+}
+.tv-elegir__buscar .tv-campo { padding-left: 32px; }
+.tv-elegir__lista { flex: 1; min-height: 0; }
+.tv-elegir__fila { min-height: 56px; }
+.tv-elegir__mini {
+    flex: none;
+    display: block;
+    width: 64px; height: 40px;
+    padding: 3px;
+    border-radius: 4px;
+    background: var(--tv-fondo);
+}
+.tv-elegir__texto { display: flex; flex-direction: column; min-width: 0; }
+.tv-elegir__der {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: var(--tv-esp-4);
+    gap: var(--tv-esp-3);
+    background: var(--tv-panel-2);
+}
+.tv-elegir__vista {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    padding: var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-fondo);
+    overflow: hidden;
+}
+.tv-elegir__lienzo { position: absolute; inset: 0; pointer-events: none; }
+.tv-elegir__nombre { font-size: var(--tv-letra-grande); font-weight: 600; }
+
+/* ── ¿Captura en vivo o desde iPad? ── */
+.tv-destino__con { margin-bottom: var(--tv-esp-3); }
+.tv-destino__con b { color: var(--tv-texto); }
+.tv-destino__opciones { display: flex; flex-direction: column; gap: var(--tv-esp-2); }
+.tv-destino__opcion {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-3);
+    padding: var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    text-align: left;
+}
+.tv-destino__opcion:hover { border-color: var(--tv-acento); background: var(--tv-acento-suave); }
+.tv-destino__opcion > .tv-icono { width: 28px; height: 28px; color: var(--tv-acento); }
+.tv-destino__opcion > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+/* ── Buscador global (Ctrl+K) ── */
+.tv-modal--buscar { align-self: flex-start; margin-top: 10vh; }
+.tv-modal--buscar .tv-modal__cabecera { display: none; }
+.tv-modal--buscar .tv-modal__cuerpo { padding: 0; }
+.tv-buscar__campo {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-3) var(--tv-esp-4);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-buscar__campo input {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    font-size: var(--tv-letra-grande);
+}
+.tv-buscar__campo input:focus { box-shadow: none; }
+.tv-buscar__resultados { max-height: 50vh; }
+.tv-buscar__grupo {
+    padding: var(--tv-esp-2) var(--tv-esp-4) var(--tv-esp-1);
+    color: var(--tv-texto-3);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+.tv-buscar__fila .tv-icono { color: var(--tv-texto-2); }

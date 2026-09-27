@@ -1,0 +1,60 @@
+{
+  "app": "tagview",
+  "kind": "backup",
+  "version": 1,
+  "dispositivo": "el iPad",
+  "date": "2026-09-20T21:00:00.000Z",
+  "current": {
+    "elements": [
+      { "id": "e1", "type": "event", "name": "Tiro", "x": 20, "y": 20, "w": 120, "h": 60, "color": "#ff3b30", "lead": 5, "lag": 3, "timeMode": "fixed", "equipo": "A" },
+      { "id": "e2", "type": "event", "name": "Gol", "x": 160, "y": 20, "w": 120, "h": 60, "color": "#34c759", "lead": 8, "lag": 4, "timeMode": "fixed", "equipo": "A" },
+      { "id": "l1", "type": "sticky_label", "name": "Linea 1", "x": 20, "y": 100, "w": 100, "h": 40, "color": "#8e8e93" },
+      { "id": "t1", "type": "teams", "x": 300, "y": 20, "w": 200, "h": 60, "A": "LOMAS", "B": "GEBA" }
+    ],
+    "links": [ { "to": "l1", "from": "e1" } ],
+    "hojas": []
+  },
+  "templates": [
+    {
+      "id": 1758400000000, "name": "Hockey 5v5", "date": "20/9/26, 18:40",
+      "elements": [
+        { "id": "e1", "type": "event", "name": "Tiro", "x": 20, "y": 20, "w": 120, "h": 60, "color": "#ff3b30", "lead": 5, "lag": 3, "timeMode": "fixed", "equipo": "A" },
+        { "id": "e2", "type": "event", "name": "Gol", "x": 160, "y": 20, "w": 120, "h": 60, "color": "#34c759", "lead": 8, "lag": 4, "timeMode": "fixed", "equipo": "A" },
+        { "id": "l1", "type": "sticky_label", "name": "Linea 1", "x": 20, "y": 100, "w": 100, "h": 40, "color": "#8e8e93" },
+        { "id": "t1", "type": "teams", "x": 300, "y": 20, "w": 200, "h": 60, "A": "LOMAS", "B": "GEBA" }
+      ],
+      "links": [ { "from": "e1", "to": "l1" } ],
+      "hojas": []
+    },
+    {
+      "id": 1758400000001, "name": "Futbol", "date": "21/9/26, 10:00",
+      "elements": [
+        { "id": "f1", "type": "event", "name": "Corner", "x": 10, "y": 10, "w": 100, "h": 50, "color": "#007aff" },
+        { "id": "f2", "type": "counter", "name": "Faltas", "x": 10, "y": 80, "w": 100, "h": 50 }
+      ],
+      "links": [],
+      "hojas": [ { "id": "h1", "name": "Ataque", "etiquetas": 1 } ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": 1758000000000, "name": "LOMAS vs GEBA 15-09-2026 20h30", "date": "15/9/26, 22:10",
+      "duration": "01:10:05", "startedAt": "2026-09-15T23:30:12.000Z",
+      "events": [
+        { "id": 1, "buttonId": "e1", "name": "Tiro", "start": 12.5, "end": 20.5, "line": "Linea 1", "descriptors": ["Contra"] },
+        { "id": 2, "buttonId": "e2", "name": "Gol", "start": 95, "end": 107, "line": null, "descriptors": ["Contra", "Corner"] },
+        { "id": 3, "buttonId": "e1", "name": "Tiro", "start": 300, "end": null, "line": "Linea 2", "descriptors": [] },
+        { "id": 4, "posesionDe": "p1", "equipo": "A", "name": "Posesion", "start": 0, "end": 40 }
+      ],
+      "counters": { "e1": 2 }, "toi": {}
+    },
+    {
+      "id": 1758100000000, "name": "Practica martes", "date": "16/9/26, 19:00",
+      "duration": "45:00", "startedAt": null,
+      "events": [ { "id": 1, "buttonId": "f1", "name": "Corner", "start": 60, "end": 70, "descriptors": [] } ],
+      "counters": {}, "toi": {},
+      "tramosPos": [ { "buttonId": "p1", "equipo": "B", "start": 0, "end": 30 } ]
+    }
+  ],
+  "equipos": [ { "nombre": "LOMAS", "color": "#1d4ed8" }, { "nombre": "GEBA", "color": "#dc2626" } ]
+}

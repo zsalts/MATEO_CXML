@@ -1,2 +1,4 @@
 .DS_Store
 *.swp
+escritorio/node_modules/
+escritorio/dist/

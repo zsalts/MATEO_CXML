@@ -1,0 +1,97 @@
+/* ─────────────────────────────────────────────
+   TOKENS DE DISEÑO — Tag & View Pro Escritorio
+   ─────────────────────────────────────────────
+   Todo color, espacio y radio de la app sale de acá. Las ramas NO usan
+   colores fijos (salvo los de cada botón de la botonera, que vienen de la
+   plantilla): así el tema claro anda solo, sin que nadie lo pruebe.
+
+   El tema se elige con data-tema en <html>. Sin atributo = oscuro, que es
+   el de trabajo: en una cabina o un vestuario a oscuras, un fondo blanco
+   encandila y se come el video.
+
+   Contraste: --tv-texto y --tv-texto-2 pasan AA (4.5:1) sobre --tv-fondo,
+   --tv-panel y --tv-panel-2. --tv-acento pasa AA como texto sobre esos
+   fondos, y --tv-acento-texto pasa AA sobre --tv-acento. */
+
+:root {
+    /* Superficies, de atrás hacia adelante */
+    --tv-fondo:        #0e1014;
+    --tv-panel:        #161920;
+    --tv-panel-2:      #1e222b;
+    --tv-panel-3:      #272c37;   /* hover de filas y botones */
+    --tv-borde:        #2d323d;
+    --tv-borde-fuerte: #3d4452;
+
+    /* Texto */
+    --tv-texto:        #e7e9ee;
+    --tv-texto-2:      #9ba2b0;
+    --tv-texto-3:      #6d7482;   /* solo para cosas deshabilitadas o decorativas */
+
+    /* Un solo acento: selección, botón primario, foco */
+    --tv-acento:        #5aa9ff;
+    --tv-acento-texto:  #06121f;
+    --tv-acento-suave:  rgba(90, 169, 255, 0.14);
+
+    /* Estados. --tv-rec es distinto de --tv-peligro a propósito: "está
+       grabando" no es "cuidado", y tienen que distinguirse de un vistazo. */
+    --tv-peligro:      #f0705a;
+    --tv-peligro-suave: rgba(240, 112, 90, 0.14);
+    --tv-ok:           #3ecf8e;
+    --tv-aviso:        #f5b83d;
+    --tv-rec:          #ff2a5f;
+
+    /* Forma y espacio */
+    --tv-radio:        6px;
+    --tv-radio-2:      10px;       /* tarjetas grandes */
+    --tv-esp-1: 4px;
+    --tv-esp-2: 8px;
+    --tv-esp-3: 12px;
+    --tv-esp-4: 16px;
+    --tv-esp-5: 24px;
+    --tv-esp-6: 32px;
+
+    --tv-sombra:       0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --tv-foco:         0 0 0 2px var(--tv-fondo), 0 0 0 4px var(--tv-acento);
+
+    /* Tipografía: la del sistema, como cualquier app de Windows. Los relojes
+       van con números tabulares para que no bailen al correr. */
+    --tv-fuente:       "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    --tv-fuente-mono:  "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+    --tv-letra:        13px;
+    --tv-letra-chica:  12px;
+    --tv-letra-grande: 15px;
+
+    /* Carcasa (la usan index.html y app.js) */
+    --tv-barra-alto:   36px;
+    --tv-lateral-ancho: 52px;
+    --tv-lateral-ancho-abierta: 196px;
+
+    color-scheme: dark;
+}
+
+[data-tema="claro"] {
+    --tv-fondo:        #eef0f3;
+    --tv-panel:        #ffffff;
+    --tv-panel-2:      #f5f6f8;
+    --tv-panel-3:      #e8ebf0;
+    --tv-borde:        #d6dae1;
+    --tv-borde-fuerte: #b9bfc9;
+
+    --tv-texto:        #161a21;
+    --tv-texto-2:      #555d6b;
+    --tv-texto-3:      #8a919d;
+
+    --tv-acento:        #0a5fc2;
+    --tv-acento-texto:  #ffffff;
+    --tv-acento-suave:  rgba(10, 95, 194, 0.10);
+
+    --tv-peligro:      #c4371f;
+    --tv-peligro-suave: rgba(196, 55, 31, 0.10);
+    --tv-ok:           #17804d;
+    --tv-aviso:        #9a6400;
+    --tv-rec:          #d4003c;
+
+    --tv-sombra:       0 10px 30px rgba(20, 30, 50, 0.18), 0 2px 6px rgba(20, 30, 50, 0.10);
+
+    color-scheme: light;
+}

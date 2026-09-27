@@ -1,0 +1,125 @@
+/* Rama Captura desde iPad. Solo variables de tokens.css. */
+
+.tv-ipad {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-esp-4);
+    padding: var(--tv-esp-5);
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+    color: var(--tv-texto);
+}
+.tv-ipad h1 { margin: 0; font-size: 1.5rem; }
+.tv-ipad h2 { margin: 0 0 var(--tv-esp-3); font-size: 1.05rem; }
+.tv-ipad p  { margin: 0 0 var(--tv-esp-3); }
+
+.tv-ipad-cabeza { flex-direction: column; align-items: flex-start; gap: var(--tv-esp-1); }
+.tv-ipad-sub, .tv-ipad-tenue { color: var(--tv-texto-2); font-size: .9rem; }
+
+/* ── Preparación ── */
+.tv-ipad-rejilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--tv-esp-4);
+    align-items: start;
+}
+.tv-ipad-bloque { display: flex; flex-direction: column; gap: var(--tv-esp-3); padding: var(--tv-esp-4); }
+.tv-ipad-previa {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--tv-panel-2);
+    border-radius: var(--tv-radio);
+    object-fit: contain;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tv-ipad-plantilla { display: flex; align-items: center; justify-content: space-between; gap: var(--tv-esp-2); font-weight: 600; }
+
+.tv-ipad-qr {
+    align-self: center;
+    width: 220px;
+    max-width: 100%;
+    padding: var(--tv-esp-2);
+    background: #fff;             /* el QR necesita fondo blanco para leerse */
+    border-radius: var(--tv-radio);
+}
+.tv-ipad-qr svg { display: block; width: 100%; height: auto; }
+.tv-ipad-url { font-family: ui-monospace, Consolas, monospace; font-size: 1rem; text-align: center; word-break: break-all; }
+.tv-ipad-pin { display: flex; align-items: baseline; justify-content: center; gap: var(--tv-esp-3); }
+.tv-ipad-pin span { color: var(--tv-texto-2); }
+.tv-ipad-pin strong { font-size: 3rem; letter-spacing: .3em; font-variant-numeric: tabular-nums; }
+
+.tv-ipad-clientes .tv-lista__fila { display: flex; align-items: center; gap: var(--tv-esp-2); }
+.tv-ipad-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--tv-texto-2); flex: none; }
+.tv-ipad-punto.is-ok { background: var(--tv-ok); }
+.tv-ipad-punto.is-mal { background: var(--tv-peligro); }
+
+.tv-ipad-ayuda {
+    border: 1px solid var(--tv-aviso);
+    border-radius: var(--tv-radio);
+    padding: var(--tv-esp-3);
+    font-size: .9rem;
+}
+.tv-ipad-ayuda ol { margin: var(--tv-esp-2) 0 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--tv-esp-1); }
+
+.tv-ipad-acciones { display: flex; justify-content: flex-end; gap: var(--tv-esp-3); flex-wrap: wrap; }
+.tv-ipad-aparte { opacity: .9; }
+
+/* ── En vivo ── */
+.tv-ipad-vivo-barra { display: flex; align-items: center; gap: var(--tv-esp-3); }
+.tv-ipad-espacio { flex: 1; }
+.tv-ipad-reloj { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tv-ipad-rec { color: var(--tv-rec); font-weight: 700; }
+.tv-ipad-conectado.is-ok { color: var(--tv-ok); }
+.tv-ipad-conectado.is-mal { color: var(--tv-peligro); }
+
+.tv-ipad-vivo {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    gap: var(--tv-esp-4);
+}
+.tv-ipad-video {
+    background: var(--tv-panel-2);
+    border-radius: var(--tv-radio);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+}
+.tv-ipad-video__v { width: 100%; height: 100%; object-fit: contain; }
+.tv-ipad-lado { display: grid; grid-template-rows: minmax(180px, 1fr) minmax(0, 1fr); gap: var(--tv-esp-4); min-height: 0; }
+.tv-ipad-mini { position: relative; min-height: 0; overflow: hidden; padding: 0; }
+.tv-ipad-registro { display: flex; flex-direction: column; min-height: 0; padding: var(--tv-esp-3); }
+.tv-ipad-registro .tv-lista { overflow: auto; margin: 0; padding: 0; }
+.tv-ipad-ev { display: flex; align-items: center; gap: var(--tv-esp-2); }
+.tv-ipad-ev__nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-ipad-origen {
+    font-size: .75rem;
+    padding: 1px var(--tv-esp-2);
+    border-radius: 999px;
+    border: 1px solid var(--tv-borde);
+    color: var(--tv-texto-2);
+}
+
+.tv-ipad-aviso-caido {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-esp-1);
+    padding: var(--tv-esp-4);
+    border-radius: var(--tv-radio);
+    background: var(--tv-peligro);
+    color: var(--tv-fondo);
+    font-size: 1.1rem;
+}
+.tv-ipad-aviso-caido[hidden] { display: none; }
+.tv-ipad-aviso-caido strong { font-size: 1.4rem; }
+
+.tv-ipad-clip { width: min(80vw, 960px); max-height: 70vh; background: #000; }
+
+.tv-ipad-fin { align-self: center; max-width: 560px; padding: var(--tv-esp-5); text-align: center; }
+.tv-ipad-fin .tv-ipad-acciones { justify-content: center; }

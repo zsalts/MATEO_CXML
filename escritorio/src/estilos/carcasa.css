@@ -1,0 +1,250 @@
+/* ─────────────────────────────────────────────
+   CARCASA — barra superior, barra lateral y el hueco de la rama
+   ───────────────────────────────────────────── */
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Barra superior. Es la barra de título de la ventana: se arrastra
+      desde cualquier lado salvo los botones. ── */
+.tv-app-barra {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-3);
+    height: var(--tv-barra-alto);
+    padding-left: var(--tv-esp-3);
+    background: var(--tv-panel);
+    border-bottom: 1px solid var(--tv-borde);
+    -webkit-app-region: drag;
+}
+.tv-app-barra button, .tv-app-barra a, .tv-app-barra input { -webkit-app-region: no-drag; }
+.tv-app-barra__espacio { flex: 1; min-width: var(--tv-esp-4); }
+
+.tv-app-marca {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.tv-app-marca__logo { width: 20px; height: 20px; }
+
+.tv-app-miga {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-1);
+    min-width: 0;
+    color: var(--tv-texto-2);
+    white-space: nowrap;
+}
+.tv-app-miga .tv-icono { width: 14px; height: 14px; color: var(--tv-texto-3); }
+.tv-app-miga__parte { overflow: hidden; text-overflow: ellipsis; }
+.tv-app-miga__parte:last-child { color: var(--tv-texto); }
+
+.tv-app-buscar {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    height: 26px;
+    width: 220px;
+    padding: 0 var(--tv-esp-1) 0 var(--tv-esp-2);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-fondo);
+    color: var(--tv-texto-3);
+}
+.tv-app-buscar:hover { border-color: var(--tv-borde-fuerte); color: var(--tv-texto-2); }
+.tv-app-buscar__icono { display: flex; }
+.tv-app-buscar__icono .tv-icono { width: 14px; height: 14px; }
+.tv-app-buscar__texto { flex: 1; text-align: left; }
+
+/* ● REC: rojo de grabación, parpadeo lento. Siempre visible arriba, así
+   desde la base de datos se sabe que la cámara sigue grabando. */
+.tv-app-rec {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    height: 26px;
+    padding: 0 var(--tv-esp-3);
+    border: 1px solid var(--tv-rec);
+    border-radius: 13px;
+    background: transparent;
+    color: var(--tv-rec);
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.tv-app-rec[hidden] { display: none; }
+.tv-app-rec:hover { background: color-mix(in srgb, var(--tv-rec) 14%, transparent); }
+.tv-app-rec__punto {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--tv-rec);
+    animation: tv-latido 1.4s ease-in-out infinite;
+}
+.tv-app-rec__reloj { font-weight: 600; letter-spacing: 0; color: var(--tv-texto); }
+@keyframes tv-latido { 50% { opacity: .25; } }
+
+/* Los botones nativos de Windows ocupan ~138 px a la derecha. */
+.tv-app-botones-nativos { flex: none; width: 138px; height: 100%; }
+
+/* ── Cuerpo: lateral + rama ── */
+.tv-app-cuerpo {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+.tv-app-lateral {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: var(--tv-lateral-ancho);
+    padding: var(--tv-esp-2) 6px;
+    background: var(--tv-panel);
+    border-right: 1px solid var(--tv-borde);
+    transition: width .16s ease;
+    overflow: hidden;
+}
+.tv-app-lateral.es-abierta { width: var(--tv-lateral-ancho-abierta); }
+
+.tv-app-lateral__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-3);
+    height: 38px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--tv-radio);
+    background: transparent;
+    color: var(--tv-texto-2);
+    white-space: nowrap;
+    text-align: left;
+}
+.tv-app-lateral__item .tv-icono { width: 20px; height: 20px; }
+.tv-app-lateral__item:hover { background: var(--tv-panel-3); color: var(--tv-texto); }
+.tv-app-lateral__item[aria-current="page"] {
+    background: var(--tv-acento-suave);
+    color: var(--tv-acento);
+}
+/* Rayita del activo, del lado del borde, como en las apps de Windows. */
+.tv-app-lateral__item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: -6px; top: 9px; bottom: 9px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--tv-acento);
+}
+.tv-app-lateral__texto { opacity: 0; transition: opacity .12s; }
+.tv-app-lateral.es-abierta .tv-app-lateral__texto { opacity: 1; }
+/* La rama que graba lleva un punto rojo sobre el ícono. */
+.tv-app-lateral__item.es-grabando::after {
+    content: "";
+    position: absolute;
+    left: 25px; top: 7px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--tv-rec);
+    box-shadow: 0 0 0 2px var(--tv-panel);
+}
+.tv-app-lateral__espacio { flex: 1; }
+.tv-app-lateral__separador { height: 1px; margin: var(--tv-esp-1) 4px; background: var(--tv-borde); }
+
+/* Tooltip propio: el title nativo tarda un segundo en salir y con la barra
+   plegada es lo único que dice qué es cada ícono. */
+.tv-app-lateral:not(.es-abierta) .tv-app-lateral__item:hover .tv-app-lateral__tip,
+.tv-app-lateral:not(.es-abierta) .tv-app-lateral__item:focus-visible .tv-app-lateral__tip { opacity: 1; transform: translate(0, -50%); }
+.tv-app-lateral__tip {
+    position: fixed;
+    left: calc(var(--tv-lateral-ancho) + 6px);
+    z-index: 50;
+    padding: 5px 10px;
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    box-shadow: var(--tv-sombra);
+    color: var(--tv-texto);
+    font-size: var(--tv-letra-chica);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-4px, -50%);
+    transition: opacity .1s, transform .1s;
+}
+.tv-app-lateral.es-abierta .tv-app-lateral__tip { display: none; }
+.tv-app-lateral__tip .tv-tecla { margin-left: var(--tv-esp-2); }
+
+/* ── El hueco de la rama: ocupa todo; la rama maneja su propio scroll. ── */
+.tv-app-rama {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--tv-fondo);
+}
+.tv-app-rama:focus { box-shadow: none; }
+.tv-rama {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    animation: tv-entrar .16s ease-out;
+}
+@keyframes tv-entrar { from { opacity: 0; transform: translateY(4px); } }
+
+/* "En construcción" y "Algo falló" */
+.tv-app-aviso-rama {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tv-esp-3);
+    padding: var(--tv-esp-6);
+    color: var(--tv-texto-2);
+    text-align: center;
+}
+.tv-app-aviso-rama .tv-icono { width: 48px; height: 48px; stroke-width: 1.3; color: var(--tv-texto-3); }
+.tv-app-aviso-rama h2 { color: var(--tv-texto); font-size: 18px; }
+.tv-app-aviso-rama__detalle {
+    max-width: 560px;
+    padding: var(--tv-esp-2) var(--tv-esp-3);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel);
+    font: var(--tv-letra-chica)/1.5 var(--tv-fuente-mono);
+    color: var(--tv-texto-3);
+    word-break: break-word;
+}
+
+.tv-app-cargando {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    overflow: hidden;
+}
+.tv-app-cargando::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; width: 30%;
+    background: var(--tv-acento);
+    animation: tv-cargando 1s ease-in-out infinite;
+}
+@keyframes tv-cargando { from { left: -30%; } to { left: 100%; } }
+
+/* Pantalla angosta (1024 px con la lateral abierta): el buscador se achica. */
+@media (max-width: 1100px) {
+    .tv-app-buscar { width: 34px; padding: 0; justify-content: center; }
+    .tv-app-buscar__texto, .tv-app-buscar .tv-tecla { display: none; }
+}
+
+/* ── macOS (Agente 7) ──
+   El semáforo (cerrar/minimizar/zoom) lo dibuja macOS arriba a la izquierda,
+   adentro de esta barra (main/mac.js → trafficLightPosition): se le dejan
+   78 px. A la derecha no hay botones nativos. En pantalla completa el
+   semáforo desaparece y la barra vuelve a su margen normal. */
+[data-plataforma="mac"] .tv-app-barra { padding-left: 78px; padding-right: var(--tv-esp-3); }
+[data-plataforma="mac"] .tv-app-botones-nativos { display: none; }
+[data-plataforma="mac"][data-pantalla-completa] .tv-app-barra { padding-left: var(--tv-esp-3); }

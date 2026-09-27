@@ -1,0 +1,15 @@
+{
+  "name": "Tag & View — iPad remoto",
+  "short_name": "TV Remoto",
+  "description": "Botonera por wifi: la compu graba, el iPad codifica",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0e1014",
+  "theme_color": "#0e1014",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

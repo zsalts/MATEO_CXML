@@ -1,0 +1,17 @@
+{
+  "app": "tagview",
+  "kind": "session",
+  "version": 1,
+  "name": "LOMAS vs GEBA 15-09-2026 20h30",
+  "date": "15/9/26, 20:30",
+  "duration": "70:05",
+  "events": [
+    { "id": 1, "buttonId": 1726000000001, "name": "Ataque", "start": 10.5, "end": 16.5, "timestamp": "00:10", "line": "L1", "descriptors": ["Derecha"] },
+    { "id": 2, "buttonId": 1726000000002, "name": "Corner", "start": 120, "end": 126, "timestamp": "02:00", "line": null, "descriptors": [] },
+    { "id": 3, "buttonId": 1726000000001, "name": "Ataque", "start": 900, "end": null, "timestamp": "15:00", "line": null, "descriptors": ["Izquierda", "Gol"] },
+    { "id": 4, "buttonId": 1726000000002, "name": "Corner", "start": 2000, "end": 1990, "timestamp": "33:20", "line": null, "descriptors": [] },
+    { "id": 5, "posesionDe": 1726000000009, "equipo": "A", "name": "Posesión LOMAS", "start": 0, "end": 40 }
+  ],
+  "counters": {},
+  "toi": {}
+}

@@ -1,0 +1,111 @@
+{
+  "name": "tagview-escritorio",
+  "version": "2.0.0",
+  "description": "Tag & View Pro para Windows: graba, codifica con las plantillas del iPad y guarda todo en una base de datos local",
+  "main": "main.js",
+  "author": "Tag & View Pro",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "node build/preparar.js && electron-builder --win nsis --x64",
+    "dist:win": "node build/preparar.js && electron-builder --win nsis --x64",
+    "dist:mac": "node build/preparar.js && electron-builder --mac dmg zip"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
+    "qrcode": "^1.5.4",
+    "sql.js": "^1.11.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.tagview.pro",
+    "productName": "Tag & View Pro",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "db.js",
+      "main/**/*",
+      "src/**/*",
+      "remoto/**/*",
+      "build/icon.png",
+      "build/nube-config.js",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "files": [
+        "main.js",
+        "preload.js",
+        "db.js",
+        "main/**/*",
+        "src/**/*",
+        "remoto/**/*",
+        "build/icon.png",
+        "build/nube-config.js",
+        "node_modules/**/*",
+        "!node_modules/ffprobe-static/bin/darwin/**",
+        "!node_modules/ffprobe-static/bin/linux/**",
+        "!node_modules/ffprobe-static/bin/win32/ia32/**"
+      ]
+    },
+    "afterPack": "build/mac/firmar-adhoc.js",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.sports",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/mac/entitlements.mac.plist",
+      "entitlementsInherit": "build/mac/entitlements.mac.plist",
+      "minimumSystemVersion": "11.0",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Tag & View Pro usa la cámara o la placa de captura HDMI para grabar el partido mientras lo codificás.",
+        "NSMicrophoneUsageDescription": "Tag & View Pro graba el sonido del partido junto con el video.",
+        "NSLocalNetworkUsageDescription": "Tag & View Pro recibe los toques del iPad por la red local (Wi-Fi) para codificar desde el iPad."
+      },
+      "files": [
+        "main.js",
+        "preload.js",
+        "db.js",
+        "main/**/*",
+        "src/**/*",
+        "remoto/**/*",
+        "build/icon.png",
+        "build/nube-config.js",
+        "node_modules/**/*",
+        "!node_modules/ffprobe-static/bin/win32/**",
+        "!node_modules/ffprobe-static/bin/linux/**"
+      ]
+    },
+    "dmg": {
+      "title": "Tag & View Pro ${version}",
+      "artifactName": "Tag-View-Pro-${version}-${arch}.dmg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Tag & View Pro"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "app": "tagview",
+  "kind": "template",
+  "version": 1,
+  "name": "Hockey 5v5",
+  "date": "20/9/26, 18:40",
+  "elements": [
+    { "id": "e1", "type": "event", "name": "Tiro", "x": 20, "y": 20, "w": 120, "h": 60, "color": "#ff3b30", "lead": 5, "lag": 3, "timeMode": "fixed", "equipo": "A" },
+    { "id": "e2", "type": "event", "name": "Gol", "x": 160, "y": 20, "w": 120, "h": 60, "color": "#34c759", "lead": 8, "lag": 4, "timeMode": "fixed", "equipo": "A" },
+    { "id": "l1", "type": "sticky_label", "name": "Linea 1", "x": 20, "y": 100, "w": 100, "h": 40, "color": "#8e8e93" },
+    { "id": "t1", "type": "teams", "x": 300, "y": 20, "w": 200, "h": 60, "A": "LOMAS", "B": "GEBA" }
+  ],
+  "links": [ { "from": "e1", "to": "l1" } ],
+  "hojas": []
+}

@@ -1,0 +1,256 @@
+/* ─────────────────────────────────────────────
+   BASE — reset y clases compartidas por todas las ramas
+   ─────────────────────────────────────────────
+   Tiene que parecer una app de Windows, no una página: nada de scroll de
+   página entera, links sin subrayar, cursor de flecha en los controles y el
+   texto de la interfaz no se selecciona al arrastrar (los campos sí). */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: var(--tv-fondo);
+    color: var(--tv-texto);
+    font: var(--tv-letra)/1.45 var(--tv-fuente);
+    cursor: default;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Lo que sí se puede seleccionar: campos y lo que la rama marque a mano
+   (una ruta de archivo, un mensaje de error para copiar). */
+input, textarea, [contenteditable="true"], .tv-seleccionable {
+    user-select: text;
+    cursor: auto;
+}
+
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2, h3, h4 { font-weight: 600; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+a { color: var(--tv-acento); text-decoration: none; cursor: default; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: default; }
+
+img, svg, video { display: block; max-width: 100%; }
+
+/* Los íconos de crearIcono(): trazo con el color del texto que los rodea. */
+.tv-icono {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ── Foco: visible solo con teclado. Con mouse el anillo molesta; con
+      teclado es la única forma de saber dónde estás. ── */
+:focus { outline: none; }
+:focus-visible { outline: none; box-shadow: var(--tv-foco); }
+
+/* ── Scrollbars finos, que no roben lugar a paneles densos ── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--tv-borde-fuerte);
+    border-radius: 10px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--tv-texto-3); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+::selection { background: var(--tv-acento-suave); }
+
+/* ─────────────────────────────────────────────
+   BOTONES
+   ───────────────────────────────────────────── */
+.tv-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tv-esp-2);
+    height: 32px;
+    padding: 0 var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel-2);
+    color: var(--tv-texto);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color .12s, border-color .12s, color .12s;
+}
+.tv-btn:hover { background: var(--tv-panel-3); border-color: var(--tv-borde-fuerte); }
+.tv-btn:active { transform: translateY(1px); }
+.tv-btn:disabled, .tv-btn[aria-disabled="true"] {
+    opacity: .45;
+    pointer-events: none;
+}
+.tv-btn .tv-icono { width: 16px; height: 16px; }
+
+.tv-btn--primario {
+    background: var(--tv-acento);
+    border-color: var(--tv-acento);
+    color: var(--tv-acento-texto);
+}
+.tv-btn--primario:hover {
+    background: var(--tv-acento);
+    border-color: var(--tv-acento);
+    filter: brightness(1.08);
+}
+
+.tv-btn--peligro { color: var(--tv-peligro); }
+.tv-btn--peligro:hover {
+    background: var(--tv-peligro-suave);
+    border-color: var(--tv-peligro);
+}
+
+/* Sin borde ni fondo hasta el hover: para barras de herramientas. */
+.tv-btn--fantasma { background: transparent; border-color: transparent; }
+.tv-btn--fantasma:hover { background: var(--tv-panel-3); border-color: transparent; }
+
+.tv-btn--icono { width: 32px; padding: 0; }
+.tv-btn--chico { height: 26px; padding: 0 var(--tv-esp-2); font-size: var(--tv-letra-chica); }
+.tv-btn--chico.tv-btn--icono { width: 26px; }
+
+/* ─────────────────────────────────────────────
+   PANELES, BARRAS, LISTAS
+   ───────────────────────────────────────────── */
+.tv-panel {
+    background: var(--tv-panel);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+}
+
+/* Barra de herramientas: una fila de controles con separación pareja. */
+.tv-barra {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    min-height: 44px;
+    padding: var(--tv-esp-2) var(--tv-esp-3);
+    background: var(--tv-panel);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-barra__espacio { flex: 1; }
+.tv-barra__titulo { font-size: var(--tv-letra-grande); font-weight: 600; }
+.tv-barra__separador { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--tv-borde); }
+
+.tv-lista {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+.tv-lista__fila {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-3);
+    min-height: 40px;
+    padding: var(--tv-esp-2) var(--tv-esp-3);
+    border-bottom: 1px solid var(--tv-borde);
+    background: transparent;
+    border-left: 0; border-right: 0; border-top: 0;
+    width: 100%;
+    text-align: left;
+    color: inherit;
+}
+.tv-lista__fila:last-child { border-bottom: 0; }
+.tv-lista__fila:hover { background: var(--tv-panel-3); }
+.tv-lista__fila[aria-selected="true"], .tv-lista__fila.es-activa {
+    background: var(--tv-acento-suave);
+    box-shadow: inset 3px 0 0 var(--tv-acento);
+}
+
+/* Estado vacío: centrado, gris, con un ícono y una acción opcional. */
+.tv-vacio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tv-esp-3);
+    padding: var(--tv-esp-6) var(--tv-esp-4);
+    color: var(--tv-texto-2);
+    text-align: center;
+}
+.tv-vacio .tv-icono { width: 36px; height: 36px; stroke-width: 1.4; color: var(--tv-texto-3); }
+.tv-vacio__titulo { color: var(--tv-texto); font-size: var(--tv-letra-grande); font-weight: 600; }
+
+/* ─────────────────────────────────────────────
+   CAMPOS
+   ───────────────────────────────────────────── */
+.tv-campo {
+    height: 32px;
+    width: 100%;
+    padding: 0 var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-fondo);
+    color: var(--tv-texto);
+}
+textarea.tv-campo { height: auto; min-height: 72px; padding: var(--tv-esp-2) var(--tv-esp-3); resize: vertical; }
+select.tv-campo { padding-right: var(--tv-esp-5); cursor: default; }
+.tv-campo::placeholder { color: var(--tv-texto-3); }
+.tv-campo:hover { border-color: var(--tv-borde-fuerte); }
+.tv-campo:focus { border-color: var(--tv-acento); box-shadow: 0 0 0 3px var(--tv-acento-suave); }
+.tv-campo[type="color"] { width: 44px; padding: 2px; cursor: default; }
+
+.tv-etiqueta {
+    display: block;
+    margin-bottom: var(--tv-esp-1);
+    color: var(--tv-texto-2);
+    font-size: var(--tv-letra-chica);
+    font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────
+   UTILIDADES CHICAS
+   ───────────────────────────────────────────── */
+.tv-texto-2 { color: var(--tv-texto-2); }
+.tv-chica   { font-size: var(--tv-letra-chica); }
+.tv-mono    { font-family: var(--tv-fuente-mono); }
+.tv-numeros { font-variant-numeric: tabular-nums; }
+.tv-recortar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.tv-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--tv-esp-1);
+    height: 20px;
+    padding: 0 var(--tv-esp-2);
+    border-radius: 10px;
+    background: var(--tv-panel-3);
+    color: var(--tv-texto-2);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.tv-chip .tv-icono { width: 12px; height: 12px; }
+.tv-chip--acento { background: var(--tv-acento-suave); color: var(--tv-acento); }
+.tv-chip--ok     { color: var(--tv-ok); }
+.tv-chip--rec    { color: var(--tv-rec); }
+
+/* Tecla: para mostrar atajos ("Ctrl" "1"). */
+.tv-tecla {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--tv-borde-fuerte);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font: 11px/16px var(--tv-fuente-mono);
+    color: var(--tv-texto-2);
+    text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+}
