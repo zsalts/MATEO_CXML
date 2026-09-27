@@ -50,6 +50,9 @@ jobs:
 
       - name: Pruebas
         run: npm test
+        # Tardan segundos: si algo queda colgado (un servidor abierto), que no
+        # espere las 6 horas por defecto de GitHub.
+        timeout-minutes: 10
 
       - name: Armar .dmg y .zip
         run: npm run dist:mac -- --${{ matrix.arch }}

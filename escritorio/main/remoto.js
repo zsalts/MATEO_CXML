@@ -209,6 +209,8 @@ function crearServidorRemoto(opciones = {}) {
     const alCliente = opciones.alCliente || (() => {});
     const ahora = opciones.ahora || (() => Date.now());
     const interfaces = opciones.interfaces || (() => os.networkInterfaces());
+    // Inyectable: las pruebas simulan adaptadores de Windows en cualquier SO.
+    const plataforma = opciones.plataforma || process.platform;
 
     let servidor = null, wss = null;
     let sesion = null;   // {pin, puerto, plantillaId, plantilla, estado, desde}
@@ -485,7 +487,7 @@ function crearServidorRemoto(opciones = {}) {
     }
 
     async function datosConexion() {
-        const ips = ipsLocales(interfaces());
+        const ips = ipsLocales(interfaces(), plataforma);
         const urls = ips.map(i => `http://${i.ip}:${sesion.puerto}/`);
         const qrs = {};
         if (qrcode) {
@@ -535,7 +537,7 @@ function crearServidorRemoto(opciones = {}) {
             puerto: sesion.puerto,
             pin: sesion.pin,
             plantillaId: sesion.plantillaId,
-            ips: ipsLocales(interfaces()).map(i => i.ip),
+            ips: ipsLocales(interfaces(), plataforma).map(i => i.ip),
             desde: sesion.desde,
             clientes,
             latenciaMs: act ? act.latenciaMs : null,

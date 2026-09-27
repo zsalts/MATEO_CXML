@@ -41,6 +41,9 @@ function nuevo(extra = {}) {
         rutaNucleo: path.join(tmp, 'src', 'nucleo'),
         alMensaje: m => mensajes.push(m),
         alCliente: e => clientes.push(e),
+        // Nombres de adaptadores de Windows: se prueba el filtro de Windows
+        // también cuando las pruebas corren en la Mac del workflow.
+        plataforma: 'win32',
         interfaces: () => ({
             'Wi-Fi': [{ family: 'IPv4', address: '192.168.1.50', internal: false }],
             'vEthernet (WSL)': [{ family: 'IPv4', address: '172.20.0.1', internal: false }]
@@ -394,7 +397,7 @@ test('ipsLocales: privadas, sin virtuales ni loopback, la wifi primero', () => {
         'Loopback Pseudo-Interface 1': [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
         'Otra': [{ family: 'IPv4', address: '8.8.8.8', internal: false },
                  { family: 'IPv4', address: '169.254.3.3', internal: false }]
-    });
+    }, 'win32');   // nombres de Windows: también en la Mac del workflow
     assert.deepEqual(r.map(x => x.ip), ['192.168.0.20', '10.0.0.5']);
 });
 
