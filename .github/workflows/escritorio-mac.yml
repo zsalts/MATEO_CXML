@@ -56,22 +56,30 @@ jobs:
         # espere las 6 horas por defecto de GitHub.
         timeout-minutes: 10
 
-      # Cada prueba que falla queda como anotacion en la pagina de la corrida
-      # (se ve sin abrir el log entero).
-      - name: Anotar las pruebas que fallaron
-        if: failure()
-        run: |
-          awk '
-            /^ *not ok / { if (n) print "::error title=" t "::" m; t=$0; sub(/^ *not ok [0-9]+ - /, "", t); m=""; n=1; next }
-            n && /^ *(error|location|expected|actual):/ { l=$0; sub(/^ */, "", l); m = m l "%0A" }
-            END { if (n) print "::error title=" t "::" m }
-          ' pruebas.log | head -n 20
-
       - name: Armar .dmg y .zip
-        run: npm run dist:mac -- --${{ matrix.arch }}
+        run: |
+          set -o pipefail
+          npm run dist:mac -- --${{ matrix.arch }} 2>&1 | tee armado.log
         env:
           # Sin certificado: que electron-builder no busque uno en el llavero.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # Si algo falla, queda como anotacion en la pagina de la corrida (se ve
+      # sin iniciar sesion y sin abrir el log entero). El nombre va en el
+      # mensaje y no en title=: ahi las comas y los ":" cortan la anotacion.
+      - name: Anotar lo que fallo
+        if: failure()
+        run: |
+          esc() { sed -e 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }'; }
+          if [ -f pruebas.log ]; then
+            awk '
+              /^ *not ok / { if (n) print b; b=$0; sub(/^ *not ok [0-9]+ - /, "PRUEBA: ", b); n=1; next }
+              n && /^ *(error|location|expected|actual):/ { l=$0; sub(/^ */, "", l); b = b "\n  " l }
+              END { if (n) print b }
+            ' pruebas.log | awk 'BEGIN{RS="PRUEBA: "} NR>1 { print "PRUEBA: " $0 > ("falla-" NR ".txt") }'
+            for f in falla-*.txt; do [ -f "$f" ] && echo "::error::$(esc < "$f")"; done | head -n 15
+          fi
+          if [ -f armado.log ]; then echo "::error::ARMADO (ultimas lineas)%0A$(tail -n 30 armado.log | esc)"; fi
 
       - name: Verificar ffmpeg y ffprobe adentro de la .app
         run: |
