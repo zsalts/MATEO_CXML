@@ -87,12 +87,22 @@ jobs:
           echo "App: $app"
           test -n "$app"
           fallo=0
-          for bin in $(find "$app/Contents/Resources/app.asar.unpacked" -type f \( -name ffmpeg -o -name ffprobe \)); do
+          # El nombre de la app tiene espacios ("Tag & View Pro.app"): se recorre
+          # con -print0 para no partir las rutas.
+          while IFS= read -r -d '' bin; do
             archs="$(lipo -archs "$bin")"
             echo "$bin → $archs"
             codesign -dv "$bin" 2>&1 | head -n 3 || true
-            case " $archs " in *" ${{ matrix.lipo }} "*) ;; *) echo "::error::$bin es $archs, se esperaba ${{ matrix.lipo }}"; fallo=1 ;; esac
-          done
+            case " $archs " in
+              *" ${{ matrix.lipo }} "*) ;;
+              # ffprobe-static no trae ffprobe arm64: corre con Rosetta 2 (ver
+              # build/mac/firmar-adhoc.js). ffmpeg sí tiene que ser arm64.
+              " x86_64 ") if [ "${{ matrix.lipo }}" = arm64 ] && [ "$(basename "$bin")" = ffprobe ]; then
+                            echo "::warning::ffprobe es x86_64 en el .dmg arm64 (corre con Rosetta 2)"
+                          else echo "::error::$bin es $archs, se esperaba ${{ matrix.lipo }}"; fallo=1; fi ;;
+              *) echo "::error::$bin es $archs, se esperaba ${{ matrix.lipo }}"; fallo=1 ;;
+            esac
+          done < <(find "$app/Contents/Resources/app.asar.unpacked" -type f \( -name ffmpeg -o -name ffprobe \) -print0)
           exit $fallo
 
       - uses: actions/upload-artifact@v4

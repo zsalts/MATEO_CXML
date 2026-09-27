@@ -174,6 +174,11 @@ donde corre `npm install`, y un `.dmg` x64 armado en una M1 llevaría ffmpeg
 arm64. `build/mac/firmar-adhoc.js` corta el build si pasa eso y firma ffmpeg y
 ffprobe "ad-hoc" (sin eso, en chip Apple macOS los mata al arrancar).
 
+Excepción: `ffprobe-static` no trae un ffprobe arm64 de verdad (su
+`bin/darwin/arm64` es x86_64). En el `.dmg` arm64 va ese y corre con Rosetta 2;
+la app solo lo usa para leer duración y resolución, y si no anda usa la del
+reproductor. ffmpeg, que corta los clips, sí es arm64.
+
 ### Firma y notarización (no configurado)
 
 Para que abra sin el aviso de Gatekeeper hace falta una cuenta de **Apple

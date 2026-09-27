@@ -76,7 +76,16 @@ exports.default = async function firmarAdhoc(contexto) {
     for (const bin of binarios) {
         const archs = arquitecturas(bin);
         const rel = path.relative(app, bin);
-        if (esperada && esperada !== 'universal' && archs.length && !archs.includes(esperada)) {
+        // ffprobe-static no trae ffprobe arm64 de verdad: su bin/darwin/arm64
+        // es x86_64. En Apple Silicon corre con Rosetta 2, y la app solo lo usa
+        // para tv.video.info (si falla, info() da null y la pantalla usa la
+        // duracion del <video>). Se deja pasar con aviso; ffmpeg, que corta
+        // los clips, tiene que ser de la arquitectura justa.
+        const ffprobeConRosetta = esperada === 'arm64' && path.basename(bin) === 'ffprobe' &&
+            archs.length === 1 && archs[0] === 'x86_64';
+        if (ffprobeConRosetta) {
+            console.warn(`  • [mac] ${rel} es x86_64: en Apple Silicon corre con Rosetta 2`);
+        } else if (esperada && esperada !== 'universal' && archs.length && !archs.includes(esperada)) {
             throw new Error(`${rel} es ${archs.join('+')} y el .dmg es ${esperada}. ` +
                 'Arma cada arquitectura en su propia Mac (el workflow de GitHub lo hace) ' +
                 `o reinstala ffmpeg-static con npm_config_arch=${esperada === 'x86_64' ? 'x64' : 'arm64'}.`);
