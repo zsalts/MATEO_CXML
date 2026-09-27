@@ -51,7 +51,10 @@ jobs:
       - name: Pruebas
         run: |
           set -o pipefail
-          node --test --test-reporter=tap "test/*.test.js" 2>&1 | tee pruebas.log
+          # --test-timeout: una prueba colgada falla con su nombre (y queda
+          # anotada) en vez de trabar el paso; --test-force-exit: un servidor
+          # que quedó abierto no impide terminar.
+          node --test --test-timeout=60000 --test-force-exit --test-reporter=tap "test/*.test.js" 2>&1 | tee pruebas.log
         # Tardan segundos: si algo queda colgado (un servidor abierto), que no
         # espere las 6 horas por defecto de GitHub.
         timeout-minutes: 10
