@@ -38,8 +38,11 @@ function archivoDeUrl(raiz, pathname) {
     let rel;
     try { rel = decodeURIComponent(pathname || '/'); } catch (_) { return null; }
     if (rel.includes('\0')) return null;
+    // "\" separa carpetas en Windows y en Mac es un caracter de nombre comun:
+    // ningun archivo de la app lo lleva, asi que se rechaza en los dos y
+    // "/..\\..\\x" se comporta igual en cualquier sistema.
+    if (rel.includes('\\')) return null;
     if (rel === '' || rel === '/') rel = '/index.html';
-    // "\" tambien separa en Windows: "/..\\..\\x" no puede colarse.
     const destino = path.resolve(raiz, '.' + path.sep + rel.replace(/^[\\/]+/, ''));
     return dentroDe(raiz, destino) ? destino : null;
 }
