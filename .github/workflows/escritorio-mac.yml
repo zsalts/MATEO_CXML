@@ -49,10 +49,23 @@ jobs:
         run: npm ci
 
       - name: Pruebas
-        run: npm test
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap "test/*.test.js" 2>&1 | tee pruebas.log
         # Tardan segundos: si algo queda colgado (un servidor abierto), que no
         # espere las 6 horas por defecto de GitHub.
         timeout-minutes: 10
+
+      # Cada prueba que falla queda como anotacion en la pagina de la corrida
+      # (se ve sin abrir el log entero).
+      - name: Anotar las pruebas que fallaron
+        if: failure()
+        run: |
+          awk '
+            /^ *not ok / { if (n) print "::error title=" t "::" m; t=$0; sub(/^ *not ok [0-9]+ - /, "", t); m=""; n=1; next }
+            n && /^ *(error|location|expected|actual):/ { l=$0; sub(/^ */, "", l); m = m l "%0A" }
+            END { if (n) print "::error title=" t "::" m }
+          ' pruebas.log | head -n 20
 
       - name: Armar .dmg y .zip
         run: npm run dist:mac -- --${{ matrix.arch }}
