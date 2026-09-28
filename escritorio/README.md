@@ -159,11 +159,13 @@ cualquier app de Mac), ⌘, abre Ajustes. El zoom de la línea de tiempo es
 
 ### Generar el `.dmg`
 
-**Desde GitHub (recomendado):** pestaña **Actions** → **Escritorio Mac** →
-**Run workflow**. Arma en dos Macs de GitHub (una Apple Silicon y una Intel),
-corre las pruebas y deja `tagview-mac-arm64` y `tagview-mac-x64` en
-**Artifacts**, abajo de la corrida: se bajan como `.zip` con el `.dmg` y el
-`.zip` adentro. También corre solo cuando un push toca `escritorio/`.
+**Desde GitHub (recomendado):** cada push a la rama `app` que toca
+`escritorio/` publica una versión en
+[Releases](https://github.com/zsalts/MATEO_CXML/releases/latest) con el `.exe`
+de Windows y los dos `.dmg` (`arm64` = chip Apple, `x64` = Intel), todos con
+el mismo número. Se bajan sin iniciar sesión en GitHub. Para otras ramas,
+**Actions** → **Escritorio Mac** → **Run workflow** deja los `.dmg` en
+**Artifacts** (esos sí piden estar logueado).
 
 **En una Mac:**
 

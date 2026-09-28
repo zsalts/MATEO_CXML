@@ -10,9 +10,12 @@
 
 name: Escritorio Mac
 
+# En la rama app los .dmg ya los arma y publica escritorio-windows.yml, en
+# la misma release que Windows: acá solo las otras ramas (para probar).
 on:
   workflow_dispatch:
   push:
+    branches-ignore: [app]
     paths:
       - 'escritorio/**'
       - '.github/workflows/escritorio-mac.yml'

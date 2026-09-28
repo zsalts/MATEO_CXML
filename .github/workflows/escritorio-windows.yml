@@ -1,5 +1,8 @@
-# Arma el instalador de Windows y lo publica en GitHub Releases. La app
-# instalada mira ahí (main/actualizar.js) y se actualiza sola.
+# Arma el instalador de Windows y los .dmg de Mac y los publica juntos en
+# GitHub Releases, con el mismo número. La app de Windows mira ahí
+# (main/actualizar.js) y se actualiza sola; en Mac se baja a mano de
+# https://github.com/zsalts/MATEO_CXML/releases/latest (sin iniciar sesión:
+# los "artifacts" de una corrida solo se ven logueado en GitHub).
 #
 # Cada corrida es una versión nueva: 2.1.<número de corrida>. El número de
 # package.json no se toca en el repo; solo se cambia acá antes de armar, así
@@ -8,7 +11,7 @@
 # Corre con cada push a la rama app que toque escritorio/. Si las pruebas
 # fallan no se publica nada y la app instalada sigue como estaba.
 
-name: Escritorio Windows
+name: Escritorio Windows y Mac
 
 on:
   workflow_dispatch:
@@ -30,6 +33,8 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.v }}
     defaults:
       run:
         working-directory: escritorio
@@ -77,3 +82,56 @@ jobs:
             escritorio/dist/latest.yml
           if-no-files-found: error
           retention-days: 14
+
+  # Mac: después de Windows, que es el que crea el tag y la release. Cada
+  # arquitectura en su Mac (ffmpeg-static baja el binario de la máquina que
+  # arma; ver escritorio-mac.yml). Sin firma de Apple los .dmg solo se suben
+  # a la misma release: macOS no deja que la app se actualice sola.
+  mac:
+    needs: windows
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14        # Apple Silicon
+            arch: arm64
+            lipo: arm64
+          - runner: macos-15-intel  # Intel
+            arch: x64
+            lipo: x86_64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: escritorio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Versión
+        run: npm version "${{ needs.windows.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Armar .dmg
+        run: npm run dist:mac -- --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # Un .dmg con el ffmpeg de la otra arquitectura no corta clips: no se sube.
+      - name: Verificar ffmpeg adentro de la .app
+        run: |
+          app="$(find dist -maxdepth 2 -name '*.app' -type d | head -n 1)"
+          bin="$(find "$app/Contents/Resources/app.asar.unpacked" -type f -name ffmpeg | head -n 1)"
+          echo "$bin: $(lipo -archs "$bin")"
+          lipo -archs "$bin" | grep -qw "${{ matrix.lipo }}"
+
+      - name: Subir a la release
+        run: gh release upload "v${{ needs.windows.outputs.version }}" dist/*.dmg --clobber --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
