@@ -1187,3 +1187,17 @@ html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
 .inicio__error { color: var(--in-peligro); font-size: 14px; margin: 8px 0 0; }
 .inicio__error.hidden { display: none; }
 .inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
+
+/* La línea de la sincronización con la compu, arriba de "Mis plantillas" */
+.inicio__sincro {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px 10px 20px;
+    border-bottom: 1px solid var(--in-borde);
+    background: var(--in-panel-2);
+    color: var(--in-texto-2);
+    font-size: 13px;
+}
+.inicio__sincro.hidden { display: none; }
+.inicio__sincro-texto { flex: 1; min-width: 0; }
+.inicio__sincro > * + * { margin-left: 10px; }

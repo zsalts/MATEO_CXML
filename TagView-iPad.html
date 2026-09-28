@@ -1438,6 +1438,20 @@ html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
 .inicio__error.hidden { display: none; }
 .inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
 
+/* La línea de la sincronización con la compu, arriba de "Mis plantillas" */
+.inicio__sincro {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px 10px 20px;
+    border-bottom: 1px solid var(--in-borde);
+    background: var(--in-panel-2);
+    color: var(--in-texto-2);
+    font-size: 13px;
+}
+.inicio__sincro.hidden { display: none; }
+.inicio__sincro-texto { flex: 1; min-width: 0; }
+.inicio__sincro > * + * { margin-left: 10px; }
+
 </style>
     <meta name="theme-color" content="#161920">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1542,6 +1556,11 @@ html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
                         <span class="inicio__espacio"></span>
                         <button id="btnInicioVerPlantillas" class="inicio__btn-chico">Ver todas ›</button>
                     </header>
+                    <!-- Sincronización con la compu: estado, o entrar a la nube -->
+                    <div id="inicioSincro" class="inicio__sincro hidden">
+                        <span id="inicioSincroTexto" class="inicio__sincro-texto"></span>
+                        <button id="btnInicioSincro" class="inicio__btn-chico"></button>
+                    </div>
                     <div id="inicioPlantillas" class="inicio__lista"></div>
                 </section>
                 <section class="inicio__bloque">
@@ -2094,6 +2113,161 @@ window.NUBE = {
     bucket:  'codificaciones'    // el bucket que creaste en Storage
 };
 </script>
+    <!-- La regla para sincronizar plantillas con la compu: la misma que usa ella -->
+    <script>// Sincronización de plantillas entre el iPad y la compu, por la nube.
+//
+// En la nube hay un solo archivo, plantillas.json, con todas las plantillas.
+// Cada una tiene un uid que no cambia (el mismo en todos los dispositivos) y
+// la fecha de su último cambio. Borrar deja una "lápida" (borrado: true) para
+// que el borrado también viaje. Cada dispositivo baja el archivo, lo une con
+// lo suyo con fusionar(), aplica lo que ganó afuera y sube si ganó algo suyo.
+//
+// Regla: por uid gana el cambio más nuevo. Empate de fecha con contenido
+// distinto: gana la firma mayor, así los dos lados eligen lo mismo.
+//
+// Lo usan las dos apps y por eso vive acá, en la raíz: el iPad lo carga con
+// <script> (window.SincroPlantillas) y la compu con require (build/preparar.js
+// lo copia al armar). Puro: sin red, sin DOM, sin base. Tiene que correr en el
+// Safari de un iPad con iOS 12: nada de ?? ni ?., ni Array.prototype.find
+// sobre cosas raras.
+(function (raiz) {
+    'use strict';
+
+    var ARCHIVO = 'plantillas.json';
+    // Una lápida más vieja que esto se olvida: un dispositivo que estuvo tres
+    // meses sin conectarse podría devolver una plantilla borrada, y está bien.
+    var VIDA_LAPIDA = 90 * 24 * 60 * 60 * 1000;
+    var FECHA_CERO = '1970-01-01T00:00:00.000Z';
+
+    function nuevoUid() {
+        return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function lista(v) { return Array.isArray(v) ? v : []; }
+
+    // Deja un item con la forma de siempre. null si no sirve (sin uid).
+    function limpiar(x) {
+        if (!x || typeof x.uid !== 'string' || !x.uid) return null;
+        var d = x.datos || {};
+        return {
+            uid: x.uid,
+            nombre: x.nombre == null ? '' : String(x.nombre),
+            datos: { elements: lista(d.elements), links: lista(d.links), hojas: lista(d.hojas) },
+            actualizado: typeof x.actualizado === 'string' && x.actualizado ? x.actualizado : FECHA_CERO,
+            borrado: !!x.borrado,
+            nueva: !!x.nueva
+        };
+    }
+
+    // Lo que se compara para saber si dos plantillas dicen lo mismo.
+    function firma(x) {
+        if (x.borrado) return 'borrada';
+        return JSON.stringify([x.nombre, x.datos.elements, x.datos.links, x.datos.hojas]);
+    }
+
+    // ¿b le gana a a? El más nuevo; si empatan, la firma mayor.
+    function gana(b, a) {
+        if (b.actualizado !== a.actualizado) return b.actualizado > a.actualizado;
+        return firma(b) > firma(a);
+    }
+
+    // locales, remotas: [{uid, nombre, datos, actualizado, borrado?, nueva?}]
+    //   nueva = la local nunca se subió (su uid lo inventó este dispositivo).
+    // Devuelve:
+    //   plantillas  la lista unida, lista para subir (sin "nueva")
+    //   poner       las que hay que escribir acá (llegaron o cambiaron afuera)
+    //   borrar      uids que hay que borrar acá
+    //   uids        {uidLocalViejo: uidNuevo} de las locales que resultaron ser
+    //               la misma que una de la nube (primera vez: mismo nombre y
+    //               mismos botones), para que cada lado guarde el uid común
+    //   subir       true si la nube no tiene todo lo de acá
+    function fusionar(locales, remotas, ahora) {
+        var hoy = ahora == null ? Date.now() : ahora;
+        var L = lista(locales).map(limpiar).filter(Boolean);
+        var R = lista(remotas).map(limpiar).filter(Boolean);
+
+        var remotaPorUid = {};
+        R.forEach(function (r) { remotaPorUid[r.uid] = r; });
+
+        // Primera vez: una local nueva igual a una de la nube (que no tenga ya
+        // su pareja) es la misma plantilla y toma su uid. Así no se duplica
+        // todo lo que ya estaba en los dos lados.
+        var uids = {};
+        var tomadas = {};
+        L.forEach(function (l) { if (remotaPorUid[l.uid]) tomadas[l.uid] = true; });
+        L.forEach(function (l) {
+            if (!l.nueva || remotaPorUid[l.uid] || l.borrado) return;
+            var f = firma(l);
+            for (var i = 0; i < R.length; i++) {
+                var r = R[i];
+                if (!r.borrado && !tomadas[r.uid] && firma(r) === f) {
+                    tomadas[r.uid] = true;
+                    uids[l.uid] = r.uid;
+                    l.uid = r.uid;
+                    break;
+                }
+            }
+        });
+
+        // Unir: por uid, gana el más nuevo.
+        var elegida = {};      // uid → item
+        var deAca = {};        // uid → true si ganó el de este dispositivo
+        var localPorUid = {};
+        R.forEach(function (r) { elegida[r.uid] = r; });
+        L.forEach(function (l) {
+            localPorUid[l.uid] = l;
+            var r = elegida[l.uid];
+            if (!r || gana(l, r)) { elegida[l.uid] = l; deAca[l.uid] = true; }
+        });
+
+        var plantillas = [], poner = [], borrar = [], subir = false;
+        Object.keys(elegida).forEach(function (uid) {
+            var x = elegida[uid];
+            // Lápidas viejas: se olvidan (y no hace falta avisar a nadie).
+            if (x.borrado && hoy - Date.parse(x.actualizado) > VIDA_LAPIDA) {
+                if (remotaPorUid[uid]) subir = true;
+                return;
+            }
+            plantillas.push({ uid: x.uid, nombre: x.nombre, datos: x.datos, actualizado: x.actualizado, borrado: x.borrado || undefined });
+            if (deAca[uid]) {
+                var r = remotaPorUid[uid];
+                if (!r || firma(r) !== firma(x) || r.actualizado !== x.actualizado) subir = true;
+            } else {
+                var l = localPorUid[uid];
+                if (x.borrado) {
+                    if (l && !l.borrado) borrar.push(uid);
+                } else if (!l || l.borrado || firma(l) !== firma(x) || l.actualizado !== x.actualizado) {
+                    poner.push(x);
+                }
+            }
+        });
+        // Siempre en el mismo orden: el archivo de la nube no cambia de un
+        // lado a otro solo por cómo se armó.
+        plantillas.sort(function (a, b) { return a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0; });
+        return { plantillas: plantillas, poner: poner, borrar: borrar, uids: uids, subir: subir };
+    }
+
+    // El archivo de la nube, como texto. Y al revés: lo que venga (vacío, roto,
+    // de una versión vieja) da una lista, nunca un error.
+    function armarArchivo(plantillas, dispositivo) {
+        return JSON.stringify({
+            app: 'tagview', kind: 'plantillas', version: 1,
+            dispositivo: dispositivo || '', actualizado: new Date().toISOString(),
+            plantillas: plantillas
+        });
+    }
+    function leerArchivo(texto) {
+        try {
+            var d = typeof texto === 'string' ? JSON.parse(texto) : texto;
+            return d && d.kind === 'plantillas' ? lista(d.plantillas) : [];
+        } catch (e) { return []; }
+    }
+
+    var api = { ARCHIVO: ARCHIVO, nuevoUid: nuevoUid, fusionar: fusionar, armarArchivo: armarArchivo, leerArchivo: leerArchivo };
+    if (typeof module !== 'undefined' && module.exports) module.exports = api;
+    else raiz.SincroPlantillas = api;
+})(typeof window !== 'undefined' ? window : this);
+</script>
     <script>// ─────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────
@@ -2153,7 +2327,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v52';
+const APP_VERSION = 'v53';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -2567,7 +2741,7 @@ function dialogoGuardarArchivo(file, filename, compartible) {
         const kb = Math.max(1, Math.round(file.size / 1024));
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+        overlay.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:rgba(0,0,0,.55);' +
             'display:flex;align-items:center;justify-content:center;padding:24px;' +
             '-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);';
 
@@ -3084,7 +3258,7 @@ function renderEstadoNube() {
 // campo que no la muestre en pantalla.
 function dialogoEntrarNube() {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+    overlay.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:rgba(0,0,0,.55);' +
         'display:flex;align-items:center;justify-content:center;padding:24px;';
 
     const card = document.createElement('div');
@@ -3144,7 +3318,7 @@ function dialogoEntrarNube() {
             renderEstadoNube();
             // Entrar por primera vez en un dispositivo es justo el momento de
             // traer lo que ya hay, antes de mandar nada.
-            revisarRespaldoRemoto().then(() => sincronizarNube(true));
+            revisarRespaldoRemoto().then(() => sincronizarNube(true)).then(() => sincronizarPlantillas());
         } catch (err) {
             aviso.textContent = (err && err.message) || String(err);
             btnEntrar.disabled = false;
@@ -3264,7 +3438,8 @@ function init() {
     asegurarSesionNube()
         .catch(() => {})
         .then(() => revisarRespaldoRemoto())
-        .then(() => sincronizarNube(false));
+        .then(() => sincronizarNube(false))
+        .then(() => sincronizarPlantillas());
     reportarFaltantes();
 }
 
@@ -3344,6 +3519,10 @@ function bindInicio() {
     on(D('btnInicioCompu'), 'click', () => alternarCompu());
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
     on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
+    on(D('btnInicioSincro'), 'click', () => {
+        if (!nubeSesion() && !credencialesNube()) dialogoEntrarNube();
+        else { sincronizarPlantillas(); renderSincroInicio(); }
+    });
     on(D('btnInicioVerXml'), 'click', () => setPage('xml'));
 }
 
@@ -3411,7 +3590,27 @@ function filaInicio({ lado, nombre, detalle, destacada, acciones = [], alTocar }
     return f;
 }
 
+// La línea de la sincronización con la compu, arriba de las plantillas.
+function renderSincroInicio() {
+    const caja = D('inicioSincro');
+    if (!caja) return;
+    if (!sincroDisponible()) { caja.classList.add('hidden'); return; }
+    caja.classList.remove('hidden');
+    const texto = D('inicioSincroTexto'), boton = D('btnInicioSincro');
+    if (!nubeSesion() && !credencialesNube()) {
+        texto.textContent = 'Entrá a la nube para que las plantillas se sincronicen con la compu.';
+        boton.textContent = 'Entrar';
+        return;
+    }
+    const fecha = lsGet('tv_sincro_fecha');
+    const hora = fecha ? new Date(fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    texto.textContent = _sincroPlantillas ? 'Sincronizando con la compu…'
+        : 'Sincronizadas con la compu' + (hora ? ' · ' + hora : '');
+    boton.textContent = 'Sincronizar';
+}
+
 function renderInicio() {
+    renderSincroInicio();
     const hora = new Date().getHours();
     D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
     const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
@@ -6841,10 +7040,182 @@ function getSavedTemplates() {
 }
 // Guardar, borrar, importar y restaurar pasan todas por acá, así que es el
 // único lugar donde hace falta pedir el respaldo: ninguna vía se escapa.
+// También es donde cada plantilla recibe su uid y la fecha de su último
+// cambio, y donde un borrado deja su lápida: eso es lo que la sincronización
+// con la compu lleva y trae (ver SINCRONIZACIÓN DE PLANTILLAS, abajo).
 function saveTemplates(arr) {
+    if (!_aplicandoSincro) marcarCambiosPlantillas(getSavedTemplates(), arr);
     lsSet('tv_templates', JSON.stringify(arr));
     respaldarEnNube();
+    if (!_aplicandoSincro) programarSincroPlantillas();
 }
+
+// ─────────────────────────────────────────────
+// SINCRONIZACIÓN DE PLANTILLAS
+// Con la compu (y con otros iPad) por la nube: un solo archivo,
+// plantillas.json. La regla para unir (gana lo más nuevo, los borrados
+// viajan, la primera vez no duplica) está en sincro.js, el mismo archivo que
+// usa la compu, así los dos lados deciden lo mismo. Acá solo se baja, se
+// une con lo de este iPad, se aplica y se sube. Nunca pregunta nada.
+// ─────────────────────────────────────────────
+let _aplicandoSincro = false;
+let _sincroPlantillas = null, _sincroOtraVez = false, _sincroDemora = null, _sincroUltima = 0;
+const sincroDisponible = () => typeof SincroPlantillas !== 'undefined' && nubeActiva();
+
+function lapidasPlantillas() {
+    try { return JSON.parse(lsGet('tv_plantillas_borradas') || '{}') || {}; } catch (e) { return {}; }
+}
+function guardarLapidas(l) { lsSet('tv_plantillas_borradas', JSON.stringify(l)); }
+
+const firmaPlantilla = t => JSON.stringify([t.name || '', t.elements || [], t.links || [], t.hojas || []]);
+
+// Qué cambió entre la lista de antes y la nueva: uid a las que no tienen,
+// fecha nueva a las nuevas o editadas, lápida a las que ya no están. Al
+// aplicar un respaldo no hay lápidas ni fechas nuevas: esa lista no es un
+// cambio de este iPad, y la sincronización le devuelve lo que falte.
+function marcarCambiosPlantillas(antes, despues) {
+    const ahora = new Date().toISOString();
+    const previa = {};
+    antes.forEach(t => { previa[t.id] = t; });
+    despues.forEach(t => {
+        if (!t.uid) t.uid = typeof SincroPlantillas !== 'undefined' ? SincroPlantillas.nuevoUid() : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        if (_aplicandoRespaldo && t.actualizado) return;
+        const p = previa[t.id];
+        if (!p || !t.actualizado || firmaPlantilla(p) !== firmaPlantilla(t)) t.actualizado = ahora;
+    });
+    if (_aplicandoRespaldo) return;
+    const quedan = {};
+    despues.forEach(t => { quedan[t.id] = true; });
+    const lapidas = lapidasPlantillas();
+    let cambio = false;
+    antes.forEach(t => { if (!quedan[t.id] && t.uid) { lapidas[t.uid] = ahora; cambio = true; } });
+    if (cambio) guardarLapidas(lapidas);
+}
+
+// Las de este iPad (y sus lápidas) con la forma de SincroPlantillas.fusionar.
+function plantillasParaSincro() {
+    const lista = getSavedTemplates();
+    if (lista.some(t => !t.uid)) {          // de antes de la sincronización
+        _aplicandoSincro = true;
+        try {
+            lista.forEach(t => { if (!t.uid) t.uid = SincroPlantillas.nuevoUid(); });
+            lsSet('tv_templates', JSON.stringify(lista));
+        } finally { _aplicandoSincro = false; }
+    }
+    const vivas = lista.map(t => ({
+        uid: t.uid, nombre: t.name || '',
+        datos: { elements: t.elements || [], links: t.links || [], hojas: t.hojas || [] },
+        // Sin fecha propia (de antes), la de creación: el id es Date.now().
+        actualizado: t.actualizado || new Date(Number(t.id) || 0).toISOString(),
+        nueva: !t.subida
+    }));
+    const lapidas = lapidasPlantillas();
+    return vivas.concat(Object.keys(lapidas).map(uid => ({ uid: uid, nombre: '', actualizado: lapidas[uid], borrado: true })));
+}
+
+// Escribe lo que ganó afuera, con SU fecha: si no, rebotaría como un cambio
+// de acá. Devuelve cuántas cambiaron.
+function aplicarSincroPlantillas(r) {
+    const lista = getSavedTemplates();
+    Object.keys(r.uids).forEach(viejo => lista.forEach(t => { if (t.uid === viejo) t.uid = r.uids[viejo]; }));
+    const lapidas = lapidasPlantillas();
+    r.poner.forEach((x, i) => {
+        let t = lista.find(o => o.uid === x.uid);
+        if (!t) { t = { id: Date.now() + i, uid: x.uid }; lista.unshift(t); }
+        t.name = x.nombre;
+        t.elements = x.datos.elements; t.links = x.datos.links; t.hojas = x.datos.hojas;
+        t.actualizado = x.actualizado;
+        t.date = new Date(x.actualizado).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        t.subida = true;
+        delete lapidas[x.uid];
+    });
+    const borrar = {};
+    r.borrar.forEach(uid => { borrar[uid] = true; lapidas[uid] = new Date().toISOString(); });
+    const quedan = lista.filter(t => !borrar[t.uid]);
+    _aplicandoSincro = true;
+    try {
+        saveTemplates(quedan);
+        guardarLapidas(lapidas);
+    } finally { _aplicandoSincro = false; }
+    return Object.keys(r.uids).length + r.poner.length + r.borrar.length;
+}
+
+// Después de subir: todo lo de acá ya está en la nube, y las lápidas que la
+// nube olvidó (viejas) se olvidan acá también.
+function marcarPlantillasSubidas(r) {
+    const lista = getSavedTemplates();
+    if (lista.some(t => !t.subida)) {
+        lista.forEach(t => { t.subida = true; });
+        _aplicandoSincro = true;
+        try { lsSet('tv_templates', JSON.stringify(lista)); } finally { _aplicandoSincro = false; }
+    }
+    const vigentes = {};
+    r.plantillas.forEach(x => { if (x.borrado) vigentes[x.uid] = true; });
+    const lapidas = lapidasPlantillas();
+    let cambio = false;
+    Object.keys(lapidas).forEach(uid => { if (!vigentes[uid]) { delete lapidas[uid]; cambio = true; } });
+    if (cambio) guardarLapidas(lapidas);
+}
+
+// Una sola a la vez; lo que se pida mientras tanto hace una vuelta más.
+function sincronizarPlantillas() {
+    if (!sincroDisponible()) return Promise.resolve(false);
+    if (_sincroPlantillas) { _sincroOtraVez = true; return _sincroPlantillas; }
+    _sincroPlantillas = (async () => {
+        let cambios = 0;
+        try {
+            do {
+                _sincroOtraVez = false;
+                _sincroUltima = Date.now();
+                if (!nubeSesion() && !await asegurarSesionNube()) break;
+                let texto = '';
+                try {
+                    texto = await nubeBajar(SincroPlantillas.ARCHIVO);
+                } catch (err) {
+                    // Todavía no hay archivo en la nube: se sube el primero.
+                    if (!/not.?found|NoSuchKey|404|400/i.test((err && err.message) || '')) throw err;
+                }
+                const r = SincroPlantillas.fusionar(plantillasParaSincro(), SincroPlantillas.leerArchivo(texto));
+                cambios += aplicarSincroPlantillas(r);
+                if (r.subir) {
+                    await nubeSubir({ nombre: SincroPlantillas.ARCHIVO, formato: 'json',
+                                      texto: SincroPlantillas.armarArchivo(r.plantillas, nombreDispositivo()) });
+                }
+                marcarPlantillasSubidas(r);
+                lsSet('tv_sincro_fecha', new Date().toISOString());
+            } while (_sincroOtraVez);
+        } catch (err) {
+            // Sin red o la nube caída: la vuelta siguiente lo reintenta.
+            console.warn('Sincronizar plantillas:', (err && err.message) || err);
+        } finally {
+            _sincroPlantillas = null;
+        }
+        if (cambios) {
+            if (state.page === 'inicio') renderInicio();
+            if (state.page === 'plantillas') renderTemplatesList();
+        } else if (state.page === 'inicio') {
+            renderSincroInicio();
+        }
+        return cambios > 0;
+    })();
+    return _sincroPlantillas;
+}
+
+function programarSincroPlantillas() {
+    if (!sincroDisponible()) return;
+    clearTimeout(_sincroDemora);
+    _sincroDemora = setTimeout(sincronizarPlantillas, 3000);
+}
+
+// Cada minuto con la app a la vista, y al volver a ella. Cambiar la lista de
+// plantillas no toca la botonera que está en pantalla: vale también
+// codificando.
+setInterval(() => {
+    if (document.visibilityState === 'visible') sincronizarPlantillas();
+}, 60000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - _sincroUltima > 20000) sincronizarPlantillas();
+});
 
 function openTemplatesModal() { setPage('plantillas'); }
 

@@ -37,6 +37,7 @@ $css      = Leer 'style.css'
 $app      = Leer 'app.js'
 $tailwind = Leer 'tailwind.css'
 $config   = Leer 'nube-config.js'
+$sincro   = Leer 'sincro.js'
 $sw       = Leer 'sw.js'
 
 # El número que muestra la app tiene que ser el mismo que versiona el caché.
@@ -55,6 +56,7 @@ $reemplazos = @(
     @('<link rel="stylesheet" href="style.css">',    "<style>`n$css`n</style>"),
     # Sin red no hay nube, pero la config tiene que existir: app.js la lee al arrancar.
     @('<script src="nube-config.js"></script>',      "<script>$(Blindar $config)</script>"),
+    @('<script src="sincro.js"></script>',          "<script>$(Blindar $sincro)</script>"),
     @('<script src="app.js"></script>',              "<script>$(Blindar $app)</script>"),
     # El manifest y los iconos sueltos no existen en el archivo único
     @('<link rel="manifest" href="manifest.json">',  ''),
