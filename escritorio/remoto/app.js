@@ -235,7 +235,7 @@ function accion(a, opciones) {
     }
 }
 
-function alTocar(elemento, evento) {
+function alTocar(elemento, evento, extra) {
     if (!elemento || S.terminado) return;
     if (!S.estado || !S.estado.enCurso) {
         avisar('La compu todavía no empezó el partido.');
@@ -257,8 +257,9 @@ function alTocar(elemento, evento) {
     }
 
     const a = { tipo: 'tocar', elementoId: id };
-    // Posesion: la vista dice que mitad se toco ('A' o 'B').
-    const equipo = evento && (evento.equipo != null ? evento.equipo : (evento.detail && evento.detail.equipo));
+    // Posesion: la vista dice que mitad se toco ('A' o 'B') en el tercer
+    // argumento, como a la captura de la compu.
+    const equipo = extra && extra.equipo;
     if (equipo === 'A' || equipo === 'B') a.equipo = equipo;
     // En una pestaña de detalle se elige una opcion: no tiene hora propia.
     accion(a, { conMomento: !(S.estado && S.estado.hoja) });

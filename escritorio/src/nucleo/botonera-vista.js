@@ -24,6 +24,8 @@ import {
 import { posesionDe } from './codificacion.js';
 
 const ESCALA_MINIMA = 0.35;   // la de app.js: más chico, un botón no se puede tocar
+// ¿El navegador tiene pointer events? Safari los tiene desde iOS 13.
+const CON_PUNTERO = typeof window !== 'undefined' && 'PointerEvent' in window;
 
 /**
  * @param contenedor  elemento donde se dibuja (ocupa todo su tamaño)
@@ -259,7 +261,23 @@ export function crearVista(contenedor, datos, opciones = {}) {
         setTimeout(() => nodo.classList.remove('tv-bv--apretado'), 120);
         o.alTocar(e, ev, extra);
     }
-    raiz.addEventListener('pointerdown', alPresionar);
+    // Safari de iOS 12 (iPad Air 1, mini 2 y 3 no pasan de ahí) no tiene
+    // pointer events: sin esto, tocar un botón no hacía nada. Ahí se escucha
+    // touchstart (y mousedown para un mouse); el preventDefault de un toque
+    // que cae en un botón evita el mousedown "de compatibilidad" que Safari
+    // manda después, así no cuenta dos veces.
+    function alPresionarTactil(ev) {
+        const t = ev.changedTouches && ev.changedTouches[0];
+        alPresionar({
+            target: ev.target, button: 0,
+            clientX: t ? t.clientX : undefined, clientY: t ? t.clientY : undefined,
+            preventDefault: () => ev.preventDefault()
+        });
+    }
+    const oyentes = CON_PUNTERO
+        ? [['pointerdown', alPresionar, false]]
+        : [['touchstart', alPresionarTactil, { passive: false }], ['mousedown', alPresionar, false]];
+    oyentes.forEach(([tipo, fn, op]) => raiz.addEventListener(tipo, fn, op));
     // Un toque largo en el iPad no abre el menú de copiar.
     const sinMenu = ev => { if (vivo) ev.preventDefault(); };
     raiz.addEventListener('contextmenu', sinMenu);
@@ -356,7 +374,7 @@ export function crearVista(contenedor, datos, opciones = {}) {
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'tv-bv-bd-boton';
-            b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); if (o.alCerrarDetalle) o.alCerrarDetalle(); });
+            b.addEventListener(CON_PUNTERO ? 'pointerdown' : 'click', ev => { ev.preventDefault(); ev.stopPropagation(); if (o.alCerrarDetalle) o.alCerrarDetalle(); });
             barraDetalle.append(b);
             raiz.appendChild(barraDetalle);
         }
@@ -436,7 +454,7 @@ export function crearVista(contenedor, datos, opciones = {}) {
 
     function destruir() {
         if (ro) ro.disconnect(); else window.removeEventListener('resize', reajustar);
-        raiz.removeEventListener('pointerdown', alPresionar);
+        oyentes.forEach(([tipo, fn, op]) => raiz.removeEventListener(tipo, fn, op));
         raiz.removeEventListener('contextmenu', sinMenu);
         raiz.remove();
     }
