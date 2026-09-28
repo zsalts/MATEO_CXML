@@ -124,8 +124,7 @@
 .tv-ipad-fin { align-self: center; max-width: 560px; padding: var(--tv-esp-5); text-align: center; }
 .tv-ipad-fin .tv-ipad-acciones { justify-content: center; }
 
-/* La dirección para mirar los clips (/clips), plegada abajo del PIN. */
-.tv-ipad-clips { border-top: 1px solid var(--tv-borde); padding-top: var(--tv-esp-3); }
-.tv-ipad-clips summary { cursor: pointer; font-weight: 600; }
-.tv-ipad-clips p { color: var(--tv-texto-2); margin: var(--tv-esp-2) 0; }
-.tv-ipad-clips .tv-ipad-qr { max-width: 180px; }
+/* Enlazar para ver cortes en vivo: la dirección /clips, el QR y el PIN. */
+.tv-ipad-enlazar { display: flex; flex-direction: column; gap: var(--tv-esp-3); max-width: 460px; }
+.tv-ipad-enlazar > p { margin: 0; color: var(--tv-texto-2); }
+.tv-ipad-enlazar__quien { text-align: center; }

@@ -127,20 +127,27 @@
                     <span class="inicio__titulo">Conectar con la compu</span>
                     <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
                 </button>
+                <button id="btnInicioCortes" class="inicio__tarjeta inicio__tarjeta--ok" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.2v5.6l4.6-2.8z" fill="currentColor"/></svg></span>
+                    <span class="inicio__titulo">Ver cortes en vivo</span>
+                    <span class="inicio__texto">Mirá cada jugada que se marca en la compu, unos segundos después.</span>
+                </button>
             </div>
 
-            <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
+            <!-- Conectar: la compu muestra la dirección y el PIN. Sirve para
+                 codificar (Captura desde iPad) o para ver los cortes en vivo
+                 ("Enlazar para ver cortes en vivo"); app.js cambia los textos. -->
             <section id="inicioCompu" class="inicio__bloque inicio__conectar hidden">
-                <header class="inicio__bloque-cabeza"><h2>Conectar con la compu</h2></header>
+                <header class="inicio__bloque-cabeza"><h2 id="compuTitulo">Conectar con la compu</h2></header>
                 <div class="inicio__conectar-cuerpo">
                     <ol class="inicio__pasos">
-                        <li><span>1</span><span>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
+                        <li><span>1</span><span id="compuPaso1">En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
                         <li><span>2</span><span>Escribí la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). Tienen que estar en el mismo wifi.</span></li>
                         <li><span>3</span><span>Poné el <b>PIN</b> de 4 números que aparece en la compu.</span></li>
                     </ol>
                     <form id="formCompu" class="inicio__fila" autocomplete="off">
                         <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
-                        <button type="submit" class="inicio__boton">Conectar</button>
+                        <button type="submit" id="compuBoton" class="inicio__boton">Conectar</button>
                     </form>
                     <p id="compuError" class="inicio__error hidden"></p>
                     <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>

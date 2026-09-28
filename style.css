@@ -1006,7 +1006,7 @@ html[data-tema="oscuro"] .inicio {
 }
 
 /* ── Tarjetas ── */
-.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; }
+.inicio__tarjetas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; }
 @media (max-width: 600px) { .inicio__tarjetas, .inicio__columnas { grid-template-columns: 1fr !important; } }
 .inicio__tarjeta {
     --tono: var(--in-acento);
@@ -1148,6 +1148,7 @@ html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
 
 /* ── Conectar con la compu ── */
 .inicio__conectar { border-color: var(--in-acento); }
+.inicio__conectar--cortes { border-color: var(--in-ok); }
 .inicio__fila-lista > * + * { margin-left: 14px; }
 .inicio__conectar-cuerpo { padding: 20px 20px 22px; }
 .inicio__pasos { list-style: none; margin: 0 0 18px; padding: 0; color: var(--in-texto-2); line-height: 1.45; }

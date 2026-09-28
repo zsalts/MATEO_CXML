@@ -109,9 +109,9 @@ export function crearCompartir(o) {
         const qrCaja = el('div', { class: 'tv-captura-compartir__qr' });
         if (qr) qrCaja.innerHTML = qr;   // SVG que genera la librería qrcode en main
         await ctx.ui.modal({
-            titulo: 'Ver los clips en vivo',
+            titulo: 'Enlazar para ver cortes en vivo',
             contenido: el('div', { class: 'tv-captura-compartir' },
-                el('p', { class: 'tv-texto-2', texto: 'En el iPad o iPhone (misma wifi) apuntá la cámara al código, o escribí la dirección en Safari. Cada evento que marques le llega como clip unos segundos después.' }),
+                el('p', { class: 'tv-texto-2', texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Cada evento que marques le llega como clip unos segundos después.' }),
                 qr ? qrCaja : null,
                 el('div', { class: 'tv-captura-compartir__url', texto: url }),
                 el('div', { class: 'tv-captura-compartir__pin' }, el('span', { texto: 'PIN' }), el('strong', { texto: c.pin })),
@@ -124,12 +124,12 @@ export function crearCompartir(o) {
 
     // El botón de la barra: dice cuántos miran una vez prendido.
     function boton() {
-        const texto = el('span', { texto: 'Clips en vivo' });
-        const b = el('button', { type: 'button', class: 'tv-btn', title: 'Ver los clips en otro iPad o iPhone', onClick: () => mostrar() },
+        const texto = el('span', { texto: 'Enlazar cortes en vivo' });
+        const b = el('button', { type: 'button', class: 'tv-btn', title: 'Ver los cortes en otro iPad o iPhone', onClick: () => mostrar() },
             icono('wifi'), texto);
         const pintar = () => {
             const n = miran();
-            texto.textContent = conexion ? (n ? `Clips en vivo · ${n}` : 'Clips en vivo · nadie') : 'Clips en vivo';
+            texto.textContent = conexion ? (n ? `Cortes en vivo · ${n} mirando` : 'Cortes en vivo · nadie') : 'Enlazar cortes en vivo';
         };
         alCambiarOyentes.add(pintar);
         return b;

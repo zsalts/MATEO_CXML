@@ -1256,7 +1256,7 @@ html[data-tema="oscuro"] .inicio {
 }
 
 /* ── Tarjetas ── */
-.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; }
+.inicio__tarjetas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; }
 @media (max-width: 600px) { .inicio__tarjetas, .inicio__columnas { grid-template-columns: 1fr !important; } }
 .inicio__tarjeta {
     --tono: var(--in-acento);
@@ -1398,6 +1398,7 @@ html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
 
 /* ── Conectar con la compu ── */
 .inicio__conectar { border-color: var(--in-acento); }
+.inicio__conectar--cortes { border-color: var(--in-ok); }
 .inicio__fila-lista > * + * { margin-left: 14px; }
 .inicio__conectar-cuerpo { padding: 20px 20px 22px; }
 .inicio__pasos { list-style: none; margin: 0 0 18px; padding: 0; color: var(--in-texto-2); line-height: 1.45; }
@@ -1528,20 +1529,27 @@ html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
                     <span class="inicio__titulo">Conectar con la compu</span>
                     <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
                 </button>
+                <button id="btnInicioCortes" class="inicio__tarjeta inicio__tarjeta--ok" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.2v5.6l4.6-2.8z" fill="currentColor"/></svg></span>
+                    <span class="inicio__titulo">Ver cortes en vivo</span>
+                    <span class="inicio__texto">Mirá cada jugada que se marca en la compu, unos segundos después.</span>
+                </button>
             </div>
 
-            <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
+            <!-- Conectar: la compu muestra la dirección y el PIN. Sirve para
+                 codificar (Captura desde iPad) o para ver los cortes en vivo
+                 ("Enlazar para ver cortes en vivo"); app.js cambia los textos. -->
             <section id="inicioCompu" class="inicio__bloque inicio__conectar hidden">
-                <header class="inicio__bloque-cabeza"><h2>Conectar con la compu</h2></header>
+                <header class="inicio__bloque-cabeza"><h2 id="compuTitulo">Conectar con la compu</h2></header>
                 <div class="inicio__conectar-cuerpo">
                     <ol class="inicio__pasos">
-                        <li><span>1</span><span>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
+                        <li><span>1</span><span id="compuPaso1">En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
                         <li><span>2</span><span>Escribí la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). Tienen que estar en el mismo wifi.</span></li>
                         <li><span>3</span><span>Poné el <b>PIN</b> de 4 números que aparece en la compu.</span></li>
                     </ol>
                     <form id="formCompu" class="inicio__fila" autocomplete="off">
                         <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
-                        <button type="submit" class="inicio__boton">Conectar</button>
+                        <button type="submit" id="compuBoton" class="inicio__boton">Conectar</button>
                     </form>
                     <p id="compuError" class="inicio__error hidden"></p>
                     <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
@@ -2327,7 +2335,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v53';
+const APP_VERSION = 'v54';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -3516,7 +3524,8 @@ function urlDeCompu(texto) {
 
 function bindInicio() {
     on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
-    on(D('btnInicioCompu'), 'click', () => alternarCompu());
+    on(D('btnInicioCompu'), 'click', () => alternarCompu('codificar'));
+    on(D('btnInicioCortes'), 'click', () => alternarCompu('cortes'));
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
     on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
     on(D('btnInicioSincro'), 'click', () => {
@@ -3705,12 +3714,31 @@ function codificarDesdeInicio() {
     setTimeout(() => lista.classList.remove('inicio__lista--marcada'), 1200);
 }
 
-function alternarCompu(abrir) {
+// La misma caja para las dos tarjetas: codificar (la página de la compu) o
+// ver los cortes en vivo (la misma dirección + /clips, que solo mira).
+// Tocar la tarjeta abierta la cierra; tocar la otra cambia de modo.
+let _modoCompu = null;
+const TEXTOS_COMPU = {
+    codificar: { titulo: 'Conectar con la compu', boton: 'Conectar',
+        paso1: 'En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.' },
+    cortes: { titulo: 'Ver cortes en vivo', boton: 'Ver cortes',
+        paso1: 'En la compu, en <b>Captura en vivo</b> o <b>Captura desde iPad</b>, tocá <b>Enlazar para ver cortes en vivo</b>.' }
+};
+
+function alternarCompu(modo) {
     const caja = D('inicioCompu');
-    const ver = abrir !== undefined ? abrir : caja.classList.contains('hidden');
+    const ver = caja.classList.contains('hidden') || _modoCompu !== modo;
+    _modoCompu = ver ? modo : null;
     caja.classList.toggle('hidden', !ver);
-    D('btnInicioCompu').setAttribute('aria-expanded', String(ver));
+    D('btnInicioCompu').setAttribute('aria-expanded', String(_modoCompu === 'codificar'));
+    D('btnInicioCortes').setAttribute('aria-expanded', String(_modoCompu === 'cortes'));
     if (!ver) return;
+    const t = TEXTOS_COMPU[modo];
+    D('compuTitulo').textContent = t.titulo;
+    D('compuBoton').textContent = t.boton;
+    D('compuPaso1').innerHTML = t.paso1;
+    caja.classList.toggle('inicio__conectar--cortes', modo === 'cortes');
+    D('compuError').classList.add('hidden');
     const campo = D('inputCompu');
     if (!campo.value) campo.value = lsGet(CLAVE_COMPU) || '';
     caja.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -3727,7 +3755,7 @@ function conectarCompu() {
     }
     error.classList.add('hidden');
     lsSet(CLAVE_COMPU, campo.value.trim());
-    location.href = url;
+    location.href = _modoCompu === 'cortes' ? url + 'clips' : url;
 }
 
 // ─────────────────────────────────────────────

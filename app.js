@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v53';
+const APP_VERSION = 'v54';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1246,7 +1246,8 @@ function urlDeCompu(texto) {
 
 function bindInicio() {
     on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
-    on(D('btnInicioCompu'), 'click', () => alternarCompu());
+    on(D('btnInicioCompu'), 'click', () => alternarCompu('codificar'));
+    on(D('btnInicioCortes'), 'click', () => alternarCompu('cortes'));
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
     on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
     on(D('btnInicioSincro'), 'click', () => {
@@ -1435,12 +1436,31 @@ function codificarDesdeInicio() {
     setTimeout(() => lista.classList.remove('inicio__lista--marcada'), 1200);
 }
 
-function alternarCompu(abrir) {
+// La misma caja para las dos tarjetas: codificar (la página de la compu) o
+// ver los cortes en vivo (la misma dirección + /clips, que solo mira).
+// Tocar la tarjeta abierta la cierra; tocar la otra cambia de modo.
+let _modoCompu = null;
+const TEXTOS_COMPU = {
+    codificar: { titulo: 'Conectar con la compu', boton: 'Conectar',
+        paso1: 'En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.' },
+    cortes: { titulo: 'Ver cortes en vivo', boton: 'Ver cortes',
+        paso1: 'En la compu, en <b>Captura en vivo</b> o <b>Captura desde iPad</b>, tocá <b>Enlazar para ver cortes en vivo</b>.' }
+};
+
+function alternarCompu(modo) {
     const caja = D('inicioCompu');
-    const ver = abrir !== undefined ? abrir : caja.classList.contains('hidden');
+    const ver = caja.classList.contains('hidden') || _modoCompu !== modo;
+    _modoCompu = ver ? modo : null;
     caja.classList.toggle('hidden', !ver);
-    D('btnInicioCompu').setAttribute('aria-expanded', String(ver));
+    D('btnInicioCompu').setAttribute('aria-expanded', String(_modoCompu === 'codificar'));
+    D('btnInicioCortes').setAttribute('aria-expanded', String(_modoCompu === 'cortes'));
     if (!ver) return;
+    const t = TEXTOS_COMPU[modo];
+    D('compuTitulo').textContent = t.titulo;
+    D('compuBoton').textContent = t.boton;
+    D('compuPaso1').innerHTML = t.paso1;
+    caja.classList.toggle('inicio__conectar--cortes', modo === 'cortes');
+    D('compuError').classList.add('hidden');
     const campo = D('inputCompu');
     if (!campo.value) campo.value = lsGet(CLAVE_COMPU) || '';
     caja.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1457,7 +1477,7 @@ function conectarCompu() {
     }
     error.classList.add('hidden');
     lsSet(CLAVE_COMPU, campo.value.trim());
-    location.href = url;
+    location.href = _modoCompu === 'cortes' ? url + 'clips' : url;
 }
 
 // ─────────────────────────────────────────────

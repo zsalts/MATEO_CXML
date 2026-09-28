@@ -542,7 +542,8 @@ function pintarPreparar() {
     if (!st.conexion) {
         con.append(
             h('p', { texto: 'El iPad tiene que estar en la misma wifi que la compu.' }),
-            h('button', { class: 'tv-btn tv-btn--primario', texto: 'Conectar iPad', disabled: !st.plantilla, onClick: conectarIpad }));
+            h('button', { class: 'tv-btn tv-btn--primario', texto: 'Conectar iPad', disabled: !st.plantilla, onClick: conectarIpad }),
+            botonEnlazar());
     } else {
         const c = st.conexion;
         const urls = c.urls && c.urls.length ? c.urls : [c.url];
@@ -557,8 +558,8 @@ function pintarPreparar() {
                         texto: u + (c.adaptadores && c.adaptadores[i] ? ` (${c.adaptadores[i].adaptador})` : '') })))
                 : h('div', { class: 'tv-ipad-url', texto: urls[0] }),
             h('div', { class: 'tv-ipad-pin' }, h('span', { texto: 'PIN' }), h('strong', { texto: c.pin })),
-            direccionClips(c, st.urlElegida),
-            listaIpads());
+            listaIpads(),
+            botonEnlazar());
         if (st.firewall) con.append(ayudaFirewall());
     }
 
@@ -571,18 +572,42 @@ function pintarPreparar() {
             onClick: () => empezar() }));
 }
 
-// La otra dirección, para el iPad o iPhone que solo mira los clips. Es otra
-// a propósito: el que entra por ahí nunca se queda con la botonera, llegue
-// antes o después del que codifica. Mismo PIN.
-function direccionClips(c, urlElegida) {
-    const url = (urlElegida || c.url) + 'clips';
+// Enlazar un iPad o iPhone que solo mira los cortes. Es otra dirección
+// (/clips) a propósito: el que entra por ahí nunca se queda con la
+// botonera, llegue antes o después del que codifica. Mismo PIN. En el iPad
+// es "Ver cortes en vivo", en la pantalla de inicio.
+function botonEnlazar() {
+    return h('button', { class: 'tv-btn', texto: 'Enlazar para ver cortes en vivo', disabled: !st.plantilla,
+        title: 'Ver los cortes en otro iPad o iPhone', onClick: () => enlazarClips() });
+}
+
+async function enlazarClips() {
+    if (!st.conexion) await conectarIpad();
+    const c = st && st.conexion;
+    if (!c) return;
+    const url = (st.urlElegida || c.url) + 'clips';
     const qr = c.qrs && c.qrs[url];
-    // Abierto o cerrado sobrevive al repintado (cada iPad que entra repinta).
-    return h('details', { class: 'tv-ipad-clips', open: !!st.clipsAbierto, onToggle: e => { st.clipsAbierto = e.target.open; } },
-        h('summary', { texto: 'Ver los clips en vivo en otro iPad o iPhone' }),
-        h('p', { texto: 'Con el mismo PIN. El que entra por esta dirección solo mira: cada evento que se marca le llega como clip.' }),
-        qr ? h('div', { class: 'tv-ipad-qr', html: qr }) : null,
-        h('div', { class: 'tv-ipad-url', texto: url }));
+    const quien = h('p', { class: 'tv-ipad-tenue tv-ipad-enlazar__quien' });
+    const pintarQuien = () => {
+        if (!st) return;
+        const n = st.clientes.filter(x => !x.activo && x.conectado).length;
+        quien.textContent = n === 0 ? 'Todavía no entró nadie a mirar.' : n === 1 ? '1 aparato mirando.' : `${n} aparatos mirando.`;
+    };
+    pintarQuien();
+    const t = setInterval(pintarQuien, 1000);
+    try {
+        await st.ui.modal({
+            titulo: 'Enlazar para ver cortes en vivo',
+            contenido: h('div', { class: 'tv-ipad-enlazar' },
+                h('p', { texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Cada evento que se marca le llega como clip unos segundos después.' }),
+                // El SVG lo genera la librería qrcode en main a partir de la URL.
+                qr ? h('div', { class: 'tv-ipad-qr', html: qr }) : null,
+                h('div', { class: 'tv-ipad-url', texto: url }),
+                h('div', { class: 'tv-ipad-pin' }, h('span', { texto: 'PIN' }), h('strong', { texto: c.pin })),
+                quien),
+            botones: [{ texto: 'Listo', valor: true, primario: true }]
+        });
+    } finally { clearInterval(t); }
 }
 
 function listaIpads() {
@@ -618,6 +643,7 @@ function armarVivo() {
             h('span', { class: 'tv-ipad-tenue', id: 'tv-ipad-bytes' }),
             h('span', { class: 'tv-ipad-conectado', id: 'tv-ipad-conectado' }),
             h('span', { class: 'tv-ipad-espacio' }),
+            h('button', { class: 'tv-btn', texto: 'Enlazar cortes en vivo', title: 'Ver los cortes en otro iPad o iPhone', onClick: () => enlazarClips() }),
             h('button', { class: 'tv-btn', id: 'tv-ipad-play', onClick: () => st.partido.alternar() }),
             h('button', { class: 'tv-btn tv-btn--peligro', texto: 'Terminar', onClick: () => terminar() })),
         h('div', { class: 'tv-ipad-vivo' },
