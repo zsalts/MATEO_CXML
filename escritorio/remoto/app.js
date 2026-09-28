@@ -8,6 +8,9 @@
 //
 // Por que no es la PWA del iPad: ver el comentario de main/remoto.js
 // (HTTPS → ws:// de la red local = contenido mixto, Safari lo bloquea).
+//
+// Tiene que correr en el Safari de un iPad viejo: sin ?? ni ?. (iPadOS
+// 13.4). Si algo no arranca, la trampa de index.html lo muestra en pantalla.
 
 import { crearVista } from '/nucleo/botonera-vista.js';
 import * as plantillaNucleo from '/nucleo/plantilla.js';
@@ -255,7 +258,7 @@ function alTocar(elemento, evento) {
 
     const a = { tipo: 'tocar', elementoId: id };
     // Posesion: la vista dice que mitad se toco ('A' o 'B').
-    const equipo = evento && (evento.equipo ?? (evento.detail && evento.detail.equipo));
+    const equipo = evento && (evento.equipo != null ? evento.equipo : (evento.detail && evento.detail.equipo));
     if (equipo === 'A' || equipo === 'B') a.equipo = equipo;
     // En una pestaña de detalle se elige una opcion: no tiene hora propia.
     accion(a, { conMomento: !(S.estado && S.estado.hoja) });
@@ -299,7 +302,7 @@ function optimista(elemento) {
     if (!datos) return;
     try {
         const hoja = plantillaNucleo.hojaQueAbre ? plantillaNucleo.hojaQueAbre(datos, elemento.id) : null;
-        if (hoja) S.vista.mostrarHoja(hoja.id ?? hoja);
+        if (hoja) S.vista.mostrarHoja(hoja.id != null ? hoja.id : hoja);
         const emerg = plantillaNucleo.emergentesDe ? plantillaNucleo.emergentesDe(datos, elemento.id) : [];
         if (emerg && emerg.length) abrirEmergentes(elemento.id, emerg);
     } catch (e) { console.warn('optimista', e); }
@@ -345,7 +348,7 @@ function ponerEstado(e) {
     if (cola.cantidad() > 0) return;
 
     try {
-        S.vista.mostrarHoja(e.hoja ?? null);
+        S.vista.mostrarHoja(e.hoja != null ? e.hoja : null);
         const nuevas = e.marcas || {};
         for (const id of Object.keys(marcasPintadas)) if (!(id in nuevas)) S.vista.marcar(id, null);
         for (const [id, v] of Object.entries(nuevas)) if (marcasPintadas[id] !== v) S.vista.marcar(id, v);
@@ -450,8 +453,8 @@ function avisar(texto) {
 // Circulo que se expande donde toco el dedo: la confirmacion visual es
 // inmediata aunque la compu tarde en contestar.
 function destello(ev) {
-    const x = ev && (ev.clientX ?? (ev.touches && ev.touches[0] && ev.touches[0].clientX));
-    const y = ev && (ev.clientY ?? (ev.touches && ev.touches[0] && ev.touches[0].clientY));
+    const x = ev && (ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] && ev.touches[0].clientX));
+    const y = ev && (ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] && ev.touches[0].clientY));
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const d = document.createElement('i');
     d.className = 'destello';
@@ -572,6 +575,7 @@ setInterval(() => {
 // ─────────────────────────────────────────────
 // ARRANQUE
 // ─────────────────────────────────────────────
+window.__remotoOk = true;   // para la trampa de index.html: el modulo corrio entero
 pintarCola();
 if (leer(claveToken)) {
     mostrarMensaje('Conectando con la compu…', '');

@@ -1,7 +1,11 @@
 /* La pagina del iPad. Este archivo no ve src/estilos/tokens.css (el
    servidor solo sirve remoto/ y nucleo/), asi que repite los tokens que usa
    el nucleo para dibujar la botonera, en el tema oscuro. Si cambian los de
-   la app, cambialos aca tambien. */
+   la app, cambialos aca tambien.
+
+   Tiene que andar en el Safari de un iPad viejo: nada de inset, gap en
+   flex (iPadOS 14.5), aspect-ratio (15) ni color-mix (16.2). Se usan
+   top/left/right/bottom y margenes. */
 
 :root {
     --tv-fondo: #0e1014;
@@ -59,28 +63,30 @@ button {
 /* ── Franja de arriba ── */
 .franja {
     position: fixed;
-    inset: 0 0 auto 0;
+    top: 0; left: 0; right: 0;
     height: calc(var(--franja) + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) calc(var(--tv-esp-3) + env(safe-area-inset-right)) 0 calc(var(--tv-esp-3) + env(safe-area-inset-left));
     display: flex;
     align-items: center;
-    gap: var(--tv-esp-4);
     background: var(--tv-panel);
     border-bottom: 1px solid var(--tv-borde);
     font-size: 15px;
     z-index: 10;
     white-space: nowrap;
 }
+.franja > * + * { margin-left: var(--tv-esp-4); }
 .franja__reloj { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 4.5ch; }
 .franja__rec { color: var(--tv-rec); font-weight: 700; letter-spacing: .04em; animation: latido 1.2s ease-in-out infinite; }
-.franja__conexion { display: inline-flex; align-items: center; gap: 6px; color: var(--tv-texto-2); }
+.franja__conexion { display: inline-flex; align-items: center; color: var(--tv-texto-2); }
+.franja__conexion b { margin-left: 6px; }
 .franja__conexion i { width: 10px; height: 10px; border-radius: 50%; background: var(--tv-peligro); }
 .franja__conexion[data-nivel="verde"] i { background: var(--tv-ok); }
 .franja__conexion[data-nivel="amarillo"] i { background: var(--tv-aviso); }
 .franja__conexion[data-nivel="rojo"] b { color: var(--tv-peligro); }
 .franja__cola { color: var(--tv-aviso); font-weight: 600; }
 .franja__ultimo { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--tv-texto-2); }
-.franja__botones { display: flex; gap: var(--tv-esp-2); }
+.franja__botones { display: flex; }
+.franja__botones > * + * { margin-left: var(--tv-esp-2); }
 
 @keyframes latido { 50% { opacity: .35; } }
 
@@ -121,7 +127,7 @@ button {
 /* ── Pantallas (PIN, mensajes) ── */
 .pantalla {
     position: fixed;
-    inset: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -131,16 +137,16 @@ button {
 }
 #pantallaMensaje { background: rgba(14, 16, 20, .92); }
 
-.pin { text-align: center; width: min(360px, 100%); }
+.pin { text-align: center; width: 360px; max-width: 100%; }
 .pin h1 { margin: 0 0 var(--tv-esp-2); font-size: 28px; }
 .pin__ayuda { margin: 0 0 var(--tv-esp-5); color: var(--tv-texto-2); font-size: 17px; }
-.pin__puntos { display: flex; justify-content: center; gap: 18px; margin-bottom: var(--tv-esp-3); }
-.pin__puntos i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--tv-texto-2); }
+.pin__puntos { display: flex; justify-content: center; margin-bottom: var(--tv-esp-3); }
+.pin__puntos i { width: 18px; height: 18px; margin: 0 9px; border-radius: 50%; border: 2px solid var(--tv-texto-2); }
 .pin__puntos i.lleno { background: var(--tv-texto); border-color: var(--tv-texto); }
 .pin__puntos.sacudir { animation: sacudir .35s; }
 @keyframes sacudir { 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
 .pin__error { min-height: 1.4em; margin: 0 0 var(--tv-esp-4); color: var(--tv-peligro); font-size: 15px; }
-.pin__teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.pin__teclado { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 14px; gap: 14px; }
 .pin__teclado button {
     height: 72px;
     border-radius: 50%;
@@ -148,7 +154,6 @@ button {
     background: var(--tv-panel-2);
     font-size: 30px;
     font-weight: 500;
-    aspect-ratio: 1;
     justify-self: center;
     width: 72px;
 }
@@ -176,7 +181,8 @@ button {
 }
 
 @media (max-width: 700px) {
-    .franja { gap: var(--tv-esp-2); font-size: 13px; }
+    .franja { font-size: 13px; }
+    .franja > * + * { margin-left: var(--tv-esp-2); }
     .franja__ultimo { display: none; }
 }
 

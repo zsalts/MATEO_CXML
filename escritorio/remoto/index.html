@@ -16,6 +16,42 @@
 <link rel="apple-touch-icon" href="icono-192.png">
 <link rel="icon" href="icono-192.png">
 <link rel="stylesheet" href="estilo.css">
+<!-- Trampa de errores. ES5 a proposito: tiene que correr en cualquier
+     Safari, aunque no entienda el resto. Si app.js no arranca (Safari viejo,
+     un archivo que no llego), lo dice en pantalla con la version de Safari,
+     en vez de dejar un teclado que no responde. -->
+<script>
+(function () {
+    function mostrar(txt) {
+        var d = document.getElementById('errorRemoto');
+        if (!d) {
+            d = document.createElement('div');
+            d.id = 'errorRemoto';
+            d.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#b91c1c;color:#fff;'
+                + 'padding:12px 14px;max-height:50%;overflow:auto;white-space:pre-wrap;font:12px/1.45 Menlo,monospace;');
+            (document.body || document.documentElement).appendChild(d);
+        }
+        d.appendChild(document.createTextNode(txt + '\n'));
+    }
+    window.onerror = function (msg, url, linea, col) {
+        mostrar('ERROR: ' + msg + '\n  en ' + (url || '?') + ':' + linea + ':' + col);
+    };
+    // Solo scripts: el botonera-vista.css de abajo puede faltar y no pasa nada.
+    window.addEventListener('error', function (ev) {
+        var t = ev.target;
+        if (t && t.tagName === 'SCRIPT') mostrar('NO CARGO: ' + t.src);
+    }, true);
+    window.addEventListener('load', function () {
+        setTimeout(function () {
+            if (!window.__remotoOk) {
+                mostrar('La pagina no llego a arrancar: este Safari puede ser muy viejo.\n'
+                    + 'Actualiza el iPad (Ajustes > General > Actualizacion de software) o mandanos esta foto.\n'
+                    + 'Safari: ' + navigator.userAgent);
+            }
+        }, 1500);
+    });
+})();
+</script>
 <!-- Si el nucleo trae estilos propios para la botonera, se cargan; si no
      existe, es un 404 que no rompe nada. -->
 <link rel="stylesheet" href="/nucleo/botonera-vista.css">
