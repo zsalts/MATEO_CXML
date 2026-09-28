@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v52';
+const APP_VERSION = 'v53';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -471,7 +471,7 @@ function dialogoGuardarArchivo(file, filename, compartible) {
         const kb = Math.max(1, Math.round(file.size / 1024));
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+        overlay.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:rgba(0,0,0,.55);' +
             'display:flex;align-items:center;justify-content:center;padding:24px;' +
             '-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);';
 
@@ -988,7 +988,7 @@ function renderEstadoNube() {
 // campo que no la muestre en pantalla.
 function dialogoEntrarNube() {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);' +
+    overlay.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:rgba(0,0,0,.55);' +
         'display:flex;align-items:center;justify-content:center;padding:24px;';
 
     const card = document.createElement('div');
@@ -1048,7 +1048,7 @@ function dialogoEntrarNube() {
             renderEstadoNube();
             // Entrar por primera vez en un dispositivo es justo el momento de
             // traer lo que ya hay, antes de mandar nada.
-            revisarRespaldoRemoto().then(() => sincronizarNube(true));
+            revisarRespaldoRemoto().then(() => sincronizarNube(true)).then(() => sincronizarPlantillas());
         } catch (err) {
             aviso.textContent = (err && err.message) || String(err);
             btnEntrar.disabled = false;
@@ -1168,7 +1168,8 @@ function init() {
     asegurarSesionNube()
         .catch(() => {})
         .then(() => revisarRespaldoRemoto())
-        .then(() => sincronizarNube(false));
+        .then(() => sincronizarNube(false))
+        .then(() => sincronizarPlantillas());
     reportarFaltantes();
 }
 
@@ -1248,6 +1249,10 @@ function bindInicio() {
     on(D('btnInicioCompu'), 'click', () => alternarCompu());
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
     on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
+    on(D('btnInicioSincro'), 'click', () => {
+        if (!nubeSesion() && !credencialesNube()) dialogoEntrarNube();
+        else { sincronizarPlantillas(); renderSincroInicio(); }
+    });
     on(D('btnInicioVerXml'), 'click', () => setPage('xml'));
 }
 
@@ -1315,7 +1320,27 @@ function filaInicio({ lado, nombre, detalle, destacada, acciones = [], alTocar }
     return f;
 }
 
+// La línea de la sincronización con la compu, arriba de las plantillas.
+function renderSincroInicio() {
+    const caja = D('inicioSincro');
+    if (!caja) return;
+    if (!sincroDisponible()) { caja.classList.add('hidden'); return; }
+    caja.classList.remove('hidden');
+    const texto = D('inicioSincroTexto'), boton = D('btnInicioSincro');
+    if (!nubeSesion() && !credencialesNube()) {
+        texto.textContent = 'Entrá a la nube para que las plantillas se sincronicen con la compu.';
+        boton.textContent = 'Entrar';
+        return;
+    }
+    const fecha = lsGet('tv_sincro_fecha');
+    const hora = fecha ? new Date(fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    texto.textContent = _sincroPlantillas ? 'Sincronizando con la compu…'
+        : 'Sincronizadas con la compu' + (hora ? ' · ' + hora : '');
+    boton.textContent = 'Sincronizar';
+}
+
 function renderInicio() {
+    renderSincroInicio();
     const hora = new Date().getHours();
     D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
     const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
@@ -4745,10 +4770,182 @@ function getSavedTemplates() {
 }
 // Guardar, borrar, importar y restaurar pasan todas por acá, así que es el
 // único lugar donde hace falta pedir el respaldo: ninguna vía se escapa.
+// También es donde cada plantilla recibe su uid y la fecha de su último
+// cambio, y donde un borrado deja su lápida: eso es lo que la sincronización
+// con la compu lleva y trae (ver SINCRONIZACIÓN DE PLANTILLAS, abajo).
 function saveTemplates(arr) {
+    if (!_aplicandoSincro) marcarCambiosPlantillas(getSavedTemplates(), arr);
     lsSet('tv_templates', JSON.stringify(arr));
     respaldarEnNube();
+    if (!_aplicandoSincro) programarSincroPlantillas();
 }
+
+// ─────────────────────────────────────────────
+// SINCRONIZACIÓN DE PLANTILLAS
+// Con la compu (y con otros iPad) por la nube: un solo archivo,
+// plantillas.json. La regla para unir (gana lo más nuevo, los borrados
+// viajan, la primera vez no duplica) está en sincro.js, el mismo archivo que
+// usa la compu, así los dos lados deciden lo mismo. Acá solo se baja, se
+// une con lo de este iPad, se aplica y se sube. Nunca pregunta nada.
+// ─────────────────────────────────────────────
+let _aplicandoSincro = false;
+let _sincroPlantillas = null, _sincroOtraVez = false, _sincroDemora = null, _sincroUltima = 0;
+const sincroDisponible = () => typeof SincroPlantillas !== 'undefined' && nubeActiva();
+
+function lapidasPlantillas() {
+    try { return JSON.parse(lsGet('tv_plantillas_borradas') || '{}') || {}; } catch (e) { return {}; }
+}
+function guardarLapidas(l) { lsSet('tv_plantillas_borradas', JSON.stringify(l)); }
+
+const firmaPlantilla = t => JSON.stringify([t.name || '', t.elements || [], t.links || [], t.hojas || []]);
+
+// Qué cambió entre la lista de antes y la nueva: uid a las que no tienen,
+// fecha nueva a las nuevas o editadas, lápida a las que ya no están. Al
+// aplicar un respaldo no hay lápidas ni fechas nuevas: esa lista no es un
+// cambio de este iPad, y la sincronización le devuelve lo que falte.
+function marcarCambiosPlantillas(antes, despues) {
+    const ahora = new Date().toISOString();
+    const previa = {};
+    antes.forEach(t => { previa[t.id] = t; });
+    despues.forEach(t => {
+        if (!t.uid) t.uid = typeof SincroPlantillas !== 'undefined' ? SincroPlantillas.nuevoUid() : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        if (_aplicandoRespaldo && t.actualizado) return;
+        const p = previa[t.id];
+        if (!p || !t.actualizado || firmaPlantilla(p) !== firmaPlantilla(t)) t.actualizado = ahora;
+    });
+    if (_aplicandoRespaldo) return;
+    const quedan = {};
+    despues.forEach(t => { quedan[t.id] = true; });
+    const lapidas = lapidasPlantillas();
+    let cambio = false;
+    antes.forEach(t => { if (!quedan[t.id] && t.uid) { lapidas[t.uid] = ahora; cambio = true; } });
+    if (cambio) guardarLapidas(lapidas);
+}
+
+// Las de este iPad (y sus lápidas) con la forma de SincroPlantillas.fusionar.
+function plantillasParaSincro() {
+    const lista = getSavedTemplates();
+    if (lista.some(t => !t.uid)) {          // de antes de la sincronización
+        _aplicandoSincro = true;
+        try {
+            lista.forEach(t => { if (!t.uid) t.uid = SincroPlantillas.nuevoUid(); });
+            lsSet('tv_templates', JSON.stringify(lista));
+        } finally { _aplicandoSincro = false; }
+    }
+    const vivas = lista.map(t => ({
+        uid: t.uid, nombre: t.name || '',
+        datos: { elements: t.elements || [], links: t.links || [], hojas: t.hojas || [] },
+        // Sin fecha propia (de antes), la de creación: el id es Date.now().
+        actualizado: t.actualizado || new Date(Number(t.id) || 0).toISOString(),
+        nueva: !t.subida
+    }));
+    const lapidas = lapidasPlantillas();
+    return vivas.concat(Object.keys(lapidas).map(uid => ({ uid: uid, nombre: '', actualizado: lapidas[uid], borrado: true })));
+}
+
+// Escribe lo que ganó afuera, con SU fecha: si no, rebotaría como un cambio
+// de acá. Devuelve cuántas cambiaron.
+function aplicarSincroPlantillas(r) {
+    const lista = getSavedTemplates();
+    Object.keys(r.uids).forEach(viejo => lista.forEach(t => { if (t.uid === viejo) t.uid = r.uids[viejo]; }));
+    const lapidas = lapidasPlantillas();
+    r.poner.forEach((x, i) => {
+        let t = lista.find(o => o.uid === x.uid);
+        if (!t) { t = { id: Date.now() + i, uid: x.uid }; lista.unshift(t); }
+        t.name = x.nombre;
+        t.elements = x.datos.elements; t.links = x.datos.links; t.hojas = x.datos.hojas;
+        t.actualizado = x.actualizado;
+        t.date = new Date(x.actualizado).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        t.subida = true;
+        delete lapidas[x.uid];
+    });
+    const borrar = {};
+    r.borrar.forEach(uid => { borrar[uid] = true; lapidas[uid] = new Date().toISOString(); });
+    const quedan = lista.filter(t => !borrar[t.uid]);
+    _aplicandoSincro = true;
+    try {
+        saveTemplates(quedan);
+        guardarLapidas(lapidas);
+    } finally { _aplicandoSincro = false; }
+    return Object.keys(r.uids).length + r.poner.length + r.borrar.length;
+}
+
+// Después de subir: todo lo de acá ya está en la nube, y las lápidas que la
+// nube olvidó (viejas) se olvidan acá también.
+function marcarPlantillasSubidas(r) {
+    const lista = getSavedTemplates();
+    if (lista.some(t => !t.subida)) {
+        lista.forEach(t => { t.subida = true; });
+        _aplicandoSincro = true;
+        try { lsSet('tv_templates', JSON.stringify(lista)); } finally { _aplicandoSincro = false; }
+    }
+    const vigentes = {};
+    r.plantillas.forEach(x => { if (x.borrado) vigentes[x.uid] = true; });
+    const lapidas = lapidasPlantillas();
+    let cambio = false;
+    Object.keys(lapidas).forEach(uid => { if (!vigentes[uid]) { delete lapidas[uid]; cambio = true; } });
+    if (cambio) guardarLapidas(lapidas);
+}
+
+// Una sola a la vez; lo que se pida mientras tanto hace una vuelta más.
+function sincronizarPlantillas() {
+    if (!sincroDisponible()) return Promise.resolve(false);
+    if (_sincroPlantillas) { _sincroOtraVez = true; return _sincroPlantillas; }
+    _sincroPlantillas = (async () => {
+        let cambios = 0;
+        try {
+            do {
+                _sincroOtraVez = false;
+                _sincroUltima = Date.now();
+                if (!nubeSesion() && !await asegurarSesionNube()) break;
+                let texto = '';
+                try {
+                    texto = await nubeBajar(SincroPlantillas.ARCHIVO);
+                } catch (err) {
+                    // Todavía no hay archivo en la nube: se sube el primero.
+                    if (!/not.?found|NoSuchKey|404|400/i.test((err && err.message) || '')) throw err;
+                }
+                const r = SincroPlantillas.fusionar(plantillasParaSincro(), SincroPlantillas.leerArchivo(texto));
+                cambios += aplicarSincroPlantillas(r);
+                if (r.subir) {
+                    await nubeSubir({ nombre: SincroPlantillas.ARCHIVO, formato: 'json',
+                                      texto: SincroPlantillas.armarArchivo(r.plantillas, nombreDispositivo()) });
+                }
+                marcarPlantillasSubidas(r);
+                lsSet('tv_sincro_fecha', new Date().toISOString());
+            } while (_sincroOtraVez);
+        } catch (err) {
+            // Sin red o la nube caída: la vuelta siguiente lo reintenta.
+            console.warn('Sincronizar plantillas:', (err && err.message) || err);
+        } finally {
+            _sincroPlantillas = null;
+        }
+        if (cambios) {
+            if (state.page === 'inicio') renderInicio();
+            if (state.page === 'plantillas') renderTemplatesList();
+        } else if (state.page === 'inicio') {
+            renderSincroInicio();
+        }
+        return cambios > 0;
+    })();
+    return _sincroPlantillas;
+}
+
+function programarSincroPlantillas() {
+    if (!sincroDisponible()) return;
+    clearTimeout(_sincroDemora);
+    _sincroDemora = setTimeout(sincronizarPlantillas, 3000);
+}
+
+// Cada minuto con la app a la vista, y al volver a ella. Cambiar la lista de
+// plantillas no toca la botonera que está en pantalla: vale también
+// codificando.
+setInterval(() => {
+    if (document.visibilityState === 'visible') sincronizarPlantillas();
+}, 60000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - _sincroUltima > 20000) sincronizarPlantillas();
+});
 
 function openTemplatesModal() { setPage('plantillas'); }
 

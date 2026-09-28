@@ -155,6 +155,11 @@
                         <span class="inicio__espacio"></span>
                         <button id="btnInicioVerPlantillas" class="inicio__btn-chico">Ver todas ›</button>
                     </header>
+                    <!-- Sincronización con la compu: estado, o entrar a la nube -->
+                    <div id="inicioSincro" class="inicio__sincro hidden">
+                        <span id="inicioSincroTexto" class="inicio__sincro-texto"></span>
+                        <button id="btnInicioSincro" class="inicio__btn-chico"></button>
+                    </div>
                     <div id="inicioPlantillas" class="inicio__lista"></div>
                 </section>
                 <section class="inicio__bloque">
@@ -691,6 +696,8 @@
     </div>
 
     <script src="nube-config.js"></script>
+    <!-- La regla para sincronizar plantillas con la compu: la misma que usa ella -->
+    <script src="sincro.js"></script>
     <script src="app.js"></script>
     <script>
         // Solo disponible sobre https:// o localhost. Con file:// se ignora sin romper nada.
