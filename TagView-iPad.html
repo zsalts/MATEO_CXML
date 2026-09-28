@@ -1110,124 +1110,233 @@ html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
 html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
 /* ─────────────────────────────────────────────
-   INICIO — la misma cara que el menú principal de la compu: saludo,
-   tarjetas grandes con una línea de color arriba y la lista de plantillas en
-   un panel. Tarjetas grandes a propósito: se tocan con el dedo.
+   INICIO — la misma cara que el menú principal de la app de la compu:
+   sus colores (escritorio/src/estilos/tokens.css, en claro y en oscuro),
+   tarjetas con una franja de color arriba, íconos de trazo, y las dos
+   listas en paneles con cabecera. Todo un poco más grande que en la compu:
+   acá se toca con el dedo.
    ───────────────────────────────────────────── */
 .inicio {
-    --in-fondo: #f2f2f7; --in-panel: #fff; --in-borde: #d1d1d6; --in-texto: #1c1c1e;
-    --in-texto-2: #6e6e73; --in-acento: #007aff; --in-ok: #2ca038; --in-hover: #f3f4f6;
+    --in-fondo: #eef0f3; --in-panel: #fff; --in-panel-2: #f5f6f8; --in-panel-3: #e8ebf0;
+    --in-borde: #d6dae1; --in-borde-fuerte: #b9bfc9;
+    --in-texto: #161a21; --in-texto-2: #555d6b; --in-texto-3: #8a919d;
+    --in-acento: #0a5fc2; --in-acento-suave: rgba(10, 95, 194, .10);
+    --in-ok: #17804d; --in-ok-suave: rgba(23, 128, 77, .12); --in-peligro: #c4371f;
     background: var(--in-fondo);
     color: var(--in-texto);
+    font-size: 15px;
 }
 html[data-tema="oscuro"] .inicio {
-    --in-fondo: #000; --in-panel: #1c1c1e; --in-borde: #2c2c2e; --in-texto: #f2f2f7;
-    --in-texto-2: #98989d; --in-acento: #0a84ff; --in-ok: #30d158; --in-hover: #2c2c2e;
+    --in-fondo: #0e1014; --in-panel: #161920; --in-panel-2: #1e222b; --in-panel-3: #272c37;
+    --in-borde: #2d323d; --in-borde-fuerte: #3d4452;
+    --in-texto: #e7e9ee; --in-texto-2: #9ba2b0; --in-texto-3: #6d7482;
+    --in-acento: #5aa9ff; --in-acento-suave: rgba(90, 169, 255, .14);
+    --in-ok: #3ecf8e; --in-ok-suave: rgba(62, 207, 142, .16); --in-peligro: #f0705a;
 }
 .inicio__scroll {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 28px max(20px, env(safe-area-inset-left)) 40px;
-    max-width: 980px;
     width: 100%;
+    max-width: 1200px;
     margin: 0 auto;
+    padding: 24px max(24px, env(safe-area-inset-left)) 32px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
-.inicio__saludo { font-size: 28px; font-weight: 700; margin: 0; }
-.inicio__sub { color: var(--in-texto-2); margin: 2px 0 22px; }
+/* Sin esto los paneles se achican para entrar en la pantalla y el que tiene
+   el foco se corre por dentro (se pierde su título): mejor que scrollee todo. */
+.inicio__scroll > * { flex-shrink: 0; }
+.inicio__cabecera h1 { font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+.inicio__cabecera p { color: var(--in-texto-2); margin: 2px 0 0; }
 
-.inicio__tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 560px) { .inicio__tarjetas { grid-template-columns: 1fr; } }
+.inicio__svg {
+    width: 24px; height: 24px;
+    fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Tarjetas ── */
+.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 600px) { .inicio__tarjetas, .inicio__columnas { grid-template-columns: 1fr !important; } }
 .inicio__tarjeta {
+    --tono: var(--in-acento);
+    --tono-suave: var(--in-acento-suave);
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    min-height: 150px;
-    padding: 20px;
+    gap: 4px;
+    min-height: 148px;
+    padding: 16px;
     border: 1px solid var(--in-borde);
-    border-top: 4px solid var(--in-acento);
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--in-panel);
     color: var(--in-texto);
     text-align: left;
     font: inherit;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
-    transition: transform .1s;
+    transition: border-color .12s, transform .12s;
 }
-.inicio__tarjeta:active { transform: scale(.98); background: var(--in-hover); }
-.inicio__tarjeta--codificar { border-top-color: var(--in-ok); }
-.inicio__tarjeta[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--in-acento); }
+/* La franja del color de cada camino, como en la compu */
+.inicio__tarjeta::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--tono); opacity: .9; }
+.inicio__tarjeta:active { transform: translateY(1px); border-color: var(--tono); }
+.inicio__tarjeta[aria-expanded="true"] { border-color: var(--tono); box-shadow: 0 0 0 1px var(--tono); }
+.inicio__tarjeta--ok     { --tono: var(--in-ok); --tono-suave: var(--in-ok-suave); }
+.inicio__tarjeta--acento { --tono: var(--in-acento); }
 .inicio__icono {
     display: flex; align-items: center; justify-content: center;
-    width: 44px; height: 44px; border-radius: 12px;
-    background: rgba(0, 122, 255, .12); font-size: 22px; margin-bottom: 6px;
+    width: 44px; height: 44px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: var(--tono-suave);   /* sin color-mix: Safari de iPad viejo no lo entiende */
+    color: var(--tono);
 }
-.inicio__tarjeta--codificar .inicio__icono { background: rgba(44, 160, 56, .14); }
-.inicio__titulo { font-size: 19px; font-weight: 700; }
-.inicio__texto { color: var(--in-texto-2); font-size: 14px; line-height: 1.4; }
+.inicio__titulo { font-size: 17px; font-weight: 600; }
+.inicio__texto { color: var(--in-texto-2); line-height: 1.35; font-size: 14px; }
 
+/* ── Paneles ── */
+.inicio__columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .inicio__bloque {
-    margin-top: 18px;
-    padding: 16px 18px;
     border: 1px solid var(--in-borde);
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--in-panel);
+    overflow: hidden;
 }
 .inicio__bloque.hidden { display: none; }
-.inicio__bloque-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.inicio__bloque-titulo { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--in-texto-2); margin: 0 0 10px; }
-.inicio__pasos { list-style: decimal; margin: 0 0 14px; padding-left: 22px; line-height: 1.55; font-size: 15px; }
-.inicio__fila { display: flex; gap: 10px; }
-.inicio__campo {
-    flex: 1; min-width: 0;
-    padding: 12px 14px;
-    border: 1px solid var(--in-borde);
-    border-radius: 10px;
-    background: var(--in-fondo);
-    color: var(--in-texto);
-    font-size: 17px;          /* 16 o más: Safari no hace zoom al tocarlo */
-}
-.inicio__campo:focus { outline: none; border-color: var(--in-acento); }
-.inicio__boton {
-    padding: 0 22px;
-    border: 0;
-    border-radius: 10px;
-    background: var(--in-acento);
-    color: #fff;
-    font-weight: 700;
-    font-size: 16px;
-}
-.inicio__error { color: #ff3b30; font-size: 14px; margin: 8px 0 0; }
-.inicio__error.hidden { display: none; }
-.inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
-.inicio__bloque-cabeza .inicio__nota { margin: 0 0 10px; }
-
-.inicio__lista { display: flex; flex-direction: column; border-radius: 10px; transition: box-shadow .3s; }
-.inicio__lista--marcada { box-shadow: 0 0 0 3px var(--in-ok); }
-.inicio__plantilla {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas: "nombre ir" "detalle ir";
+.inicio__bloque-cabeza {
+    display: flex;
     align-items: center;
-    column-gap: 12px;
-    padding: 12px 6px;
+    gap: 8px;
+    min-height: 46px;
+    padding: 6px 8px 6px 16px;
+    border-bottom: 1px solid var(--in-borde);
+    box-sizing: border-box;
+}
+.inicio__bloque-cabeza h2 { margin: 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--in-texto-2); }
+.inicio__chip {
+    min-width: 20px; padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--in-panel-2);
+    border: 1px solid var(--in-borde);
+    color: var(--in-texto-2);
+    font-size: 12px; font-weight: 600; text-align: center;
+}
+.inicio__chip:empty { display: none; }
+.inicio__espacio { flex: 1; }
+.inicio__btn-chico {
+    padding: 6px 10px;
+    border: 0; border-radius: 6px;
+    background: none;
+    color: var(--in-acento);
+    font: inherit; font-size: 14px; font-weight: 500;
+}
+.inicio__btn-chico:active { background: var(--in-acento-suave); }
+
+/* ── Filas (plantillas y XML) ── */
+.inicio__lista { display: flex; flex-direction: column; max-height: 420px; overflow-y: auto; -webkit-overflow-scrolling: touch; transition: box-shadow .3s; }
+.inicio__lista--marcada { box-shadow: inset 0 0 0 2px var(--in-ok); }
+.inicio__fila-lista {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    width: 100%;
+    padding: 8px 12px 8px 16px;
     border: 0;
     border-bottom: 1px solid var(--in-borde);
     background: none;
     color: var(--in-texto);
-    text-align: left;
     font: inherit;
+    text-align: left;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
-.inicio__plantilla:last-child { border-bottom: 0; }
-.inicio__plantilla:active { background: var(--in-hover); }
-.inicio__plantilla-nombre { grid-area: nombre; font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inicio__plantilla-detalle { grid-area: detalle; color: var(--in-texto-2); font-size: 13px; }
-.inicio__plantilla-ir { grid-area: ir; color: var(--in-ok); font-weight: 700; font-size: 14px; }
-.inicio__plantilla--actual .inicio__plantilla-nombre { color: var(--in-acento); }
-.inicio__vacio { color: var(--in-texto-2); font-size: 14px; line-height: 1.5; padding: 6px 2px; }
+.inicio__fila-lista:last-child { border-bottom: 0; }
+button.inicio__fila-lista:active { background: var(--in-panel-3); }
+.inicio__fila-lista.es-actual .inicio__fila-nombre { color: var(--in-acento); }
+.inicio__fila-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.inicio__fila-nombre { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inicio__fila-detalle { color: var(--in-texto-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* La foto chiquita de la plantilla: la botonera a escala */
+.inicio__mini {
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 76px; height: 44px;
+    padding: 4px;
+    border-radius: 4px;
+    background: var(--in-fondo);
+    border: 1px solid var(--in-borde);
+    color: var(--in-texto-2);
+    box-sizing: border-box;
+}
+.inicio__mini-svg { width: 100%; height: 100%; display: block; }
+.inicio__ir { flex: none; color: var(--in-acento); font-size: 14px; font-weight: 600; }
+
+.inicio__doc {
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto-2);
+}
+.inicio__doc .inicio__svg { width: 20px; height: 20px; }
+.inicio__accion {
+    flex: none;
+    padding: 7px 12px;
+    border: 1px solid var(--in-borde);
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto);
+    font: inherit; font-size: 14px; font-weight: 600;
+}
+.inicio__accion:active { background: var(--in-panel-3); }
+.inicio__accion--xml { background: var(--in-acento); border-color: var(--in-acento); color: #fff; }
+html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
+.inicio__vacio { color: var(--in-texto-2); font-size: 14px; line-height: 1.5; padding: 20px 16px; }
+
+/* ── Conectar con la compu ── */
+.inicio__conectar { border-color: var(--in-acento); }
+.inicio__conectar-cuerpo { padding: 14px 16px 16px; }
+.inicio__pasos { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--in-texto-2); line-height: 1.45; }
+.inicio__pasos li { display: flex; align-items: flex-start; gap: 10px; }
+.inicio__pasos li > span + span { flex: 1; }
+.inicio__pasos li > span:first-child {
+    flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border: 1px solid var(--in-borde-fuerte);
+    border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    color: var(--in-texto);
+}
+.inicio__pasos b { color: var(--in-texto); }
+.inicio__fila { display: flex; gap: 8px; }
+.inicio__campo {
+    flex: 1; min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--in-borde);
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto);
+    font-size: 17px;          /* 16 o más: Safari no hace zoom al tocarlo */
+}
+.inicio__campo:focus { outline: none; border-color: var(--in-acento); box-shadow: 0 0 0 2px var(--in-acento-suave); }
+.inicio__boton {
+    padding: 0 20px;
+    border: 0; border-radius: 6px;
+    background: var(--in-acento);
+    color: #fff;
+    font: inherit; font-weight: 600; font-size: 16px;
+}
+html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
+.inicio__error { color: var(--in-peligro); font-size: 14px; margin: 8px 0 0; }
+.inicio__error.hidden { display: none; }
+.inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
 
 </style>
     <meta name="theme-color" content="#1f2937">
@@ -1283,50 +1392,68 @@ html[data-tema="oscuro"] .inicio {
     </header>
 
     <!-- ══ PÁGINA: INICIO ══
-         Lo mismo que el menú principal de la compu, con lo que se hace desde
-         el iPad: codificar acá, o conectarse a la compu para que ella grabe
-         mientras el iPad codifica. El editor y el XML siguen en el menú ☰. -->
+         La misma cara que el menú principal de la compu (colores, tarjetas con
+         franja, íconos de trazo y dos columnas), con lo que se hace desde el
+         iPad: codificar acá, o conectarse a la compu para que ella grabe
+         mientras el iPad codifica. El editor sigue en el menú ☰. -->
     <div id="pageInicio" class="flex-1 hidden flex-col overflow-hidden inicio">
         <div class="inicio__scroll">
-            <h1 id="inicioSaludo" class="inicio__saludo">Buen día</h1>
-            <p class="inicio__sub">¿Qué hacemos hoy?</p>
+            <header class="inicio__cabecera">
+                <h1 id="inicioSaludo">Buen día</h1>
+                <p>¿Qué hacemos hoy?</p>
+            </header>
 
             <div class="inicio__tarjetas">
-                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--codificar">
-                    <span class="inicio__icono">✂</span>
+                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--ok">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><circle cx="6" cy="6.5" r="2.8"/><circle cx="6" cy="17.5" r="2.8"/><path d="M8.3 8.2L20 18.5M8.3 15.8L20 5.5"/></svg></span>
                     <span class="inicio__titulo">Codificar en el iPad</span>
                     <span class="inicio__texto">Elegí una plantilla y marcá el partido. Después exportás el XML.</span>
                 </button>
-                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--compu" aria-expanded="false" aria-controls="inicioCompu">
-                    <span class="inicio__icono">🖥</span>
+                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--acento" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.2" r=".9" fill="currentColor"/></svg></span>
                     <span class="inicio__titulo">Conectar con la compu</span>
                     <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
                 </button>
             </div>
 
             <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
-            <section id="inicioCompu" class="inicio__bloque hidden">
-                <h2 class="inicio__bloque-titulo">Conectar con la compu</h2>
-                <ol class="inicio__pasos">
-                    <li>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</li>
-                    <li>Escribí acá la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). El iPad y la compu tienen que estar en el mismo wifi.</li>
-                    <li>Te va a pedir el <b>PIN</b> de 4 números que aparece en la compu.</li>
-                </ol>
-                <form id="formCompu" class="inicio__fila" autocomplete="off">
-                    <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
-                    <button type="submit" class="inicio__boton">Conectar</button>
-                </form>
-                <p id="compuError" class="inicio__error hidden"></p>
-                <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+            <section id="inicioCompu" class="inicio__bloque inicio__conectar hidden">
+                <header class="inicio__bloque-cabeza"><h2>Conectar con la compu</h2></header>
+                <div class="inicio__conectar-cuerpo">
+                    <ol class="inicio__pasos">
+                        <li><span>1</span><span>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
+                        <li><span>2</span><span>Escribí la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). Tienen que estar en el mismo wifi.</span></li>
+                        <li><span>3</span><span>Poné el <b>PIN</b> de 4 números que aparece en la compu.</span></li>
+                    </ol>
+                    <form id="formCompu" class="inicio__fila" autocomplete="off">
+                        <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
+                        <button type="submit" class="inicio__boton">Conectar</button>
+                    </form>
+                    <p id="compuError" class="inicio__error hidden"></p>
+                    <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+                </div>
             </section>
 
-            <section class="inicio__bloque">
-                <div class="inicio__bloque-cabeza">
-                    <h2 class="inicio__bloque-titulo">Mis plantillas</h2>
-                    <span class="inicio__nota">Tocá una para empezar a codificar</span>
-                </div>
-                <div id="inicioPlantillas" class="inicio__lista"></div>
-            </section>
+            <div class="inicio__columnas">
+                <section class="inicio__bloque">
+                    <header class="inicio__bloque-cabeza">
+                        <h2>Mis plantillas</h2>
+                        <span id="inicioCuentaPlantillas" class="inicio__chip"></span>
+                        <span class="inicio__espacio"></span>
+                        <button id="btnInicioVerPlantillas" class="inicio__btn-chico">Ver todas ›</button>
+                    </header>
+                    <div id="inicioPlantillas" class="inicio__lista"></div>
+                </section>
+                <section class="inicio__bloque">
+                    <header class="inicio__bloque-cabeza">
+                        <h2>XML</h2>
+                        <span id="inicioCuentaXml" class="inicio__chip"></span>
+                        <span class="inicio__espacio"></span>
+                        <button id="btnInicioVerXml" class="inicio__btn-chico">Ver todos ›</button>
+                    </header>
+                    <div id="inicioXml" class="inicio__lista"></div>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -1926,7 +2053,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v49';
+const APP_VERSION = 'v50';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -3115,42 +3242,147 @@ function bindInicio() {
     on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
     on(D('btnInicioCompu'), 'click', () => alternarCompu());
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
+    on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
+    on(D('btnInicioVerXml'), 'click', () => setPage('xml'));
+}
+
+// Los colores con que se ve un botón sin color propio (defaultColor), para
+// la miniatura. Los de un archivo importado pasan solo si son un color de
+// verdad: van adentro de un atributo del SVG.
+const COLOR_MINI = { event: '#3a8fd6', popup_label: '#f8d022', descriptor: '#fef08a',
+                     sticky_label: '#fdba74', line: '#4c51bf', possession: '#475569' };
+function colorMini(c, porDefecto) {
+    const s = String(c || '').trim();
+    return /^#[0-9a-f]{3,8}$/i.test(s) || /^(rgb|hsl)a?\([\d\s.,%]+\)$/i.test(s) ? s : porDefecto;
+}
+
+// Una foto chiquita de la botonera: la pestaña Principal a escala, con los
+// colores de cada botón. Es la misma cuenta que la miniatura de la compu.
+function miniaturaPlantilla(t) {
+    const num = v => Number(v);
+    const els = (t.elements || []).filter(e => e && !e.hoja && e.type !== 'popup_label' &&
+        isFinite(num(e.x)) && isFinite(num(e.y)) && num(e.w) > 0 && num(e.h) > 0);
+    if (!els.length) {
+        return '<svg class="inicio__mini-svg" viewBox="0 0 160 100" aria-hidden="true"><rect x="1" y="1" width="158" height="98" rx="6" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 4"/></svg>';
+    }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    els.forEach(e => {
+        x0 = Math.min(x0, num(e.x)); y0 = Math.min(y0, num(e.y));
+        x1 = Math.max(x1, num(e.x) + num(e.w)); y1 = Math.max(y1, num(e.y) + num(e.h));
+    });
+    const m = 12, r = n => Math.round(n * 10) / 10;
+    const fondo = e => (e.type === 'container' || e.type === 'image') ? 0 : 1;
+    const partes = els.slice().sort((a, b) => fondo(a) - fondo(b)).map(e => {
+        const x = r(num(e.x) - x0 + m), y = r(num(e.y) - y0 + m), w = r(num(e.w)), h = r(num(e.h));
+        switch (e.type) {
+            case 'container':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${colorMini(e.color, 'currentColor')}" fill-opacity=".10" stroke="currentColor" stroke-opacity=".3"/>`;
+            case 'image':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="currentColor" fill-opacity=".12"/>`;
+            case 'text':
+                return `<rect x="${x}" y="${r(y + h * .35)}" width="${r(w * .7)}" height="${r(h * .3)}" rx="3" fill="currentColor" fill-opacity=".35"/>`;
+            case 'counter':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="3"/>`;
+            case 'teams': {
+                const a = colorMini(e.colorA, '#3a8fd6'), b = colorMini(e.colorB, '#dc2626');
+                return `<rect x="${x}" y="${y}" width="${r(w / 2)}" height="${h}" rx="6" fill="${a}"/><rect x="${r(x + w / 2)}" y="${y}" width="${r(w / 2)}" height="${h}" rx="6" fill="${b}"/>`;
+            }
+            default:
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${colorMini(e.color, COLOR_MINI[e.type] || '#3a8fd6')}"/>`;
+        }
+    });
+    return `<svg class="inicio__mini-svg" viewBox="0 0 ${r(x1 - x0 + m * 2)} ${r(y1 - y0 + m * 2)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${partes.join('')}</svg>`;
+}
+
+// Una fila de las listas del Inicio. Los textos van con textContent: los
+// nombres vienen de archivos importados.
+function filaInicio({ lado, nombre, detalle, destacada, acciones = [], alTocar }) {
+    const f = document.createElement(alTocar ? 'button' : 'div');
+    f.className = 'inicio__fila-lista' + (destacada ? ' es-actual' : '');
+    const texto = document.createElement('span');
+    texto.className = 'inicio__fila-texto';
+    const n = document.createElement('span'); n.className = 'inicio__fila-nombre'; n.textContent = nombre;
+    const d = document.createElement('span'); d.className = 'inicio__fila-detalle'; d.textContent = detalle;
+    texto.append(n, d);
+    f.append(lado, texto);
+    acciones.forEach(a => f.appendChild(a));
+    if (alTocar) f.addEventListener('click', alTocar);
+    return f;
 }
 
 function renderInicio() {
     const hora = new Date().getHours();
     D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
-
-    const lista = D('inicioPlantillas');
-    lista.innerHTML = '';
-    // Los nombres van con textContent: vienen de archivos importados.
-    const fila = (titulo, detalle, alTocar, destacada) => {
-        const b = document.createElement('button');
-        b.className = 'inicio__plantilla' + (destacada ? ' inicio__plantilla--actual' : '');
-        const t = document.createElement('span'); t.className = 'inicio__plantilla-nombre'; t.textContent = titulo;
-        const d = document.createElement('span'); d.className = 'inicio__plantilla-detalle'; d.textContent = detalle;
-        const ir = document.createElement('span'); ir.className = 'inicio__plantilla-ir'; ir.textContent = '▶︎ Codificar';   // ︎: flecha de texto, no emoji
-        b.append(t, d, ir);
-        b.addEventListener('click', alTocar);
-        lista.appendChild(b);
-    };
     const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
+
+    // ── Mis plantillas ──
+    const lista = D('inicioPlantillas');
+    const plantillas = getSavedTemplates();
+    lista.innerHTML = '';
+    D('inicioCuentaPlantillas').textContent = plantillas.length || '';
+    const mini = t => {
+        const s = document.createElement('span');
+        s.className = 'inicio__mini';
+        s.innerHTML = miniaturaPlantilla(t);
+        return s;
+    };
+    const ir = () => { const s = document.createElement('span'); s.className = 'inicio__ir'; s.textContent = 'Codificar ›'; return s; };
     if (state.elements.length) {
-        fila('Seguir con la botonera de ahora', botones(state.elements.length), empezarACodificar, true);
+        lista.appendChild(filaInicio({
+            lado: mini({ elements: state.elements }), nombre: 'Seguir con la botonera de ahora',
+            detalle: botones(state.elements.length), destacada: true, acciones: [ir()], alTocar: empezarACodificar
+        }));
     }
-    getSavedTemplates().forEach(t => fila(t.name, `${t.date} · ${botones((t.elements || []).length)}`, () => {
-        if (state.mode === 'live') {
-            customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
-            setPage('botonera');
-            return;
+    plantillas.forEach(t => lista.appendChild(filaInicio({
+        lado: mini(t), nombre: t.name, detalle: `${t.date} · ${botones((t.elements || []).length)}`, acciones: [ir()],
+        alTocar: () => {
+            if (state.mode === 'live') {
+                customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
+                setPage('botonera');
+                return;
+            }
+            cargarPlantilla(t);
+            empezarACodificar();
         }
-        cargarPlantilla(t);
-        empezarACodificar();
-    }));
+    })));
     if (!lista.children.length) {
         lista.innerHTML = `<div class="inicio__vacio">Todavía no hay plantillas. Armala en la compu
             (Base de datos › Plantillas) y pasala con <b>Exportar para el iPad</b>, o armala acá
             en la Botonera, desde el menú ☰.</div>`;
+    }
+
+    // ── XML: las codificaciones guardadas, la más nueva arriba ──
+    const xml = D('inicioXml');
+    const sesiones = getSavedSessions();
+    xml.innerHTML = '';
+    D('inicioCuentaXml').textContent = sesiones.length || '';
+    const icono = () => {
+        const s = document.createElement('span');
+        s.className = 'inicio__doc';
+        s.innerHTML = '<svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>';
+        return s;
+    };
+    const accion = (texto, clase, fn) => {
+        const b = document.createElement('button');
+        b.className = 'inicio__accion ' + clase;
+        b.textContent = texto;
+        b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+        return b;
+    };
+    sesiones.forEach(s => {
+        const n = (s.events || []).filter(ev => !ev.posesionDe).length;
+        xml.appendChild(filaInicio({
+            lado: icono(), nombre: s.name,
+            detalle: `${s.date} · ${n} ${n === 1 ? 'evento' : 'eventos'} · ${s.duration || '00:00'}`,
+            acciones: [
+                accion('Ver', 'inicio__accion--ver', () => verSesion(s)),
+                accion('XML', 'inicio__accion--xml', () => exportCustomXML(s.events, s.name, s.startedAt ? new Date(s.startedAt) : null))
+            ]
+        }));
+    });
+    if (!sesiones.length) {
+        xml.innerHTML = `<div class="inicio__vacio">Todavía no hay codificaciones guardadas. Al terminar
+            de codificar, guardala desde el Historial y aparece acá para exportar el XML.</div>`;
     }
 }
 
@@ -6774,6 +7006,21 @@ function saveSessions(arr) {
 
 function openSessionsModal() { setPage('xml'); }
 
+// Abre una codificación guardada en la botonera (desde XML o desde Inicio).
+function verSesion(s) {
+    // setMode('live') resetea state.events, asi que hay que entrar al modo ANTES de cargar
+    if (state.mode !== 'live') setMode('live');
+    // Los tramos de posesión salen del registro: son estadística.
+    state.tramosPos = tramosDeSesion(s);
+    state.events   = JSON.parse(JSON.stringify(s.events || [])).filter(ev => !ev.posesionDe);
+    state.counters = JSON.parse(JSON.stringify(s.counters || {}));
+    state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
+    state.sesionCargada = s.name;
+    renderLivePanel();
+    renderElements();
+    setPage('botonera');
+}
+
 function renderSessionsList() {
     const sessions = getSavedSessions();
     el.sessionsList.innerHTML = '';
@@ -6799,19 +7046,7 @@ function renderSessionsList() {
             </div>
         `;
 
-        row.querySelector('.btn-load-sess').addEventListener('click', () => {
-            // setMode('live') resetea state.events, asi que hay que entrar al modo ANTES de cargar
-            if (state.mode !== 'live') setMode('live');
-            // Los tramos de posesión salen del registro: son estadística.
-            state.tramosPos = tramosDeSesion(s);
-            state.events   = JSON.parse(JSON.stringify(s.events || [])).filter(ev => !ev.posesionDe);
-            state.counters = JSON.parse(JSON.stringify(s.counters || {}));
-            state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
-            state.sesionCargada = s.name;
-            renderLivePanel();
-            renderElements();
-            setPage('botonera');
-        });
+        row.querySelector('.btn-load-sess').addEventListener('click', () => verSesion(s));
 
         row.querySelector('.btn-export-sess').addEventListener('click', () => {
             exportCustomXML(s.events, s.name, s.startedAt ? new Date(s.startedAt) : null);
