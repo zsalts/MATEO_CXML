@@ -73,6 +73,7 @@
         "dmg",
         "zip"
       ],
+      "artifactName": "Tag-View-Pro-${version}-${arch}-mac.${ext}",
       "category": "public.app-category.sports",
       "icon": "build/icon.png",
       "identity": null,

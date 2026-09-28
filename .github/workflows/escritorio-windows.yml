@@ -85,8 +85,8 @@ jobs:
 
   # Mac: después de Windows, que es el que crea el tag y la release. Cada
   # arquitectura en su Mac (ffmpeg-static baja el binario de la máquina que
-  # arma; ver escritorio-mac.yml). Sin firma de Apple los .dmg solo se suben
-  # a la misma release: macOS no deja que la app se actualice sola.
+  # arma; ver escritorio-mac.yml). Se suben el .dmg (para instalar) y el .zip
+  # (lo baja la app instalada para actualizarse sola: main/actualizar-mac.js).
   mac:
     needs: windows
     strategy:
@@ -132,6 +132,6 @@ jobs:
           lipo -archs "$bin" | grep -qw "${{ matrix.lipo }}"
 
       - name: Subir a la release
-        run: gh release upload "v${{ needs.windows.outputs.version }}" dist/*.dmg --clobber --repo "${{ github.repository }}"
+        run: gh release upload "v${{ needs.windows.outputs.version }}" dist/*.dmg dist/*-mac.zip --clobber --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

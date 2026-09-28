@@ -338,8 +338,17 @@ try {
 // la app. Cuando está lista se avisa una vez, con la opción de reiniciar ya.
 let versionAvisada = null;
 function avisarActualizacion(e) {
-    if (!e || e.fase !== 'lista' || e.version === versionAvisada) return;
+    if (!e || (e.fase !== 'lista' && e.fase !== 'manual') || e.version === versionAvisada) return;
     versionAvisada = e.version;
+    // Mac con la app abierta desde el .dmg o en una carpeta sin permiso: no
+    // se puede cambiar sola, se ofrece bajarla (main/actualizar-mac.js).
+    if (e.fase === 'manual') {
+        aviso(`Hay una versión nueva (${e.version}). Esta copia no se puede actualizar sola: pasá la app a Aplicaciones.`, 'info', {
+            duracion: 0,
+            accion: { texto: 'Bajarla', alHacer: () => api.actualizar.instalar().catch(() => {}) }
+        });
+        return;
+    }
     aviso(`Hay una versión nueva (${e.version}). Se instala sola al cerrar la app.`, 'info', {
         duracion: 0,
         accion: { texto: 'Reiniciar ahora', alHacer: () => api.actualizar.instalar().catch(() => {}) }

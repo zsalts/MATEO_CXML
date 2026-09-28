@@ -297,7 +297,7 @@ export default {
             faseActualizacion = e ? e.fase : null;
             boton.disabled = false;
             if (!e || !e.activo) {
-                texto.textContent = 'Solo en la app instalada en Windows. ';
+                texto.textContent = 'Solo en la app instalada. ';
                 boton.hidden = true;
                 return;
             }
@@ -306,6 +306,7 @@ export default {
                 buscando: 'Buscando…',
                 bajando: `Bajando la ${e.version || 'versión nueva'}${e.porcentaje ? ` (${e.porcentaje}%)` : ''}… `,
                 lista: `La ${e.version} está lista: se instala al cerrar la app. `,
+                manual: `Hay una versión nueva (${e.version}), pero esta copia no se puede cambiar sola: pasá la app a Aplicaciones o bajala. `,
                 error: 'No se pudo buscar (¿sin internet?). ',
                 nada: e.buscadoEn ? 'Tenés la última versión. ' : ''
             };
@@ -313,6 +314,8 @@ export default {
             boton.disabled = e.fase === 'buscando' || e.fase === 'bajando';
             if (e.fase === 'lista') {
                 boton.innerHTML = `${iconoHTML('check')} Reiniciar e instalar`;
+            } else if (e.fase === 'manual') {
+                boton.innerHTML = `${iconoHTML('descargar')} Bajar la nueva`;
             } else {
                 boton.innerHTML = `${iconoHTML('descargar')} Buscar actualizaciones`;
             }
@@ -322,7 +325,7 @@ export default {
         async function buscarActualizacion() {
             // Con una versión ya bajada, el botón reinicia (pasa por el cierre
             // de siempre: si se está grabando, pregunta).
-            if (faseActualizacion === 'lista') { api.actualizar.instalar().catch(() => {}); return; }
+            if (faseActualizacion === 'lista' || faseActualizacion === 'manual') { api.actualizar.instalar().catch(() => {}); return; }
             pintarActualizacion({ fase: 'buscando', activo: true });
             try { pintarActualizacion(await api.actualizar.buscar()); }
             catch (err) { ui.aviso('No se pudo buscar: ' + mensaje(err), 'error'); pintarActualizacion(await api.actualizar.estado().catch(() => null)); }
