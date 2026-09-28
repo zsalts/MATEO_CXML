@@ -48,7 +48,7 @@
     <!-- Modo oscuro antes de dibujar: sin esto la app abre en blanco y recién
          después se oscurece, un destello molesto de noche. -->
     <script>
-    try { if (localStorage.getItem('tv_tema') === 'oscuro') document.documentElement.setAttribute('data-tema', 'oscuro'); } catch (e) {}
+    try { if (localStorage.getItem('tv_tema') !== 'claro') document.documentElement.setAttribute('data-tema', 'oscuro'); } catch (e) { document.documentElement.setAttribute('data-tema', 'oscuro'); }
     </script>
     <style>
 /* Tailwind CSS — generado desde las clases que usa esta app.
@@ -1109,6 +1109,102 @@ html[data-tema="oscuro"] .pos-panel { border-bottom-color: #2c2c2e; }
 html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
 html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
+/* ═══════════════════════════════════════════
+   PALETA DE LA COMPU
+   Los mismos colores que la app de escritorio (escritorio/src/estilos/
+   tokens.css): fondo #0e1014, paneles #161920 / #1e222b, bordes #2d323d,
+   texto #e7e9ee y el azul #5aa9ff. Van después del modo oscuro de arriba
+   (los grises de iPhone) y le ganan por orden, con la misma especificidad.
+   Si cambian los tokens de la compu, cambialos acá también.
+   ═══════════════════════════════════════════ */
+html[data-tema="oscuro"] body { background: #0e1014; color: #e7e9ee; }
+
+/* Fondos: la página es el fondo; barras, listas y menús, paneles */
+html[data-tema="oscuro"] .bg-white          { background-color: #161920; }
+html[data-tema="oscuro"] .bg-white\/95      { background-color: rgba(22,25,32,.95); }
+html[data-tema="oscuro"] .bg-\[\#f2f2f7\]   { background-color: #0e1014; }
+html[data-tema="oscuro"] body > header,
+html[data-tema="oscuro"] #setupBar,
+html[data-tema="oscuro"] #liveBar           { background-color: #161920; border-color: #2d323d; }
+html[data-tema="oscuro"] .bg-gray-100       { background-color: #1e222b; }
+html[data-tema="oscuro"] .bg-gray-50\/80    { background-color: rgba(30,34,43,.8); }
+html[data-tema="oscuro"] .hover\:bg-gray-50:hover  { background-color: #1e222b; }
+html[data-tema="oscuro"] .hover\:bg-gray-200:hover { background-color: #272c37; }
+
+/* Textos y el azul */
+html[data-tema="oscuro"] .text-black        { color: #e7e9ee; }
+html[data-tema="oscuro"] .text-gray-400     { color: #6d7482; }
+html[data-tema="oscuro"] .text-gray-500,
+html[data-tema="oscuro"] .text-gray-600     { color: #9ba2b0; }
+html[data-tema="oscuro"] .text-gray-700     { color: #c3c8d1; }
+html[data-tema="oscuro"] .text-\[\#007aff\] { color: #5aa9ff; }
+html[data-tema="oscuro"] .bg-\[\#007aff\]   { background-color: #5aa9ff; color: #06121f; }
+html[data-tema="oscuro"] .bg-\[\#007aff\]\/10 { background-color: rgba(90,169,255,.14); }
+
+/* Bordes */
+html[data-tema="oscuro"] .border-gray-100,
+html[data-tema="oscuro"] .border-gray-100\/50,
+html[data-tema="oscuro"] .border-gray-200   { border-color: #2d323d; }
+html[data-tema="oscuro"] .border-gray-300   { border-color: #3d4452; }
+html[data-tema="oscuro"] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2d323d; }
+
+/* Lienzo */
+html[data-tema="oscuro"] .bg-grid {
+    background-color: #0e1014;
+    background-image:
+        linear-gradient(to right, #1b1f28 1px, transparent 1px),
+        linear-gradient(to bottom, #1b1f28 1px, transparent 1px);
+}
+
+/* Inspector y menús */
+html[data-tema="oscuro"] .inspector-section-label { background: #0e1014; color: #9ba2b0; border-top-color: #2d323d; }
+html[data-tema="oscuro"] .inspector-cell   { background: #161920; border-bottom-color: #2d323d; }
+html[data-tema="oscuro"] .ios-menu-row     { background: #161920; color: #e7e9ee; }
+html[data-tema="oscuro"] .ios-menu-row:active { background: #1e222b; }
+html[data-tema="oscuro"] .popup-dot::before { background: #161920; border-color: #e7e9ee; }
+
+/* Elementos del lienzo con fondo claro */
+html[data-tema="oscuro"] .canvas-element[data-eltype="counter"] { background: #1e222b; border-color: #3d4452; color: #e7e9ee; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="container"],
+html[data-tema="oscuro"] .canvas-element.is-container { background: rgba(22,25,32,.85); border-color: #3d4452 !important; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="text"] { color: #e7e9ee; }
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="text"],
+html[data-tema="oscuro"] .canvas-element.mode-setup[data-eltype="image"] { border-color: #3d4452; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="teams"] { background: #161920; border-color: #3d4452; color: #e7e9ee; }
+html[data-tema="oscuro"] .canvas-element[data-eltype="possession"] { background: #161920; border-color: #3d4452; }
+html[data-tema="oscuro"] .resize-handle { background: #161920; }
+html[data-tema="oscuro"] .acciones-flotantes,
+html[data-tema="oscuro"] .barra-detalle { background: #272c37; }
+
+/* Pestañas de la botonera */
+html[data-tema="oscuro"] #hojasBar        { background: #161920; border-bottom-color: #2d323d; }
+html[data-tema="oscuro"] .hoja-tab        { background: #1e222b; color: #e7e9ee; }
+html[data-tema="oscuro"] .hoja-tab.activa { background: #5aa9ff; color: #06121f; }
+html[data-tema="oscuro"] .hoja-etiquetas  { background: #161920; color: #e7e9ee; border-color: #3d4452; }
+
+/* Panel en vivo */
+html[data-tema="oscuro"] .seg-control, html[data-tema="oscuro"] .page-nav { background: #1e222b; }
+html[data-tema="oscuro"] .seg-btn, html[data-tema="oscuro"] .page-nav-btn { color: #9ba2b0; }
+html[data-tema="oscuro"] .seg-btn.seg-active,
+html[data-tema="oscuro"] .page-nav-btn.nav-active { background: #3d4452; color: #fff; }
+html[data-tema="oscuro"] .event-row, html[data-tema="oscuro"] .toi-row { border-bottom-color: #2d323d; }
+html[data-tema="oscuro"] .event-row:nth-child(even),
+html[data-tema="oscuro"] .toi-row:nth-child(even) { background: #12151b; }
+html[data-tema="oscuro"] .event-row .ev-name, html[data-tema="oscuro"] .toi-row .toi-name { color: #e7e9ee; }
+html[data-tema="oscuro"] .ev-tag-chip { background: #272c37; color: #e7e9ee; }
+html[data-tema="oscuro"] .event-row .ev-time,
+html[data-tema="oscuro"] .pos-panel-tiempo { color: #9ba2b0; }
+html[data-tema="oscuro"] .pos-panel { border-bottom-color: #2d323d; }
+html[data-tema="oscuro"] .pos-panel-nombre { color: #e7e9ee; }
+
+/* En claro, el azul y los grises de la compu en lugar de los de iPhone */
+html:not([data-tema="oscuro"]) .text-\[\#007aff\]   { color: #0a5fc2; }
+html:not([data-tema="oscuro"]) .bg-\[\#007aff\]     { background-color: #0a5fc2; }
+html:not([data-tema="oscuro"]) .bg-\[\#007aff\]\/10 { background-color: rgba(10,95,194,.10); }
+html:not([data-tema="oscuro"]) .bg-\[\#f2f2f7\]     { background-color: #eef0f3; }
+html:not([data-tema="oscuro"]) .border-gray-300     { border-color: #d6dae1; }
+html:not([data-tema="oscuro"]) .text-black          { color: #161a21; }
+
 /* ─────────────────────────────────────────────
    INICIO — la misma cara que el menú principal de la app de la compu:
    sus colores (escritorio/src/estilos/tokens.css, en claro y en oscuro),
@@ -1339,7 +1435,7 @@ html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
 .inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
 
 </style>
-    <meta name="theme-color" content="#1f2937">
+    <meta name="theme-color" content="#161920">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Tag&View">
@@ -2053,7 +2149,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v50';
+const APP_VERSION = 'v51';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -3127,7 +3223,8 @@ async function readAppFile(kinds, etiqueta) {
 // atributo data-tema también lo pone un script en el <head> antes de dibujar,
 // así la app no abre en blanco para oscurecerse después.
 // ─────────────────────────────────────────────
-const temaOscuro = () => lsGet('tv_tema') === 'oscuro';
+// Oscuro por defecto, como la compu: claro solo si lo elegiste en el menú.
+const temaOscuro = () => lsGet('tv_tema') !== 'claro';
 
 function aplicarTema() {
     const oscuro = temaOscuro();
@@ -3135,7 +3232,7 @@ function aplicarTema() {
     else document.documentElement.removeAttribute('data-tema');
     if (el.menuTema) el.menuTema.classList.toggle('is-on', oscuro);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', oscuro ? '#111113' : '#1f2937');
+    if (meta) meta.setAttribute('content', oscuro ? '#161920' : '#eef0f3');
 }
 
 function alternarTema() {

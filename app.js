@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v50';
+const APP_VERSION = 'v51';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1131,7 +1131,8 @@ async function readAppFile(kinds, etiqueta) {
 // atributo data-tema también lo pone un script en el <head> antes de dibujar,
 // así la app no abre en blanco para oscurecerse después.
 // ─────────────────────────────────────────────
-const temaOscuro = () => lsGet('tv_tema') === 'oscuro';
+// Oscuro por defecto, como la compu: claro solo si lo elegiste en el menú.
+const temaOscuro = () => lsGet('tv_tema') !== 'claro';
 
 function aplicarTema() {
     const oscuro = temaOscuro();
@@ -1139,7 +1140,7 @@ function aplicarTema() {
     else document.documentElement.removeAttribute('data-tema');
     if (el.menuTema) el.menuTema.classList.toggle('is-on', oscuro);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', oscuro ? '#111113' : '#1f2937');
+    if (meta) meta.setAttribute('content', oscuro ? '#161920' : '#eef0f3');
 }
 
 function alternarTema() {
