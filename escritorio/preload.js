@@ -38,7 +38,20 @@ const tv = {
         importarArchivo: ()   => llamar('plantillas:importarArchivo'),
         // Sin sesion rechaza con {necesitaLogin:true}; reintentar con {correo, clave}.
         importarNube:    (credenciales) => llamar('plantillas:importarNube', credenciales),
-        exportarArchivo: (id) => llamar('plantillas:exportarArchivo', id)
+        exportarArchivo: (id) => llamar('plantillas:exportarArchivo', id),
+        // Llegaron cambios del iPad por la sincronizacion: volver a leer.
+        onCambio:        escuchar('plantillas:cambiaron')
+    },
+
+    // Plantillas sincronizadas con el iPad por la nube (main/sincro.js).
+    // estado = { fase: 'nada'|'sincronizando'|'ok'|'sin-sesion'|'error',
+    //            ultima, error, nube: {configurada, conSesion, email} }
+    sincro: {
+        estado:   ()             => llamar('sincro:estado'),
+        ahora:    ()             => llamar('sincro:ahora'),
+        entrar:   (credenciales) => llamar('sincro:entrar', credenciales),
+        salir:    ()             => llamar('sincro:salir'),
+        onEstado: escuchar('sincro:estado')
     },
 
     equipos: {

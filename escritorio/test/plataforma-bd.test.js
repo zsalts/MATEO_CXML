@@ -48,7 +48,7 @@ test('migra una base v1 sin perder nada y deja la copia antes-v2', async () => {
     assert.ok(fs.existsSync(copia), 'falta la copia de seguridad');
     assert.ok(antes.equals(fs.readFileSync(copia)), 'la copia no es la base original');
 
-    assert.strictEqual(bd._filas('PRAGMA user_version')[0].user_version, 2);
+    assert.strictEqual(bd._filas('PRAGMA user_version')[0].user_version, bd.VERSION);
     const p = bd.leerPartido(1);
     assert.strictEqual(p.nombre, 'Viejo 1');
     assert.strictEqual(p.video_ruta, 'C:\\v\\viejo.mp4');
@@ -71,11 +71,11 @@ test('migra una base v1 sin perder nada y deja la copia antes-v2', async () => {
     bd.cerrar();
 });
 
-test('base nueva: se crea en v2 sin copias', async () => {
+test('base nueva: se crea en la ultima version sin copias', async () => {
     const dir = tmp();
     const ruta = path.join(dir, 'tagview.sqlite');
     await bd.abrir(ruta);
-    assert.strictEqual(bd._filas('PRAGMA user_version')[0].user_version, 2);
+    assert.strictEqual(bd._filas('PRAGMA user_version')[0].user_version, bd.VERSION);
     assert.ok(fs.existsSync(ruta));
     assert.deepStrictEqual(fs.readdirSync(dir).filter(n => n.includes('antes')), []);
     bd.cerrar();

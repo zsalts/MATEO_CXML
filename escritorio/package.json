@@ -41,6 +41,7 @@
       "remoto/**/*",
       "build/icon.png",
       "build/nube-config.js",
+      "build/sincro.js",
       "node_modules/**/*"
     ],
     "asarUnpack": [
@@ -59,6 +60,7 @@
         "remoto/**/*",
         "build/icon.png",
         "build/nube-config.js",
+        "build/sincro.js",
         "node_modules/**/*",
         "!node_modules/ffprobe-static/bin/darwin/**",
         "!node_modules/ffprobe-static/bin/linux/**",
@@ -93,6 +95,7 @@
         "remoto/**/*",
         "build/icon.png",
         "build/nube-config.js",
+        "build/sincro.js",
         "node_modules/**/*",
         "!node_modules/ffprobe-static/bin/win32/**",
         "!node_modules/ffprobe-static/bin/linux/**"

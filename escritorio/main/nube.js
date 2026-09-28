@@ -125,7 +125,56 @@ function crearNube({ rutaConfig, guardarSesion, leerSesion }) {
 
     function salir() { sesion = null; guardarSesion(null); }
 
-    return { bajarRespaldo, salir };
+    // ── Para la sincronizacion de plantillas (main/sincro.js) ──
+    function config() {
+        const cfg = leerConfigNube(rutaConfig());
+        if (!cfg) throw new Error('La nube no esta configurada (falta nube-config.js)');
+        return cfg;
+    }
+
+    // Un archivo del bucket como texto, o null si todavia no existe. Sin
+    // sesion rechaza con {necesitaLogin:true}, igual que bajarRespaldo.
+    async function bajar(nombre) {
+        const cfg = config();
+        const t = await token(cfg);
+        try {
+            const r = await pedir(cfg, '/storage/v1/object/' + cfg.bucket + '/' + encodeURIComponent(nombre), {
+                headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + t },
+                cache: 'no-store'
+            });
+            return await r.text();
+        } catch (err) {
+            // Supabase contesta 400 "Object not found" (o 404) si no esta.
+            if (err.status === 404 || err.status === 400 || /not.?found|NoSuchKey/i.test(err.message)) return null;
+            throw err;
+        }
+    }
+
+    // Sube (o pisa) un archivo JSON del bucket.
+    async function subir(nombre, texto) {
+        const cfg = config();
+        const t = await token(cfg);
+        await pedir(cfg, '/storage/v1/object/' + cfg.bucket + '/' + encodeURIComponent(nombre), {
+            method: 'POST',
+            headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+            body: texto
+        });
+    }
+
+    // Entrar sin traer nada (para sincronizar). Rechaza con necesitaLogin si
+    // el correo o la clave no van.
+    async function entrar(credenciales) {
+        await token(config(), credenciales);
+        return estado();
+    }
+
+    function estado() {
+        const guardada = sesion || leerSesion();
+        return { configurada: !!leerConfigNube(rutaConfig()), conSesion: !!(guardada && guardada.refresh),
+                 email: (guardada && guardada.email) || '' };
+    }
+
+    return { bajarRespaldo, salir, bajar, subir, entrar, estado };
 }
 
 module.exports = { crearNube, leerConfigNube };

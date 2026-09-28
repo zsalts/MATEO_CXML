@@ -23,6 +23,7 @@ const { crearSistema } = require('./main/sistema');
 const { registrarDatos } = require('./main/datos');
 const { crearNube } = require('./main/nube');
 const { crearActualizador } = require('./main/actualizar');
+const { crearSincro } = require('./main/sincro');
 // Lo de macOS (menu, permisos, semaforo, energia) vive en main/mac.js; aca
 // solo se enchufa. En Windows: IPC de permisos que dicen "concedido" y el
 // bloqueo de suspension mientras se graba, nada visible.
@@ -77,7 +78,10 @@ const nube = crearNube({
 
 video.registrar(ipcMain);
 sistema.registrar(ipcMain);
-registrarDatos(ipcMain, { abrirBase, video, dialog, ventana: laVentana, nube });
+// Plantillas sincronizadas con el iPad por la nube (main/sincro.js).
+const sincro = crearSincro({ app, bd, nube, abrirBase, ventana: laVentana });
+sincro.registrar(ipcMain);
+registrarDatos(ipcMain, { abrirBase, video, dialog, ventana: laVentana, nube, alCambiarPlantillas: () => sincro.programar() });
 mac.registrarIpc({ ipcMain, systemPreferences, shell, obtenerVentana: laVentana });
 
 // Versiones nuevas desde GitHub Releases (main/actualizar.js).
@@ -174,6 +178,7 @@ app.whenReady().then(async () => {
     enchufarRemoto();
     vigilarEnergia();
     actualizador.arrancar();
+    sincro.arrancar();
 
     // La copia semanal no frena el arranque.
     setTimeout(() => sistema.respaldoSemanal().catch(e => console.warn('Respaldo semanal:', e.message)), 5000);

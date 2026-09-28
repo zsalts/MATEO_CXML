@@ -915,3 +915,22 @@
 .tv-pres__fila-nota { color: var(--tv-aviso); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .tv-pres__quitar { opacity: 0; }
 .tv-pres__fila:hover .tv-pres__quitar, .tv-pres__quitar:focus-visible { opacity: 1; }
+
+/* Sincronización con el iPad: una línea arriba de la grilla */
+.tv-base-pt__sincro {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    margin: var(--tv-esp-2) var(--tv-esp-3) 0;
+    padding: var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-2) var(--tv-esp-3);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+    background: var(--tv-panel);
+    color: var(--tv-texto-2);
+}
+.tv-base-pt__sincro > .tv-icono { flex: none; width: 16px; height: 16px; color: var(--tv-acento); }
+.tv-base-pt__sincro > .tv-recortar { flex: 1; min-width: 0; }
+.tv-base-pt__sincro.es-error { border-color: var(--tv-peligro); }
+.tv-base-pt__sincro.es-error > .tv-icono { color: var(--tv-peligro); }
+.tv-base-pt__sincro[hidden] { display: none; }

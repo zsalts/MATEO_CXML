@@ -19,6 +19,86 @@ export function crearPestanaPlantillas(ctx) {
 
     const grilla = h('div', { class: 'tv-base-pt__grilla' });
     const detalle = h('div', { class: 'tv-base-pt__detalle' });
+
+    // ── Sincronización con el iPad (main/sincro.js) ──
+    const sincroTexto = h('span', { class: 'tv-recortar' });
+    const sincroBoton = boton('', { clase: 'tv-btn--chico', alHacer: () => accionSincro() });
+    const sincroBarra = h('div', { class: 'tv-base-pt__sincro tv-chica', hidden: true }, crearIcono('nube'), sincroTexto, sincroBoton);
+    let sincroEstado = null;
+
+    function pintarSincro(e) {
+        sincroEstado = e || sincroEstado;
+        const s = sincroEstado;
+        const nube = (s && s.nube) || {};
+        if (!s || nube.configurada === false) { sincroBarra.hidden = true; return; }
+        sincroBarra.hidden = false;
+        sincroBarra.classList.toggle('es-error', s.fase === 'error');
+        const hora = s.ultima ? new Date(s.ultima).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '';
+        let texto, etiqueta = 'Sincronizar ahora', deshabilitado = false;
+        if (s.fase === 'sin-sesion' || nube.conSesion === false) {
+            texto = 'Las plantillas no se sincronizan con el iPad: conectate con la cuenta de la nube del iPad.';
+            etiqueta = 'Conectar';
+        } else if (s.fase === 'sincronizando') {
+            texto = 'Sincronizando con el iPad…'; deshabilitado = true;
+        } else if (s.fase === 'error') {
+            texto = 'No se pudo sincronizar: ' + (s.error || 'sin conexión') + '. Se reintenta solo.';
+            etiqueta = 'Reintentar';
+        } else if (s.fase === 'sin-regla') {
+            sincroBarra.hidden = true; return;
+        } else {
+            texto = 'Sincronizadas con el iPad' + (hora ? ` · ${hora}` : '') + (nube.email ? ` · ${nube.email}` : '');
+        }
+        sincroTexto.textContent = texto;
+        sincroTexto.title = texto;
+        sincroBoton.replaceChildren(h('span', {}, etiqueta));
+        sincroBoton.disabled = deshabilitado;
+    }
+
+    async function accionSincro() {
+        const s = sincroEstado || {};
+        if (s.fase === 'sin-sesion' || (s.nube && s.nube.conSesion === false)) return conectarNube();
+        pintarSincro({ ...s, fase: 'sincronizando' });
+        const r = await intentar(ctx, () => api.sincro.ahora(), 'No se pudo sincronizar');
+        if (r) pintarSincro(r);
+    }
+
+    // Entrar con la misma cuenta que usa el iPad para la nube.
+    async function conectarNube(error = '', correo = '') {
+        const form = h('form', { class: 'tv-form', onsubmit: e => e.preventDefault() },
+            h('p', { class: 'tv-texto-2' }, 'Entrá con la misma cuenta que usás en el iPad para la nube. Desde ahí las plantillas se sincronizan solas, en los dos sentidos.'),
+            error ? h('p', { class: 'tv-base-error' }, crearIcono('alerta'), ' ', error) : null,
+            h('div', {}, h('label', { class: 'tv-etiqueta', for: 'tv-sincro-correo' }, 'Correo'),
+                h('input', { class: 'tv-campo', id: 'tv-sincro-correo', type: 'email', autocomplete: 'username', spellcheck: 'false', value: correo })),
+            h('div', {}, h('label', { class: 'tv-etiqueta', for: 'tv-sincro-clave' }, 'Contraseña'),
+                h('input', { class: 'tv-campo', id: 'tv-sincro-clave', type: 'password', autocomplete: 'current-password' })));
+        const campoCorreo = form.querySelector('#tv-sincro-correo'), campoClave = form.querySelector('#tv-sincro-clave');
+        const r = await ctx.ui.modal({
+            titulo: 'Sincronizar con el iPad', contenido: form, ancho: 420, foco: correo ? campoClave : campoCorreo,
+            botones: [{ texto: 'Cancelar', valor: null }, { texto: 'Entrar', valor: 'entrar', primario: true }]
+        });
+        if (r !== 'entrar') return;
+        const datos = { correo: campoCorreo.value.trim(), clave: campoClave.value };
+        if (!datos.correo || !datos.clave) return conectarNube('Escribí el correo y la contraseña.', datos.correo);
+        pintarSincro({ ...(sincroEstado || {}), fase: 'sincronizando' });
+        try {
+            pintarSincro(await api.sincro.entrar(datos));
+            ctx.ui.aviso('Listo: las plantillas se sincronizan con el iPad', 'ok');
+        } catch (err) {
+            const m = (err && err.message) || String(err);
+            pintarSincro({ ...(sincroEstado || {}), fase: 'sin-sesion' });
+            return conectarNube(err && err.necesitaLogin ? 'Correo o contraseña incorrectos.' : m, datos.correo);
+        }
+    }
+
+    const quitarSincro = [];
+    if (api.sincro) {
+        quitarSincro.push(api.sincro.onEstado(e => pintarSincro({ ...e, nube: (sincroEstado && sincroEstado.nube) || e.nube })));
+        api.sincro.estado().then(pintarSincro, () => {});
+    }
+    // Llegaron plantillas del iPad: la lista se refresca sola. Con el editor
+    // abierto se espera: se recarga al cerrarlo.
+    if (api.plantillas.onCambio) quitarSincro.push(api.plantillas.onCambio(() => { if (!editor && el.isConnected) cargar(); }));
+
     const izq = h('div', { class: 'tv-base-pt__izq' },
         h('div', { class: 'tv-barra' },
             h('span', { class: 'tv-barra__titulo' }, 'Plantillas'),
@@ -27,6 +107,7 @@ export function crearPestanaPlantillas(ctx) {
             boton('Nueva plantilla', { icono: 'mas', clase: 'tv-btn--chico tv-btn--primario', titulo: 'Armar una botonera en la compu', alHacer: () => nueva() }),
             boton('Importar archivo', { icono: 'importar', clase: 'tv-btn--chico', titulo: 'El archivo que exporta el iPad', alHacer: () => importar('archivo') }),
             boton('Traer de la nube', { icono: 'nube', clase: 'tv-btn--chico', alHacer: () => importar('nube') })),
+        sincroBarra,
         grilla);
     const el = h('div', { class: 'tv-base-pt' }, izq, detalle);
 
@@ -277,6 +358,7 @@ export function crearPestanaPlantillas(ctx) {
         puedeSalir: () => editor ? editor.puedeSalir() : true,
         pausar() {},
         destruir() {
+            quitarSincro.forEach(f => { try { f(); } catch (_) { /* nada */ } });
             if (editor) { editor.destruir(); editor = null; }
             vistas.splice(0).forEach(v => { try { v.destruir(); } catch (_) { /* nada */ } });
             el.remove();

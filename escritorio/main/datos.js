@@ -9,9 +9,11 @@ const { nombreSeguro, decodificarTexto } = require('./rutas');
 
 const ORIGENES = new Set(['captura', 'ipad-vivo', 'ipad-importado', 'importado']);
 
-function registrarDatos(ipcMain, { abrirBase, video, dialog, ventana, nube }) {
+function registrarDatos(ipcMain, { abrirBase, video, dialog, ventana, nube, alCambiarPlantillas = () => {} }) {
     // Toda llamada abre (o reusa) la base de la carpeta de trabajo actual.
     const con = fn => async (...args) => { await abrirBase(); return fn(...args); };
+    // Lo que cambia plantillas avisa, y main/sincro.js las lleva al iPad.
+    const yAvisa = fn => async (...args) => { const r = await fn(...args); alCambiarPlantillas(); return r; };
 
     // Un video enlazado a un partido tiene que poder verse aunque este fuera
     // de la carpeta de trabajo (se importo sin copiar): la ruta entra en la
@@ -24,16 +26,16 @@ function registrarDatos(ipcMain, { abrirBase, video, dialog, ventana, nube }) {
     // ─── Plantillas ───
     manejar(ipcMain, 'plantillas:listar', con(() => bd.listarPlantillas()));
     manejar(ipcMain, 'plantillas:leer', con(id => bd.leerPlantilla(v.id(id))));
-    manejar(ipcMain, 'plantillas:guardar', con(t => {
+    manejar(ipcMain, 'plantillas:guardar', yAvisa(con(t => {
         v.objeto(t, 'plantilla');
         v.texto(t.nombre, 'nombre', { max: 200 });
         if (t.datos === undefined || t.datos === null) throw new Error('Faltan los datos de la plantilla');
         if (t.id !== undefined && t.id !== null) v.id(t.id);
         return bd.guardarPlantilla({ id: t.id, nombre: t.nombre, datos: t.datos, origen: t.origen });
-    }));
-    manejar(ipcMain, 'plantillas:borrar', con(id => bd.borrarPlantilla(v.id(id))));
+    })));
+    manejar(ipcMain, 'plantillas:borrar', yAvisa(con(id => bd.borrarPlantilla(v.id(id)))));
 
-    manejar(ipcMain, 'plantillas:importarArchivo', con(async () => {
+    manejar(ipcMain, 'plantillas:importarArchivo', yAvisa(con(async () => {
         const r = await dialog.showOpenDialog(ventana(), {
             title: 'Importar del iPad (plantilla, sesion o copia de seguridad)',
             properties: ['openFile', 'multiSelections'],
@@ -52,16 +54,16 @@ function registrarDatos(ipcMain, { abrirBase, video, dialog, ventana, nube }) {
             total.plantillas += c.plantillas; total.equipos += c.equipos; total.partidos += c.partidos;
         }
         return total;
-    }));
+    })));
 
     // Con credenciales = reintento despues de {necesitaLogin:true}.
-    manejar(ipcMain, 'plantillas:importarNube', con(async credenciales => {
+    manejar(ipcMain, 'plantillas:importarNube', yAvisa(con(async credenciales => {
         const cr = v.objeto(credenciales, 'credenciales', { opcional: true });
         const data = await nube.bajarRespaldo(cr.correo ? { correo: v.texto(cr.correo, 'correo', { max: 300 }),
                                                              clave: v.texto(cr.clave, 'clave', { max: 300 }) } : null);
         const c = importar.importarDatos(data, 'nube');
         return { plantillas: c.plantillas, equipos: c.equipos, partidos: c.partidos };
-    }));
+    })));
 
     manejar(ipcMain, 'plantillas:exportarArchivo', con(async id => {
         const t = bd.leerPlantilla(v.id(id));

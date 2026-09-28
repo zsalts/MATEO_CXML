@@ -22,6 +22,7 @@ const ACCIONES = [
 ];
 
 let vivo = false;
+let dejarCambios = () => {};
 
 export default {
     id: 'inicio',
@@ -147,11 +148,17 @@ export default {
             }
         }
 
+        // Plantillas que llegan del iPad por la sincronización: la lista se
+        // refresca sola.
+        dejarCambios = api.plantillas.onCambio ? api.plantillas.onCambio(() => { if (vivo) refrescar(); }) : () => {};
+
         await refrescar();
     },
 
     async desmontar() {
         vivo = false;
+        dejarCambios();
+        dejarCambios = () => {};
         return true;
     }
 };

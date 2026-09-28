@@ -15,6 +15,9 @@
 //       de escritorio, que no marcaba version (user_version = 0 con tablas).
 //   v2  plantillas, equipos, playlists; partidos suma plantilla_id, origen,
 //       desfase, xml_ruta y huella; indices para buscar.
+//   v3  plantillas suma uid (el mismo en el iPad y en la nube) y subida (ya
+//       estuvo en la nube), y plantillas_borradas guarda los borrados para
+//       que viajen. Ver sincro.js en la raiz.
 // Antes de migrar una base que ya tiene datos se deja una copia
 // tagview.antes-vN.sqlite al lado: si algo sale mal, lo del usuario sigue ahi.
 
@@ -22,7 +25,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const VERSION = 2;
+const VERSION = 3;
 const DEMORA_PERSISTIR = 500;
 
 const ESQUEMA_V1 = `
@@ -121,10 +124,22 @@ CREATE INDEX IF NOT EXISTS ix_playlist_items     ON playlist_items(playlist_id, 
 CREATE INDEX IF NOT EXISTS ix_playlist_evento    ON playlist_items(evento_id);
 `;
 
+const ESQUEMA_V3 = `
+ALTER TABLE plantillas ADD COLUMN uid    TEXT;
+ALTER TABLE plantillas ADD COLUMN subida INTEGER;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_plantillas_uid ON plantillas(uid);
+
+CREATE TABLE IF NOT EXISTS plantillas_borradas (
+    uid           TEXT    PRIMARY KEY,
+    borrado       TEXT    NOT NULL    -- ISO
+);
+`;
+
 // En orden: MIGRACIONES[n] lleva de la version n a la n+1.
 const MIGRACIONES = [
     ESQUEMA_V1,
-    ESQUEMA_V2
+    ESQUEMA_V2,
+    ESQUEMA_V3
 ];
 
 let SQL = null;
@@ -200,9 +215,12 @@ function migrar(existia) {
         return;
     }
 
+    // Una sola copia, antes del primer paso: el archivo del disco no cambia
+    // entre pasos (se escribe al final), asi que una segunda seria igual.
+    let copiada = false;
     for (; v < VERSION; v++) {
         const destino = v + 1;
-        if (existia && v >= 1) copiaAntesDe(destino);
+        if (existia && v >= 1 && !copiada) { copiaAntesDe(destino); copiada = true; }
         db.run('BEGIN');
         try {
             db.exec(MIGRACIONES[v]);
@@ -747,19 +765,89 @@ function guardarPlantilla(t) {
                          : [String(t.nombre).trim(), texto, h, cuando, id]);
             return id;
         }
-        db.run(`INSERT INTO plantillas (nombre, datos, origen, huella, creado, actualizado)
-                VALUES (?,?,?,?,?,?)`,
-            [String(t.nombre).trim(), texto, txt(t.origen) || 'local', h, cuando, cuando]);
+        db.run(`INSERT INTO plantillas (nombre, datos, origen, huella, creado, actualizado, uid)
+                VALUES (?,?,?,?,?,?,?)`,
+            [String(t.nombre).trim(), texto, txt(t.origen) || 'local', h, cuando, cuando, nuevoUid()]);
         return ultimoId();
     });
 }
 
+// Borrar deja una lapida con el uid: asi el borrado tambien llega al iPad.
 function borrarPlantilla(id) {
     transaccion(() => {
+        const t = unaFila('SELECT uid FROM plantillas WHERE id=?', [num(id)]);
+        if (t && t.uid) db.run('INSERT OR REPLACE INTO plantillas_borradas (uid, borrado) VALUES (?,?)', [t.uid, ahora()]);
         db.run('UPDATE partidos SET plantilla_id=NULL WHERE plantilla_id=?', [num(id)]);
         db.run('DELETE FROM plantillas WHERE id=?', [num(id)]);
     });
     return true;
+}
+
+// ── Sincronizacion con el iPad (sincro.js de la raiz) ──
+// Mismo formato de uid que sincro.js: 'p' + tiempo + azar, en base 36.
+function nuevoUid() {
+    return 'p' + Date.now().toString(36) + crypto.randomBytes(4).readUInt32BE(0).toString(36);
+}
+
+// Las plantillas y lapidas de aca, con la forma de sincro.fusionar(). Una
+// plantilla de antes de v3 no tiene uid: se le pone ahora.
+function plantillasParaSincro() {
+    return transaccion(() => {
+        filas('SELECT id FROM plantillas WHERE uid IS NULL').forEach(t =>
+            db.run('UPDATE plantillas SET uid=? WHERE id=?', [nuevoUid(), t.id]));
+        const vivas = filas('SELECT uid, nombre, datos, actualizado, subida FROM plantillas').map(t => {
+            let datos;
+            try { datos = JSON.parse(t.datos); } catch (_) { datos = { elements: [], links: [], hojas: [] }; }
+            return { uid: t.uid, nombre: t.nombre, datos, actualizado: t.actualizado, nueva: !t.subida };
+        });
+        const borradas = filas('SELECT uid, borrado FROM plantillas_borradas')
+            .map(b => ({ uid: b.uid, nombre: '', actualizado: b.borrado, borrado: true }));
+        return vivas.concat(borradas);
+    });
+}
+
+// Aplica lo que devolvio sincro.fusionar(): uids adoptados, plantillas que
+// llegaron o cambiaron afuera (con SU fecha, no la de ahora: si no, rebotarian
+// como un cambio de aca) y borrados. Devuelve cuantas cambiaron.
+function aplicarSincro({ uids = {}, poner = [], borrar = [] }) {
+    return transaccion(() => {
+        Object.keys(uids).forEach(viejo => db.run('UPDATE plantillas SET uid=? WHERE uid=?', [uids[viejo], viejo]));
+        poner.forEach(x => {
+            const datos = datosNormalizados(x.datos);
+            const texto = JSON.stringify(datos);
+            const nombre = String(x.nombre || '').trim() || 'Plantilla';
+            const ya = unaFila('SELECT id FROM plantillas WHERE uid=?', [x.uid]);
+            if (ya) {
+                db.run('UPDATE plantillas SET nombre=?, datos=?, huella=?, actualizado=?, subida=1 WHERE id=?',
+                    [nombre, texto, huellaPlantilla(datos), x.actualizado, ya.id]);
+            } else {
+                db.run(`INSERT INTO plantillas (nombre, datos, origen, huella, creado, actualizado, uid, subida)
+                        VALUES (?,?,?,?,?,?,?,1)`,
+                    [nombre, texto, 'nube', huellaPlantilla(datos), x.actualizado, x.actualizado, x.uid]);
+            }
+            db.run('DELETE FROM plantillas_borradas WHERE uid=?', [x.uid]);
+        });
+        borrar.forEach(uid => {
+            const t = unaFila('SELECT id FROM plantillas WHERE uid=?', [uid]);
+            if (!t) return;
+            db.run('UPDATE partidos SET plantilla_id=NULL WHERE plantilla_id=?', [t.id]);
+            db.run('DELETE FROM plantillas WHERE id=?', [t.id]);
+            db.run('INSERT OR REPLACE INTO plantillas_borradas (uid, borrado) VALUES (?,?)', [uid, ahora()]);
+        });
+        return Object.keys(uids).length + poner.length + borrar.length;
+    });
+}
+
+// Despues de subir: todo lo de aca ya esta en la nube. Las lapidas que la
+// nube ya olvido (viejas) se olvidan tambien aca.
+function marcarSincronizadas(lapidasVigentes) {
+    transaccion(() => {
+        db.run('UPDATE plantillas SET subida=1 WHERE subida IS NULL OR subida=0');
+        const vigentes = new Set(lapidasVigentes || []);
+        filas('SELECT uid FROM plantillas_borradas').forEach(b => {
+            if (!vigentes.has(b.uid)) db.run('DELETE FROM plantillas_borradas WHERE uid=?', [b.uid]);
+        });
+    });
 }
 
 function plantillaPorHuella(h) {
@@ -872,6 +960,7 @@ module.exports = {
     guardarPartido, listarPartidos, leerPartido, actualizarPartido, borrarPartido, partidoPorHuella,
     agregarEvento, actualizarEvento, actualizarVarios, borrarEvento, buscarEventos,
     listarPlantillas, leerPlantilla, guardarPlantilla, borrarPlantilla, plantillaPorHuella, plantillaPorNombre,
+    plantillasParaSincro, aplicarSincro, marcarSincronizadas,
     listarEquipos, guardarEquipo, borrarEquipo, equipoPorNombre,
     listarPlaylists, leerPlaylist, guardarPlaylist, borrarPlaylist,
     // Para las pruebas y para quien necesite una consulta propia (remoto.js).
