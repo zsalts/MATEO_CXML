@@ -57,7 +57,9 @@ const S = {
     reintento: null,
     pingTimer: null,
     ultimaVista: 0,        // cuando se vio a la compu por ultima vez
-    terminado: false
+    terminado: false,
+    clips: [],             // los que corto la compu: {id, nombre, etiquetas, equipo, inicio, duracion}
+    clipActual: null       // id del que se esta viendo
 };
 
 // ─────────────────────────────────────────────
@@ -146,6 +148,7 @@ function recibir(m) {
             S.activo = !!m.activo;
             if (m.plantilla) ponerPlantilla(m.plantilla);
             if (m.estado) ponerEstado(m.estado);
+            ponerClips(m.clips || []);
             empezarPings();
             mostrarBotonera();
             vaciarCola();
@@ -196,8 +199,19 @@ function recibir(m) {
 
         case 'guardado':
             S.terminado = true;
+            // El que mira se queda con sus clips: se siguen viendo mientras
+            // la compu no salga de la pantalla de captura.
+            if (!S.activo) { avisar('La compu terminó el partido. Los clips se siguen viendo.'); break; }
             mostrarMensaje('Partido guardado en la compu',
                 m.nombre ? `“${m.nombre}” quedó con el video y el XML en la compu.` : 'Quedó con el video y el XML en la compu.');
+            break;
+
+        case 'clip':
+            if (m.clip) agregarClip(m.clip);
+            break;
+
+        case 'quitarClip':
+            quitarClip(m.id);
             break;
 
         case 'aviso':
@@ -336,7 +350,7 @@ function ponerEstado(e) {
     S.estado = e;
     S.estadoEn = performance.now();
     $('rec').hidden = !e.rec;
-    $('btnVolver').hidden = !e.hoja;
+    $('btnVolver').hidden = !e.hoja || !S.activo;
     $('btnPlay').textContent = e.corriendo ? '❚❚ PAUSA' : '▶ PLAY';
     $('btnPlay').classList.toggle('boton--primario', !e.corriendo);
     if (e.ultimo && e.ultimo.nombre) $('ultimo').textContent = e.ultimo.nombre;
@@ -382,6 +396,121 @@ function pintarReloj() {
 setInterval(pintarReloj, 250);
 
 // ─────────────────────────────────────────────
+// CLIPS (el iPad que mira)
+// ─────────────────────────────────────────────
+// La compu corta cada evento que se cierra y avisa {tipo:'clip'}. El video
+// se pide a /clip/<id> con el token de este iPad: sin él, la compu no lo da.
+function urlClip(id) {
+    return `/clip/${encodeURIComponent(id)}?d=${encodeURIComponent(dispositivo)}&t=${encodeURIComponent(leer(claveToken) || '')}`;
+}
+
+function ponerClips(lista) {
+    S.clips = lista.filter(c => c && c.id);
+    pintarClips();
+}
+
+// Mismo id = el mismo evento con otras etiquetas o vuelto a cortar.
+function agregarClip(c) {
+    if (!c.id) return;
+    const i = S.clips.findIndex(x => x.id === c.id);
+    if (i >= 0) S.clips[i] = c; else S.clips.push(c);
+    pintarClips(i < 0 ? c.id : null);
+    // Si justo se estaba viendo ese y se volvio a cortar, se recarga.
+    if (i >= 0 && S.clipActual === c.id) verClip(c.id, { seguir: true });
+}
+
+function quitarClip(id) {
+    S.clips = S.clips.filter(c => c.id !== id);
+    if (S.clipActual === id) {
+        S.clipActual = null;
+        const v = $('clipsVideo');
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+    }
+    pintarClips();
+}
+
+function minuto(seg) {
+    const s = Math.max(0, Math.floor(Number(seg) || 0));
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+// Los textos van con textContent: los nombres vienen de la plantilla.
+function pintarClips(nuevo) {
+    const ul = $('clipsLista');
+    const orden = S.clips.slice().sort((a, b) => (b.inicio || 0) - (a.inicio || 0));
+    const scroll = ul.scrollTop;
+    ul.textContent = '';
+    for (const c of orden) {
+        const li = document.createElement('li');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'clip' + (c.id === S.clipActual ? ' es-actual' : '') + (c.id === nuevo ? ' es-nuevo' : '');
+        b.dataset.id = c.id;
+        const min = document.createElement('span');
+        min.className = 'clip__minuto';
+        min.textContent = minuto(c.inicio);
+        const texto = document.createElement('span');
+        texto.className = 'clip__texto';
+        const n = document.createElement('span');
+        n.className = 'clip__nombre';
+        n.textContent = c.nombre || 'Clip';
+        texto.appendChild(n);
+        const detalle = [c.equipo].concat(c.etiquetas || []).filter(Boolean).join(' · ');
+        if (detalle) {
+            const d = document.createElement('span');
+            d.className = 'clip__detalle';
+            d.textContent = detalle;
+            texto.appendChild(d);
+        }
+        const dur = document.createElement('span');
+        dur.className = 'clip__dur';
+        dur.textContent = c.duracion != null ? Math.round(c.duracion) + ' s' : '';
+        b.appendChild(min); b.appendChild(texto); b.appendChild(dur);
+        li.appendChild(b);
+        ul.appendChild(li);
+    }
+    ul.scrollTop = scroll;
+    $('clipsVacio').hidden = S.clips.length > 0;
+    $('clipsCuenta').textContent = S.clips.length ? String(S.clips.length) : '';
+}
+
+function verClip(id, { seguir = false } = {}) {
+    const c = S.clips.find(x => x.id === id);
+    if (!c) return;
+    const v = $('clipsVideo');
+    const donde = seguir ? v.currentTime : 0;
+    const andar = !seguir || !v.paused;
+    S.clipActual = id;
+    v.src = urlClip(id);
+    if (donde) v.addEventListener('loadedmetadata', () => { try { v.currentTime = donde; } catch (_) {} }, { once: true });
+    // Dentro del toque: asi Safari lo deja arrancar con sonido.
+    if (andar) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    $('clipsVacioVisor').hidden = true;
+    $('clipsTitulo').textContent = minuto(c.inicio) + '  ' + (c.nombre || 'Clip') +
+        ((c.etiquetas || []).length ? ' · ' + c.etiquetas.join(' · ') : '');
+    const previo = $('clipsLista').querySelector('.es-actual');
+    if (previo) previo.classList.remove('es-actual');
+    const actual = $('clipsLista').querySelector(`[data-id="${id}"]`);   // ids de [\w-]: sin escapar
+    if (actual) actual.classList.add('es-actual');
+}
+
+$('clipsLista').addEventListener('click', e => {
+    const b = e.target.closest('.clip');
+    if (b) verClip(b.dataset.id);
+});
+
+$('clipsVideo').addEventListener('error', () => {
+    if (S.clipActual) avisar('No se pudo abrir el clip. Revisá la conexión con la compu.');
+});
+
+$('btnPedirControl').addEventListener('click', () => {
+    if (!mandar({ tipo: 'pedirControl' })) return avisar('Sin conexión con la compu.');
+    avisar('Pedido enviado. Aceptalo en la compu: el otro iPad pasa a mirar.');
+});
+
+// ─────────────────────────────────────────────
 // PANTALLAS
 // ─────────────────────────────────────────────
 function mostrarPin(error = '', sacudir = false) {
@@ -406,17 +535,20 @@ function mostrarMensaje(titulo, texto, boton) {
     $('pantallaPin').hidden = true;
 }
 
+// El que codifica ve la botonera; el que mira, los clips. Pasar el control
+// de uno a otro da vuelta las dos pantallas.
 function mostrarBotonera() {
     $('pantallaPin').hidden = true;
     $('franja').hidden = false;
-    $('botonera').hidden = false;
-    if (S.terminado) return;
-    if (!S.activo) {
-        mostrarMensaje('Ya hay un iPad codificando',
-            'Podés mirar el partido desde acá. Si querés codificar vos, pedí el control: la compu tiene que aceptarlo.',
-            { texto: 'Pedir el control', accion: () => { mandar({ tipo: 'pedirControl' }); avisar('Pedido enviado. Aceptalo en la compu.'); } });
-        return;
-    }
+    const mira = !S.activo;
+    $('botonera').hidden = mira;
+    $('clips').hidden = !mira;
+    $('btnPlay').hidden = mira;
+    $('btnTerminar').hidden = mira;
+    $('btnPedirControl').hidden = !mira || S.terminado;
+    if (mira) $('btnVolver').hidden = true;
+    else { const v = $('clipsVideo'); if (!v.paused) v.pause(); }
+    if (S.terminado && !mira) return;
     $('pantallaMensaje').hidden = true;
     pedirWakeLock();
 }
@@ -531,9 +663,10 @@ function relojActual() {
 // Pellizco y doble toque (Safari ignora user-scalable=no desde iOS 10).
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
-// Sin rebote: solo se deja scrollear lo que tiene su propio scroll.
+// Sin rebote: solo se deja scrollear lo que tiene su propio scroll (y la
+// barra del video, que se arrastra con el dedo).
 document.addEventListener('touchmove', e => {
-    if (!e.target.closest('.scroll')) e.preventDefault();
+    if (!e.target.closest('.scroll, video')) e.preventDefault();
 }, { passive: false });
 document.addEventListener('contextmenu', e => e.preventDefault());
 

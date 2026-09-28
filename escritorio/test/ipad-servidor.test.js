@@ -401,5 +401,109 @@ test('ipsLocales: privadas, sin virtuales ni loopback, la wifi primero', () => {
     assert.deepEqual(r.map(x => x.ip), ['192.168.0.20', '10.0.0.5']);
 });
 
+// ── Clips en vivo para el iPad que mira ──
+const dirClips = path.join(tmp, 'Trabajo', 'Clips');
+fs.mkdirSync(dirClips, { recursive: true });
+const rutaClip = path.join(dirClips, 'Tiro 12-30.mp4');
+const bytesClip = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256));
+fs.writeFileSync(rutaClip, bytesClip);
+
+function pedirBytes(puerto, ruta, cabeceras = {}) {
+    return new Promise((ok, mal) => {
+        const req = http.request({ host: '127.0.0.1', port: puerto, path: ruta, headers: cabeceras }, res => {
+            const partes = [];
+            res.on('data', d => partes.push(d));
+            res.on('end', () => ok({ status: res.statusCode, cuerpo: Buffer.concat(partes), h: res.headers }));
+        });
+        req.on('error', mal);
+        req.end();
+    });
+}
+
+test('clips: la rama publica, el iPad que mira los recibe y los baja con su token (con Range)', async () => {
+    const { srv } = nuevo();
+    // Como main: solo la carpeta de trabajo.
+    const srv2 = crearServidorRemoto({
+        rutaRemoto: srv._raices.remoto, rutaNucleo: srv._raices.nucleo,
+        plataforma: 'win32', interfaces: () => ({}),
+        permitirClip: r => path.resolve(r).startsWith(path.join(tmp, 'Trabajo') + path.sep)
+    });
+    const { puerto, pin } = await srv2.iniciar({ puerto: 0 });
+    try {
+        const a = await entrar(puerto, { pin });
+        const c2 = cliente(puerto);
+        await c2.abierto;
+        c2.mandar({ tipo: 'hola', dispositivo: 'ipad-mira-1', nombre: 'iPad DT', pin });
+        const b = await c2.esperar(m => m.tipo === 'bienvenida');
+        assert.equal(b.activo, false);
+        assert.deepEqual(b.clips, []);
+
+        // Fuera de la carpeta de trabajo, o un id raro: no se publica.
+        assert.equal(srv2.enviar({ tipo: 'clip', clip: { id: 'c1', ruta: path.join(tmp, 'main.js'), nombre: 'x' } }), false);
+        assert.equal(srv2.enviar({ tipo: 'clip', clip: { id: '../c1', ruta: rutaClip, nombre: 'x' } }), false);
+
+        assert.equal(srv2.enviar({ tipo: 'clip', clip: {
+            id: 'c1', ruta: rutaClip, nombre: 'Tiro', etiquetas: ['Al arco'], equipo: 'Local', inicio: 750.5, duracion: 8
+        } }), true);
+        const llego = await c2.esperar(m => m.tipo === 'clip');
+        assert.deepEqual(llego.clip, { id: 'c1', nombre: 'Tiro', etiquetas: ['Al arco'], equipo: 'Local', inicio: 750.5, duracion: 8 });
+        assert.equal('ruta' in llego.clip, false, 'la ruta del disco nunca llega al iPad');
+        await a.c.esperar(m => m.tipo === 'clip');
+
+        const tok = b.token;
+        const url = `/clip/c1?d=ipad-mira-1&t=${encodeURIComponent(tok)}`;
+        const entero = await pedirBytes(puerto, url);
+        assert.equal(entero.status, 200);
+        assert.equal(entero.h['content-type'], 'video/mp4');
+        assert.equal(entero.h['accept-ranges'], 'bytes');
+        assert.ok(entero.cuerpo.equals(bytesClip));
+
+        // Lo primero que pide Safari: bytes=0-1.
+        const dos = await pedirBytes(puerto, url, { Range: 'bytes=0-1' });
+        assert.equal(dos.status, 206);
+        assert.equal(dos.h['content-range'], 'bytes 0-1/1000');
+        assert.deepEqual([...dos.cuerpo], [0, 1]);
+        const cola = await pedirBytes(puerto, url, { Range: 'bytes=990-' });
+        assert.equal(cola.status, 206);
+        assert.equal(cola.cuerpo.length, 10);
+        assert.equal((await pedirBytes(puerto, url, { Range: 'bytes=5000-' })).status, 416);
+
+        // Sin token, con el de otro, o un clip que no existe: 404.
+        for (const r of ['/clip/c1', `/clip/c1?d=ipad-mira-1&t=malo`, `/clip/c1?d=ipad-prueba-1&t=${encodeURIComponent(tok)}`,
+            `/clip/c9?d=ipad-mira-1&t=${encodeURIComponent(tok)}`, `/clip/..%2fmain.js?d=ipad-mira-1&t=${encodeURIComponent(tok)}`]) {
+            assert.equal((await pedirBytes(puerto, r)).status, 404, r);
+        }
+
+        // Un iPad que entra despues recibe los que ya habia.
+        c2.ws.close();
+        await c2.cerrado;
+        const c3 = cliente(puerto);
+        await c3.abierto;
+        c3.mandar({ tipo: 'hola', dispositivo: 'ipad-mira-1', token: tok });
+        const b3 = await c3.esperar(m => m.tipo === 'bienvenida');
+        assert.deepEqual(b3.clips.map(c => c.id), ['c1']);
+
+        // Mismo id reemplaza; quitar avisa y deja de servirlo.
+        srv2.enviar({ tipo: 'clip', clip: { id: 'c1', ruta: rutaClip, nombre: 'Tiro', etiquetas: ['Gol'], inicio: 750.5, duracion: 8 } });
+        assert.deepEqual((await c3.esperar(m => m.tipo === 'clip')).clip.etiquetas, ['Gol']);
+        assert.equal(srv2.enviar({ tipo: 'quitarClip', id: 'c1' }), true);
+        assert.equal((await c3.esperar(m => m.tipo === 'quitarClip')).id, 'c1');
+        assert.equal((await pedirBytes(puerto, url)).status, 404);
+        a.c.ws.close(); c3.ws.close();
+    } finally {
+        await srv2.detener();
+    }
+});
+
+test('clips: sin permitirClip no se publica ninguno', async () => {
+    const { srv } = nuevo();
+    await srv.iniciar({ puerto: 0 });
+    try {
+        assert.equal(srv.enviar({ tipo: 'clip', clip: { id: 'c1', ruta: rutaClip, nombre: 'x' } }), false);
+    } finally {
+        await srv.detener();
+    }
+});
+
 test.after(() => { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {} });
 void aqui;

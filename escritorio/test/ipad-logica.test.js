@@ -246,3 +246,42 @@ test('espejo: el emisor no repite estados iguales (salvo el reloj)', () => {
     assert.equal(emitir({ tipo: 'estado', reloj: 4, corriendo: false }, { forzar: true }), true);
     assert.equal(enviados.length, 3);
 });
+
+// ── Clips en vivo para el iPad que mira ──
+import { planClipsEnVivo } from '../src/ramas/ipad/clips-vivo.js';
+
+test('clips en vivo: corta los cerrados con video, reenvía etiquetas, quita los borrados', () => {
+    // Video = partido + 100 s (la cámara arrancó antes).
+    const clipDe = ev => ({ vInicio: ev.sinVideo ? null : ev.start + 100, vFin: ev.end == null ? null : ev.end + 100 });
+    const eventos = [
+        { id: 5, name: 'Tiro', start: 50, end: 58, buttonId: 1, descriptors: ['Al arco'] },
+        { id: 4, name: 'Abierto', start: 40, end: null, buttonId: 1 },
+        { id: 3, name: 'Jugador 7', start: 30, end: 45, buttonId: 2, line: 'Línea 1' },
+        { id: 2, name: 'Posesión', start: 20, end: 30, posesionDe: 'A' },
+        { id: 1, name: 'Falta', start: 10, end: 10, buttonId: 3 },
+        { id: 0, name: 'Antes', start: 0, end: 5, sinVideo: true }
+    ];
+    const hechos = new Map();
+    const p = planClipsEnVivo(eventos, hechos, { clipDe, equipoDe: ev => (ev.buttonId === 1 ? 'Local' : null) });
+    assert.deepEqual(p.cortar.map(x => x.ev.id), [5, 1], 'el más nuevo primero; sin abiertos, líneas, posesión ni sin video');
+    assert.deepEqual(p.cortar[0].tiempos, { desde: 150, hasta: 158 });
+    assert.deepEqual(p.cortar[0].meta, { nombre: 'Tiro', etiquetas: ['Al arco'], equipo: 'Local', inicio: 50 });
+    assert.deepEqual(p.cortar[1].tiempos, { desde: 110, hasta: 111 }, 'un evento de cero segundos dura uno');
+    assert.deepEqual(p.quitar, []);
+
+    for (const x of p.cortar) hechos.set(x.ev.id, { tiempos: x.tiempos, meta: x.meta });
+    const igual = planClipsEnVivo(eventos, hechos, { clipDe, equipoDe: ev => (ev.buttonId === 1 ? 'Local' : null) });
+    assert.deepEqual([igual.cortar.length, igual.actualizar.length, igual.quitar.length], [0, 0, 0]);
+
+    // Etiqueta nueva: solo se reenvía. Otro fin: se vuelve a cortar. Borrado: se quita.
+    const despues = [
+        { ...eventos[0], descriptors: ['Al arco', 'Gol'] },
+        { ...eventos[4], end: 14 }
+    ].filter(ev => ev.id !== 99);
+    const p2 = planClipsEnVivo(despues, hechos, { clipDe, equipoDe: ev => (ev.buttonId === 1 ? 'Local' : null) });
+    assert.deepEqual(p2.actualizar.map(x => x.ev.id), [5]);
+    assert.deepEqual(p2.cortar.map(x => x.ev.id), [1]);
+    assert.deepEqual(p2.cortar[0].tiempos, { desde: 110, hasta: 114 });
+    const p3 = planClipsEnVivo([despues[0]], hechos, { clipDe });
+    assert.deepEqual(p3.quitar, [1]);
+});

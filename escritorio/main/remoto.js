@@ -15,6 +15,9 @@
 //   /            escritorio/remoto/**      (la pagina del iPad)
 //   /nucleo/     escritorio/src/nucleo/**  (botonera-vista.js, plantilla.js…)
 //   /ws          el WebSocket
+//   /clip/<id>?d=<dispositivo>&t=<token>
+//                un clip cortado en vivo, para el iPad que mira. Solo los
+//                que la rama publico, y solo a un iPad que ya paso el PIN.
 // Solo GET/HEAD, sin listados de carpetas, sin salir de esas dos raices.
 //
 // Protocolo (todo JSON por el WebSocket):
@@ -33,11 +36,18 @@
 //     {tipo:'pong', t0, tServidor}
 //     {tipo:'ack', n}
 //     {tipo:'control', activo:boolean}  (este iPad codifica o mira)
+//     {tipo:'clip', clip:{id, nombre, etiquetas, equipo, inicio, duracion}}
+//     {tipo:'quitarClip', id}
 //     lo que mande la rama con tv.remoto.enviar() (estado, guardado…)
+//   La bienvenida trae tambien clips: [...], los publicados hasta ahi.
 //
 // Mensajes de la rama que entiende el servidor (no se reenvian):
 //   {tipo:'plantilla', plantilla:{nombre, datos}}   la que baja el iPad
 //   {tipo:'darControl', dispositivo} / {tipo:'negarControl', dispositivo}
+//   {tipo:'clip', clip:{id, ruta, …}}   un clip cortado: se guarda la ruta
+//       (que nunca llega al iPad) y se reenvia sin ella. Mismo id = se
+//       reemplaza (cambiaron las etiquetas o se volvio a cortar).
+//   {tipo:'quitarClip', id}             el evento se borro
 //   cualquier otro con {tipo:'estado', …} se guarda y se reenvia: un iPad que
 //   se reconecta lo recibe al toque, sin esperar al proximo cambio.
 
@@ -77,6 +87,15 @@ const PUERTO_POR_DEFECTO = 8787;
 const INTENTOS_PIN = 5;           // fallidos desde una IP antes de bloquearla
 const BLOQUEO_MS = 60 * 1000;
 const MAX_MENSAJE = 64 * 1024;    // una accion ocupa 200 bytes; esto sobra
+const MAX_CLIPS = 1000;           // por sesion; los mas viejos se olvidan
+
+const MIME_VIDEO = {
+    '.mp4': 'video/mp4',
+    '.m4v': 'video/mp4',
+    '.mov': 'video/quicktime',
+    '.webm': 'video/webm',
+    '.mkv': 'video/x-matroska'
+};
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
@@ -188,6 +207,59 @@ function servirArchivo(req, res, raices) {
     });
 }
 
+// Un video con soporte de Range. Safari no reproduce un <video> sin eso:
+// antes de nada pide "bytes=0-1", y para saltar pide el tramo que le falta.
+function servirVideo(req, res, ruta) {
+    fs.stat(ruta, (err, st) => {
+        if (err || !st.isFile()) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('No está');
+        }
+        const total = st.size;
+        let inicio = 0, fin = total - 1, estadoHttp = 200;
+        const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+        if (m && (m[1] || m[2])) {
+            estadoHttp = 206;
+            if (m[1]) {
+                inicio = parseInt(m[1], 10);
+                if (m[2]) fin = Math.min(parseInt(m[2], 10), total - 1);
+            } else {
+                inicio = Math.max(0, total - parseInt(m[2], 10));
+            }
+            if (inicio > fin || inicio >= total) {
+                res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+                return res.end();
+            }
+        }
+        const cabeceras = {
+            'Content-Type': MIME_VIDEO[path.extname(ruta).toLowerCase()] || 'video/mp4',
+            'Content-Length': total ? fin - inicio + 1 : 0,
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff'
+        };
+        if (estadoHttp === 206) cabeceras['Content-Range'] = `bytes ${inicio}-${fin}/${total}`;
+        res.writeHead(estadoHttp, cabeceras);
+        if (req.method === 'HEAD' || !total) return res.end();
+        fs.createReadStream(ruta, { start: inicio, end: fin }).on('error', () => res.destroy()).pipe(res);
+    });
+}
+
+// Lo que el iPad puede ver de un clip: sin la ruta, con cada campo acotado
+// (los nombres vienen de la plantilla, que puede venir de un archivo).
+function clipPublico(c) {
+    const texto = (v, max) => (v == null ? '' : String(v)).slice(0, max);
+    const numero = v => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : null);
+    return {
+        id: c.id,
+        nombre: texto(c.nombre, 120),
+        etiquetas: (Array.isArray(c.etiquetas) ? c.etiquetas : []).slice(0, 20).map(t => texto(t, 60)).filter(Boolean),
+        equipo: c.equipo ? texto(c.equipo, 60) : null,
+        inicio: numero(c.inicio),
+        duracion: numero(c.duracion)
+    };
+}
+
 // ─────────────────────────────────────────────
 // EL SERVIDOR
 // ─────────────────────────────────────────────
@@ -200,6 +272,8 @@ function servirArchivo(req, res, raices) {
 //   alCliente(evento)         conexiones, desconexiones, latencias, pedidos
 //   ahora()                   reloj (ms); inyectable en las pruebas
 //   interfaces()              os.networkInterfaces; inyectable
+//   permitirClip(ruta)        si ese archivo se puede servir como clip (la
+//                             carpeta de trabajo); sin esto no sale ninguno
 function crearServidorRemoto(opciones = {}) {
     const raices = {
         remoto: path.resolve(opciones.rutaRemoto || path.join(__dirname, '..', 'remoto')),
@@ -211,9 +285,10 @@ function crearServidorRemoto(opciones = {}) {
     const interfaces = opciones.interfaces || (() => os.networkInterfaces());
     // Inyectable: las pruebas simulan adaptadores de Windows en cualquier SO.
     const plataforma = opciones.plataforma || process.platform;
+    const permitirClip = opciones.permitirClip || (() => false);
 
     let servidor = null, wss = null;
-    let sesion = null;   // {pin, puerto, plantillaId, plantilla, estado, desde}
+    let sesion = null;   // {pin, puerto, plantillaId, plantilla, estado, desde, clips}
 
     // Viven lo que vive el proceso, no una sesion: reiniciar el servidor no
     // tiene que servir para resetear el bloqueo por PIN.
@@ -268,6 +343,43 @@ function crearServidorRemoto(opciones = {}) {
     function pinOk(pin) {
         const h = s => crypto.createHash('sha256').update(String(s ?? '')).digest();
         return crypto.timingSafeEqual(h(pin), h(sesion.pin));
+    }
+
+    // ── Clips ──
+    const clipsPublicos = () => (sesion ? [...sesion.clips.values()].map(c => c.publico) : []);
+
+    // /clip/<id>?d=…&t=…  El token es el mismo del WebSocket: un iPad que no
+    // paso el PIN (o de una sesion anterior) no ve nada. 404 para todo lo
+    // que no cierre, sin decir por que.
+    function servirClip(req, res) {
+        const no = () => {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('No está');
+        };
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.writeHead(405, { Allow: 'GET, HEAD' });
+            return res.end();
+        }
+        let u;
+        try { u = new URL(req.url, 'http://x'); } catch (_) { return no(); }
+        const m = /^\/clip\/([\w-]{1,64})$/.exec(u.pathname);
+        const c = m && sesion && sesion.clips.get(m[1]);
+        const d = dispositivos.get(u.searchParams.get('d') || '');
+        const t = u.searchParams.get('t') || '';
+        if (!c || !d || !d.token || t.length !== d.token.length ||
+            !crypto.timingSafeEqual(Buffer.from(t), Buffer.from(d.token))) return no();
+        servirVideo(req, res, c.ruta);
+    }
+
+    function ponerClip(c) {
+        if (!c || typeof c.id !== 'string' || !/^[\w-]{1,64}$/.test(c.id)) return false;
+        if (typeof c.ruta !== 'string' || !permitirClip(c.ruta) || !fs.existsSync(c.ruta)) return false;
+        const publico = clipPublico(c);
+        sesion.clips.delete(c.id);   // al final: el orden es el de llegada
+        sesion.clips.set(c.id, { ruta: c.ruta, publico });
+        while (sesion.clips.size > MAX_CLIPS) sesion.clips.delete(sesion.clips.keys().next().value);
+        for (const d of dispositivos.values()) enviarA(d.socket, { tipo: 'clip', clip: publico });
+        return true;
     }
 
     function darControl(id) {
@@ -369,6 +481,7 @@ function crearServidorRemoto(opciones = {}) {
                 aplicado: disp.aplicado,
                 plantilla: sesion.plantilla || null,
                 estado: sesion.estado || null,
+                clips: clipsPublicos(),
                 tServidor: ahora()
             });
             avisarClientes({ evento: 'conectado', dispositivo: id });
@@ -428,11 +541,14 @@ function crearServidorRemoto(opciones = {}) {
         await detener();
 
         const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
-        sesion = { id: crypto.randomBytes(9).toString('base64url'), pin, plantillaId, plantilla, estado: null, desde: ahora() };
+        sesion = { id: crypto.randomBytes(9).toString('base64url'), pin, plantillaId, plantilla, estado: null, desde: ahora(), clips: new Map() };
         dispositivos.clear();
         activo = null;
 
-        servidor = http.createServer((req, res) => servirArchivo(req, res, raices));
+        servidor = http.createServer((req, res) => {
+            if (/^\/clip\//.test(req.url || '')) return servirClip(req, res);
+            servirArchivo(req, res, raices);
+        });
         servidor.on('clientError', (_e, s) => { try { s.destroy(); } catch (_) {} });
         wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MENSAJE });
         wss.on('connection', alConectar);
@@ -564,6 +680,12 @@ function crearServidorRemoto(opciones = {}) {
             case 'estado':
                 sesion.estado = msg;
                 break;
+            case 'clip':
+                return ponerClip(msg.clip);
+            case 'quitarClip':
+                if (!sesion.clips.delete(String(msg.id))) return false;
+                for (const d of dispositivos.values()) enviarA(d.socket, { tipo: 'quitarClip', id: String(msg.id) });
+                return true;
         }
         // Todo lo demas va a todos los iPads conectados: el que mira tambien
         // tiene que ver el partido.
@@ -598,7 +720,10 @@ function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc } = {}) {
         rutaRemoto: path.join(__dirname, '..', 'remoto'),
         rutaNucleo: path.join(rutaSrc || path.join(__dirname, '..', 'src'), 'nucleo'),
         alMensaje: m => mandar('remoto:mensaje', m),
-        alCliente: e => mandar('remoto:cliente', e)
+        alCliente: e => mandar('remoto:cliente', e),
+        // Los clips los corta tv.clips.exportar en la carpeta de trabajo: el
+        // servidor no sirve nada de afuera, aunque la pagina se lo pida.
+        permitirClip: ruta => !!carpeta && dentroDe(carpeta(), ruta)
     });
 
     ipcMain.handle('remoto:iniciar', async (_e, opciones = {}) => {
@@ -610,7 +735,6 @@ function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc } = {}) {
     ipcMain.handle('remoto:estado', () => instancia.estado());
     ipcMain.handle('remoto:enviar', (_e, msg) => instancia.enviar(msg));
 
-    void carpeta;   // hoy no hace falta: el servidor no toca la carpeta de trabajo
     return instancia;
 }
 

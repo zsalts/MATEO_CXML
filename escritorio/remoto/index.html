@@ -71,10 +71,26 @@
     <button class="boton" id="btnVolver" type="button" hidden>✕ Cerrar pestaña</button>
     <button class="boton" id="btnPlay" type="button">▶ PLAY</button>
     <button class="boton boton--peligro" id="btnTerminar" type="button">Terminar</button>
+    <button class="boton" id="btnPedirControl" type="button" hidden>Codificar desde acá</button>
   </span>
 </header>
 
 <main class="botonera" id="botonera" hidden></main>
+
+<!-- El iPad que mira: los cortes que va haciendo el otro iPad, con el video
+     que graba la compu. El mas nuevo arriba. -->
+<main class="clips" id="clips" hidden>
+  <section class="clips__visor">
+    <video class="clips__video" id="clipsVideo" playsinline controls preload="auto"></video>
+    <div class="clips__vacio-visor" id="clipsVacioVisor">Tocá un clip de la lista para verlo</div>
+    <div class="clips__titulo" id="clipsTitulo"></div>
+  </section>
+  <aside class="clips__lado">
+    <h2 class="clips__cabeza">Clips <span id="clipsCuenta"></span></h2>
+    <ul class="clips__lista scroll" id="clipsLista"></ul>
+    <p class="clips__vacio" id="clipsVacio">Todavía no hay clips. Aparecen solos, unos segundos después de cada evento que se marca.</p>
+  </aside>
+</main>
 
 <!-- Pantalla del PIN -->
 <section class="pantalla" id="pantallaPin">

@@ -5,6 +5,10 @@
 //   vivo      video grande, reloj, REC, registro, botonera chica espejo
 //   fin       guardado: video + XML en Partidos/<nombre>/ y en la base
 //
+// Si además hay un iPad que mira (el segundo que se conecta), cada evento que
+// se cierra se corta como clip y le llega por el mismo servidor: ve los
+// cortes del partido en vivo mientras el otro iPad sigue codificando.
+//
 // El motor (nucleo/codificacion.js, envuelto en partido.js) corre ACÁ y es la
 // única fuente de verdad. El iPad manda acciones por main/remoto.js; cada una
 // se aplica en el segundo real del toque y el estado resumido (espejo.js)
@@ -19,9 +23,10 @@ import { crearGrabadora, listarEntradas, formatoBytes } from '../../nucleo/graba
 import { crearVista } from '../../nucleo/botonera-vista.js';
 import { eventosParaPartido, clipDeVideo } from '../../nucleo/codificacion.js';
 import { xmlSportscode, csvTiempoEnHielo, csvPosesion, fechaPartido } from '../../nucleo/exportar.js';
-import { nombresEquipos } from '../../nucleo/plantilla.js';
+import { nombresEquipos, equipoDeBoton } from '../../nucleo/plantilla.js';
 import { crearPartido } from './partido.js';
 import { resumir, crearEmisor } from './espejo.js';
+import { planClipsEnVivo } from './clips-vivo.js';
 
 const ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
     '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18.5h2"/>' +
@@ -72,6 +77,9 @@ function estadoNuevo(ctx) {
         sinIpad: false,
         partido: null, emisor: null, vista: null,
         caidoDesde: null,         // Date.now() desde que no hay iPad activo conectado
+        // Clips en vivo para el iPad que mira. porEvento: id del evento →
+        // {id, tiempos, meta, ruta}; cola: los cortes, de a uno.
+        enVivo: { ffmpeg: false, porEvento: new Map(), n: 0, cola: Promise.resolve(), fallo: false },
         timers: [], quitar: [],
         guardado: null
     };
@@ -98,6 +106,7 @@ async function conectarIpad() {
         st.conexion = await st.api.remoto.iniciar({ plantillaId: st.plantilla.id, plantilla: plantillaParaIpad(), puerto });
         st.urlElegida = st.conexion.url;
         st.clientes = [];
+        vigilarClientes();
         // Si en un minuto no entra nadie, casi siempre es el firewall.
         const desde = Date.now();
         st.timers.push(setTimeout(() => {
@@ -117,9 +126,32 @@ function alCliente(e) {
     if (Array.isArray(e.clientes)) st.clientes = e.clientes;
     if (st.clientes.length) st.firewall = false;
     if (e.evento === 'pideControl') pedidoDeControl(e);
-    if (e.evento === 'conectado' && st.partido) emitir(true);
+    if (e.evento === 'conectado' && st.partido) { emitir(true); revisarClipsEnVivo(); }
     seguirConexion();
     if (st.fase === 'preparar') pintarPreparar(); else pintarVivo();
+}
+
+// Además de los avisos (onCliente), se le pregunta al servidor cada 2 s
+// quién está. En una Mac el iPad entraba (el servidor lo tenía, con su
+// latencia) y la pantalla seguía en "Esperando un iPad…": el aviso no
+// llegaba, y sin él no se habilita Empezar. La pregunta es un invoke, el
+// mismo camino que Conectar iPad, que ahí sí anda. Solo repinta si cambió
+// algo: repintar la preparación le saca el foco a un campo a medio escribir.
+function vigilarClientes() {
+    if (st.vigilando) return;
+    st.vigilando = true;
+    const firma = lista => JSON.stringify((lista || []).map(c => [c.dispositivo, c.conectado, c.activo]));
+    st.timers.push(setInterval(async () => {
+        if (!st || !st.conexion) return;
+        let e = null;
+        try { e = await st.api.remoto.estado(); } catch (_) { return; }
+        if (!st || !e || !Array.isArray(e.clientes)) return;
+        if (firma(e.clientes) === firma(st.clientes)) return;
+        if (e.clientes.length > st.clientes.length) console.warn('Captura desde iPad: el servidor tiene iPads que no llegaron por onCliente', e.clientes);
+        const antes = new Set(st.clientes.filter(c => c.conectado).map(c => c.dispositivo));
+        const nuevo = e.clientes.find(c => c.conectado && !antes.has(c.dispositivo));
+        alCliente({ clientes: e.clientes, ...(nuevo ? { evento: 'conectado', dispositivo: nuevo.dispositivo } : {}) });
+    }, 2000));
 }
 
 async function pedidoDeControl(e) {
@@ -258,7 +290,8 @@ async function empezar({ sinIpad = false } = {}) {
         relojVideo: () => (st && st.grab ? st.grab.vAhora() : null)
     });
     st.emisor = crearEmisor(m => st.api.remoto.enviar({ ...m, tServidor: Date.now() }).catch(() => {}));
-    st.quitar.push(st.partido.motor.alCambiar(() => { emitir(); pintarEstadoVivo(); pintarRegistro(); }));
+    st.quitar.push(st.partido.motor.alCambiar(() => { emitir(); pintarEstadoVivo(); pintarRegistro(); revisarClipsEnVivo(); }));
+    try { st.enVivo.ffmpeg = st.camara && await st.api.clips.disponible(); } catch (_) {}
     st.fase = 'vivo';
     seguirConexion();
 
@@ -320,6 +353,75 @@ async function guardarClip(ev) {
 }
 
 // ─────────────────────────────────────────────
+// CLIPS EN VIVO → el iPad que mira
+// ─────────────────────────────────────────────
+// Recién cuando hay un iPad que mira: sin él, un partido no llena la carpeta
+// Clips de cortes que nadie pidió. Si entra tarde, los eventos que ya
+// estaban se cortan igual (planClipsEnVivo los ve como nuevos).
+const hayQuienMire = () => st.clientes.some(c => !c.activo);
+
+function revisarClipsEnVivo() {
+    if (!st || st.fase !== 'vivo' || !st.enVivo.ffmpeg || !st.conexion || !hayQuienMire()) return;
+    const g = st.grab && st.grab.estado();
+    if (!g || !g.grabando || !g.ruta) return;
+    const cv = st.enVivo;
+    const eq = { A: st.local || 'Local', B: st.visitante || 'Visitante' };
+    const plan = planClipsEnVivo(st.partido.motor.estado().eventos, cv.porEvento, {
+        clipDe,
+        equipoDe: ev => eq[equipoDeBoton(st.plantilla.datos, ev.buttonId)] || null
+    });
+    for (const { ev, tiempos, meta } of plan.cortar) {
+        // Se anota ya, antes de cortar: el próximo cambio del motor no lo
+        // tiene que volver a encolar. Si el corte falla no se reintenta.
+        const previo = cv.porEvento.get(ev.id);
+        const hecho = { id: previo ? previo.id : 'c' + (++cv.n), tiempos, meta, ruta: null };
+        cv.porEvento.set(ev.id, hecho);
+        encolarCorte(hecho, g.ruta, ev);
+    }
+    for (const { ev, meta } of plan.actualizar) {
+        const hecho = cv.porEvento.get(ev.id);
+        hecho.meta = meta;
+        if (hecho.ruta) publicarClip(hecho);
+    }
+    for (const id of plan.quitar) {
+        const hecho = cv.porEvento.get(id);
+        cv.porEvento.delete(id);
+        st.api.remoto.enviar({ tipo: 'quitarClip', id: hecho.id }).catch(() => {});
+    }
+}
+
+function encolarCorte(hecho, video, ev) {
+    const s = st;
+    s.enVivo.cola = s.enVivo.cola.then(async () => {
+        // Ya se volvió a cortar con otros segundos, o el evento se borró.
+        if (s.enVivo.porEvento.get(ev.id) !== hecho) return;
+        const r = await s.api.clips.exportar({
+            ruta: video,
+            cortes: [{ desde: hecho.tiempos.desde, hasta: hecho.tiempos.hasta, nombre: `${hecho.meta.nombre} ${formatoTiempo(hecho.meta.inicio)}` }],
+            destino: 'carpeta',
+            subcarpeta: `Partidos/${s.nombre}`
+        });
+        hecho.ruta = r && r.rutas && r.rutas[0];
+        if (hecho.ruta && s.enVivo.porEvento.get(ev.id) === hecho) publicarClip(hecho, s);
+    }).catch(err => {
+        console.warn('Clip en vivo:', err);
+        // Una vez por partido: si ffmpeg no puede con este video, no puede
+        // con ninguno, y un aviso por evento taparía la pantalla.
+        if (!s.enVivo.fallo && st === s) {
+            s.enVivo.fallo = true;
+            s.ui.aviso('No se pudo cortar un clip para el iPad que mira: ' + ((err && err.message) || err), 'error');
+        }
+    });
+}
+
+function publicarClip(hecho, s = st) {
+    return s.api.remoto.enviar({
+        tipo: 'clip',
+        clip: { id: hecho.id, ruta: hecho.ruta, ...hecho.meta, duracion: hecho.tiempos.hasta - hecho.tiempos.desde }
+    }).catch(() => {});
+}
+
+// ─────────────────────────────────────────────
 // TERMINAR
 // ─────────────────────────────────────────────
 async function terminar({ desdeIpad = null } = {}) {
@@ -358,6 +460,10 @@ async function guardarPartido() {
     let video = null;
     if (st.grab && st.grab.estado().grabando) video = await st.grab.detener();
     else if (st.grab) video = st.grab.estado().ultima;
+    // Los clips en vivo que falten se terminan de cortar antes de mover el
+    // video: en Windows no se puede renombrar un archivo que ffmpeg está
+    // leyendo. Con la grabación cerrada, ninguno espera a que llegue más.
+    await st.enVivo.cola;
     const subcarpeta = 'Partidos/' + st.nombre;
     let videoRuta = null;
     if (video && video.ruta) videoRuta = (await api.video.ubicar(video.ruta, { nombre: st.nombre, subcarpeta })).ruta;
@@ -508,7 +614,7 @@ function listaIpads() {
     return h('ul', { class: 'tv-lista tv-ipad-clientes' }, st.clientes.map(c => h('li', { class: 'tv-lista__fila' },
         h('span', { class: 'tv-ipad-punto ' + (c.conectado ? 'is-ok' : 'is-mal') }),
         h('span', { texto: c.nombre || 'iPad' }),
-        h('span', { class: 'tv-ipad-tenue', texto: c.activo ? 'codifica' : 'mira' }),
+        h('span', { class: 'tv-ipad-tenue', texto: c.activo ? 'codifica' : 'mira los clips' }),
         h('span', { class: 'tv-ipad-tenue', texto: c.latenciaMs != null ? c.latenciaMs + ' ms' : '—' }))));
 }
 
@@ -584,9 +690,10 @@ function pintarEstadoVivo() {
 
     const act = iPadActivo();
     const con = q('tv-ipad-conectado');
-    con.textContent = st.sinIpad && !act ? 'Codificando en la compu'
+    const miran = st.clientes.filter(c => !c.activo && c.conectado).length;
+    con.textContent = (st.sinIpad && !act ? 'Codificando en la compu'
         : act ? `● ${act.nombre || 'iPad'}${act.latenciaMs != null ? ' · ' + act.latenciaMs + ' ms' : ''}`
-        : '● iPad desconectado';
+        : '● iPad desconectado') + (miran ? ` · ${miran} mirando clips` : '');
     con.className = 'tv-ipad-conectado ' + (act ? 'is-ok' : st.sinIpad ? '' : 'is-mal');
 
     seguirConexion();
