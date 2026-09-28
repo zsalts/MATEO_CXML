@@ -234,11 +234,13 @@ async function sinPlantillas(ctx, titulo) {
     div.className = 'tv-vacio';
     div.innerHTML = `${iconoHTML('botonera')}
         <div class="tv-vacio__titulo">Todavía no hay plantillas</div>
-        <div>Las botoneras se arman en la app del iPad. Exportá una copia de seguridad<br>o una plantilla desde el iPad e importala acá.</div>`;
+        <div>Armá una botonera en la compu (Base de datos › Plantillas), o exportá<br>una copia de seguridad o una plantilla desde el iPad e importala acá.</div>`;
     const r = await modal({
         titulo, contenido: div, ancho: 480,
-        botones: [{ texto: 'Cancelar', valor: null }, { texto: 'Importar del iPad', valor: 'importar', primario: true }]
+        botones: [{ texto: 'Cancelar', valor: null }, { texto: 'Armar una', valor: 'armar' },
+                  { texto: 'Importar del iPad', valor: 'importar', primario: true }]
     });
+    if (r === 'armar') { ctx.navegar('base', { pestana: 'plantillas', nueva: true }); return null; }
     if (r !== 'importar') return null;
     try {
         const res = await ctx.api.plantillas.importarArchivo();

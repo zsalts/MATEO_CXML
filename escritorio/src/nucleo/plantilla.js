@@ -115,7 +115,7 @@ export function normalizar(datos) {
             n.hoja = e.hoja || null;
             if (n.subHojaId === undefined) n.subHojaId = null;
             if (Array.isArray(e.popupPos)) n.popupPos = e.popupPos.slice(0, n.popups.length);
-            if (typeof n.atajo === 'string') n.atajo = n.atajo.trim().toLowerCase().slice(0, 1) || undefined;
+            if (typeof n.atajo === 'string') n.atajo = teclaDeAtajo(n.atajo) || undefined;
             if (n.atajo === undefined) delete n.atajo;
             return n;
         });
@@ -237,10 +237,18 @@ export function contadoresDe(datos, elId) {
 // Atajos de teclado (element.atajo, campo nuevo que el iPad ignora). Una
 // tecla repetida no se asigna a ninguno de los dos: disparar el que "gane"
 // sin avisar sería peor que no disparar nada.
+// La tecla de un atajo como la escribe la captura (e.key): una letra en
+// minúscula, o F1–F12 tal cual. Un atajo viejo de más letras queda en la primera.
+export function teclaDeAtajo(v) {
+    const t = typeof v === 'string' ? v.trim() : '';
+    if (/^f([1-9]|1[0-2])$/i.test(t)) return t.toUpperCase();
+    return t.toLowerCase().slice(0, 1);
+}
+
 export function atajos(datos) {
     const porTecla = new Map();
     (datos.elements || []).forEach(e => {
-        const t = typeof e.atajo === 'string' ? e.atajo.trim().toLowerCase() : '';
+        const t = teclaDeAtajo(e.atajo);
         if (!t) return;
         if (!porTecla.has(t)) porTecla.set(t, []);
         porTecla.get(t).push(e.id);

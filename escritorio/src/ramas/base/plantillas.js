@@ -1,32 +1,62 @@
-// Pestaña Plantillas: las botoneras que vinieron del iPad. Acá no se diseñan
-// (eso se hace en el iPad o en la web): se ven, se renombran, se duplican,
-// se exportan de vuelta para el iPad, se borran, y se les pone atajos de
-// teclado, que es lo único que la compu agrega (element.atajo; el iPad lo
-// ignora).
+// Pestaña Plantillas: las botoneras, vengan del iPad o se armen acá. Se ven,
+// se diseñan en el editor (editor.js, igual que en el iPad), se renombran, se
+// duplican, se exportan para el iPad, se borran, y se les pone atajos de
+// teclado (element.atajo; el iPad lo ignora).
 
 import { h, llenar, boton, crearIcono, intentar, hacer, cargarNucleo, vacio, fechaCorta } from './comun.js';
 import { datosDePlantilla, botonesDePlantilla, atajosRepetidos, atajoValido, conAtajo, rectangulosMiniatura, NOMBRE_TIPO } from './logica.js';
+import { abrirEditor } from './editor.js';
+import { plantillaVacia } from './editor-logica.js';
 
-const ORIGEN = { ipad: 'Del iPad', nube: 'De la nube', archivo: 'De un archivo', web: 'De la web' };
+const ORIGEN = { ipad: 'Del iPad', nube: 'De la nube', archivo: 'De un archivo', web: 'De la web', local: 'Hecha en la compu' };
 
 export function crearPestanaPlantillas(ctx) {
     const api = ctx.api;
     let plantillas = [];
     let elegida = null;          // { id, nombre, datos }
     const vistas = [];           // miniaturas con crearVista, para destruirlas
+    let editor = null;           // el editor abierto, si hay
 
     const grilla = h('div', { class: 'tv-base-pt__grilla' });
     const detalle = h('div', { class: 'tv-base-pt__detalle' });
-    const el = h('div', { class: 'tv-base-pt' },
-        h('div', { class: 'tv-base-pt__izq' },
-            h('div', { class: 'tv-barra' },
-                h('span', { class: 'tv-barra__titulo' }, 'Plantillas'),
-                h('span', { class: 'tv-chica tv-texto-2' }, 'Se arman en el iPad y se traen acá'),
-                h('span', { class: 'tv-barra__espacio' }),
-                boton('Importar archivo', { icono: 'importar', clase: 'tv-btn--chico', titulo: 'El archivo que exporta el iPad', alHacer: () => importar('archivo') }),
-                boton('Traer de la nube', { icono: 'nube', clase: 'tv-btn--chico', alHacer: () => importar('nube') })),
-            grilla),
-        detalle);
+    const izq = h('div', { class: 'tv-base-pt__izq' },
+        h('div', { class: 'tv-barra' },
+            h('span', { class: 'tv-barra__titulo' }, 'Plantillas'),
+            h('span', { class: 'tv-chica tv-texto-2' }, 'Armalas acá o traelas del iPad'),
+            h('span', { class: 'tv-barra__espacio' }),
+            boton('Nueva plantilla', { icono: 'mas', clase: 'tv-btn--chico tv-btn--primario', titulo: 'Armar una botonera en la compu', alHacer: () => nueva() }),
+            boton('Importar archivo', { icono: 'importar', clase: 'tv-btn--chico', titulo: 'El archivo que exporta el iPad', alHacer: () => importar('archivo') }),
+            boton('Traer de la nube', { icono: 'nube', clase: 'tv-btn--chico', alHacer: () => importar('nube') })),
+        grilla);
+    const el = h('div', { class: 'tv-base-pt' }, izq, detalle);
+
+    // ── Editor ──
+    // Ocupa toda la pestaña: la grilla y el detalle quedan escondidos atrás
+    // y vuelven al cerrarlo, con la plantilla que se editó elegida.
+    function editar(id, nombre, datos) {
+        if (editor) return;
+        izq.hidden = true;
+        detalle.hidden = true;
+        editor = abrirEditor(ctx, {
+            id, nombre, datos,
+            alCerrar: async idGuardado => {
+                editor = null;
+                izq.hidden = false;
+                detalle.hidden = false;
+                ctx.miga?.('Plantillas');
+                if (idGuardado != null) elegida = { id: idGuardado };
+                await cargar();
+            }
+        });
+        el.appendChild(editor.el);
+        ctx.miga?.(nombre ? 'Editar ' + nombre : 'Nueva plantilla');
+    }
+
+    async function nueva() {
+        const n = await ctx.ui.pedirTexto('Nueva plantilla', '', { etiqueta: 'Nombre', placeholder: 'Ej.: Hockey — Primera', si: 'Crear' });
+        if (!n || !n.trim()) return;
+        editar(null, n.trim(), plantillaVacia());
+    }
 
     // ── Datos ──
     async function cargar() {
@@ -55,8 +85,9 @@ export function crearPestanaPlantillas(ctx) {
         vistas.splice(0).forEach(v => { try { v.destruir(); } catch (_) { /* nada */ } });
         if (!plantillas.length) {
             grilla.replaceChildren(vacio('botonera', 'Todavía no hay plantillas',
-                'Armá la botonera en el iPad, exportala y traela con "Importar archivo" o "Traer de la nube".',
-                boton('Importar archivo', { icono: 'importar', clase: 'tv-btn--primario', alHacer: () => importar('archivo') })));
+                'Armá una botonera acá, o traé las del iPad con "Importar archivo" o "Traer de la nube".',
+                boton('Nueva plantilla', { icono: 'mas', clase: 'tv-btn--primario', alHacer: () => nueva() }),
+                boton('Importar archivo', { icono: 'importar', alHacer: () => importar('archivo') })));
             return;
         }
         const tarjetas = plantillas.map(p => {
@@ -164,12 +195,15 @@ export function crearPestanaPlantillas(ctx) {
                 boton('Capturar con esta', { icono: 'camara', clase: 'tv-btn--primario', alHacer: () => ctx.navegar('captura', { plantillaId: id }) }),
                 boton('Capturar desde iPad', { icono: 'ipad', alHacer: () => ctx.navegar('ipad', { plantillaId: id }) })),
             h('div', { class: 'tv-base-pt__acciones' },
+                boton('Editar diseño', { icono: 'botonera', clase: 'tv-btn--chico', titulo: 'Mover, agregar y configurar botones, como en el iPad',
+                                         alHacer: () => editar(id, nombre, elegida.crudo) }),
                 boton('Renombrar', { icono: 'lapiz', clase: 'tv-btn--chico', alHacer: () => renombrar() }),
                 boton('Duplicar', { icono: 'copia', clase: 'tv-btn--chico', alHacer: () => duplicar() }),
                 boton('Exportar para el iPad', { icono: 'descargar', clase: 'tv-btn--chico', alHacer: () => exportar() }),
                 boton('Borrar', { icono: 'basura', clase: 'tv-btn--chico tv-btn--peligro', alHacer: () => borrar() })),
             h('div', { class: 'tv-base-pt__ayuda tv-chica tv-texto-2' },
-                'El diseño se cambia en el iPad. Acá solo se ponen los atajos de teclado para capturar en la compu: tocá el casillero y apretá la tecla.'),
+                'Cada botón puede tener una tecla para tocarlo en la Captura en vivo: tocá el casillero y apretá la tecla. ',
+                'Para mover o agregar botones, "Editar diseño".'),
             conflicto.length ? h('div', { class: 'tv-base-error tv-chica' }, crearIcono('alerta'),
                 ` Teclas repetidas: ${conflicto.map(k => k.toUpperCase()).join(', ')}. En la captura, esa tecla dispara solo el primero.`) : null,
             botones.length
@@ -230,11 +264,22 @@ export function crearPestanaPlantillas(ctx) {
         }
     }
 
+    // Desde Inicio: {nueva:true} abre el editor con una plantilla en blanco.
+    async function activar(params = {}) {
+        await cargar();
+        if (params.nueva && !editor) await nueva();
+    }
+
     return {
         el,
-        activar: cargar,
-        teclas: () => false,
+        activar,
+        teclas: e => !!editor && editor.teclas(e),
+        puedeSalir: () => editor ? editor.puedeSalir() : true,
         pausar() {},
-        destruir() { vistas.splice(0).forEach(v => { try { v.destruir(); } catch (_) { /* nada */ } }); el.remove(); }
+        destruir() {
+            if (editor) { editor.destruir(); editor = null; }
+            vistas.splice(0).forEach(v => { try { v.destruir(); } catch (_) { /* nada */ } });
+            el.remove();
+        }
     };
 }

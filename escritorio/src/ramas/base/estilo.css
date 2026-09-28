@@ -534,6 +534,209 @@
     cursor: default;
 }
 .tv-base-pt__atajo.es-repetido { border-color: var(--tv-peligro); color: var(--tv-peligro); }
+.tv-base-pt > [hidden] { display: none !important; }
+
+/* ── Editor de plantillas ──
+   Paleta | lienzo con pestañas | inspector. El lienzo es lo único con
+   scroll en las dos direcciones; la paleta y el inspector, solo vertical. */
+.tv-ed { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tv-ed__barra { flex: none; gap: var(--tv-esp-2); }
+.tv-ed__nombre { width: 240px; font-weight: 600; }
+.tv-ed__estado.es-sucio { color: var(--tv-aviso); }
+.tv-ed__cuerpo { flex: 1; display: flex; min-height: 0; }
+
+.tv-ed__paleta {
+    flex: none;
+    width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--tv-esp-2);
+    overflow-y: auto;
+    background: var(--tv-panel);
+    border-right: 1px solid var(--tv-borde);
+}
+.tv-ed__paleta-titulo { padding: var(--tv-esp-1) var(--tv-esp-2); text-transform: uppercase; letter-spacing: .04em; }
+.tv-ed__pieza {
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: 6px var(--tv-esp-2);
+    border: 0;
+    border-radius: var(--tv-radio);
+    background: none;
+    color: var(--tv-texto);
+    font: inherit;
+    text-align: left;
+    cursor: grab;
+}
+.tv-ed__pieza:hover { background: var(--tv-panel-3); }
+.tv-ed__pieza:active { cursor: grabbing; }
+.tv-ed__muestra {
+    flex: none;
+    width: 18px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--tv-borde-fuerte);
+}
+.tv-ed__muestra[data-tipo="container"], .tv-ed__muestra[data-tipo="text"], .tv-ed__muestra[data-tipo="image"] { border-style: dashed; }
+.tv-ed__muestra[data-tipo="possession"], .tv-ed__muestra[data-tipo="teams"] { background: linear-gradient(90deg, #3a8fd6 50%, #dc2626 50%) !important; }
+.tv-ed__muestra[data-tipo="counter"] { background: var(--tv-panel-2) !important; }
+
+.tv-ed__centro { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tv-ed__hojas {
+    flex: none;
+    display: flex;
+    gap: 2px;
+    padding: var(--tv-esp-1) var(--tv-esp-2) 0;
+    overflow-x: auto;
+    background: var(--tv-panel);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-ed__hoja {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--tv-esp-1);
+    height: 30px;
+    padding: 0 var(--tv-esp-3);
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: var(--tv-radio) var(--tv-radio) 0 0;
+    background: none;
+    color: var(--tv-texto-2);
+    font: inherit;
+}
+.tv-ed__hoja:hover { color: var(--tv-texto); }
+.tv-ed__hoja[aria-selected="true"] { color: var(--tv-texto); background: var(--tv-fondo); border-color: var(--tv-borde); }
+.tv-ed__hoja--mas .tv-icono { width: 14px; height: 14px; }
+
+.tv-ed__scroll { flex: 1; min-height: 0; overflow: auto; background: var(--tv-fondo); }
+.tv-ed__lienzo {
+    position: relative;
+    /* Rejilla de puntos cada 16 px: se ve dónde va a caer lo que soltás */
+    background-image: radial-gradient(circle, var(--tv-borde) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+}
+/* z-index 0 encierra los z-index de los botones de la vista (10, 20): sin
+   eso quedarían encima de la capa y taparían las teclas y los tiradores. */
+.tv-ed__vista { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.tv-ed__flechas { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; color: var(--tv-texto-2); }
+.tv-ed__flechas line { stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.tv-ed__flechas line.es-elegida { stroke: var(--tv-acento); stroke-dasharray: none; }
+.tv-ed__flechas path { fill: currentColor; }
+.tv-ed__capa { position: absolute; inset: 0; z-index: 2; }
+.tv-ed__caja {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px dashed transparent;
+    border-radius: 4px;
+    cursor: move;
+}
+.tv-ed__caja:hover { border-color: var(--tv-texto-3); }
+.tv-ed__caja.es-elegida { border: 2px solid var(--tv-acento); box-shadow: 0 0 0 3px var(--tv-acento-suave); }
+.tv-ed__tecla {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--tv-panel);
+    border: 1px solid var(--tv-borde-fuerte);
+    color: var(--tv-texto);
+    font: 700 11px/16px var(--tv-fuente-mono);
+    text-align: center;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.tv-ed__tirador {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--tv-acento);
+    border: 2px solid var(--tv-fondo);
+    cursor: nwse-resize;
+    z-index: 1;
+}
+/* Con el tirador a la vista, la tecla se corre para no taparlo */
+.tv-ed__tirador ~ .tv-ed__tecla, .tv-ed__tecla:has(~ .tv-ed__tirador) { right: 10px; }
+.tv-ed__marco {
+    position: absolute;
+    border: 1px solid var(--tv-acento);
+    background: var(--tv-acento-suave);
+    pointer-events: none;
+}
+
+.tv-ed__inspector {
+    flex: none;
+    width: 300px;
+    overflow-y: auto;
+    background: var(--tv-panel);
+    border-left: 1px solid var(--tv-borde);
+}
+.tv-ed__seccion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tv-esp-3);
+    padding: var(--tv-esp-4);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-ed__seccion h3 { margin: 0; font-size: var(--tv-letra); font-weight: 600; }
+.tv-ed__seccion p { margin: 0; line-height: 1.45; }
+.tv-ed__campo { display: flex; flex-direction: column; gap: var(--tv-esp-1); min-width: 0; }
+.tv-ed__campo > .tv-campo { width: 100%; box-sizing: border-box; }
+.tv-ed__campo textarea.tv-campo { resize: vertical; font: inherit; }
+.tv-ed__etiqueta { font-size: var(--tv-letra-chica); color: var(--tv-texto-2); }
+.tv-ed__ayuda { line-height: 1.35; }
+.tv-ed__subtitulo { color: var(--tv-texto-2); margin-top: var(--tv-esp-1); }
+.tv-ed__geo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--tv-esp-2); }
+.tv-ed__color { display: flex; align-items: center; gap: var(--tv-esp-2); }
+.tv-ed__color input[type="color"] { width: 44px; height: 28px; padding: 0 2px; border: 1px solid var(--tv-borde); border-radius: var(--tv-radio); background: none; }
+.tv-ed__campo-tecla {
+    width: 72px !important;
+    text-align: center;
+    text-transform: uppercase;
+    caret-color: transparent;
+    cursor: default;
+    font-weight: 700;
+}
+.tv-ed__campo-tecla:focus { border-color: var(--tv-acento); background: var(--tv-acento-suave); }
+.tv-ed__lista {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 168px;
+    overflow-y: auto;
+    padding: var(--tv-esp-1);
+    border: 1px solid var(--tv-borde);
+    border-radius: var(--tv-radio);
+}
+.tv-ed__casilla { display: flex; align-items: center; gap: var(--tv-esp-2); min-width: 0; }
+.tv-ed__casilla > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-ed__casilla > .tv-chica { margin-left: auto; flex: none; }
+.tv-ed__acciones { display: flex; flex-wrap: wrap; gap: var(--tv-esp-2); padding: var(--tv-esp-4); }
+.tv-ed__seccion .tv-ed__acciones { padding: 0; }
+.tv-ed__teclas { display: flex; flex-direction: column; gap: 2px; }
+.tv-ed__tecla-fila {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: 4px var(--tv-esp-2);
+    border: 0;
+    border-radius: var(--tv-radio);
+    background: none;
+    color: var(--tv-texto);
+    font: inherit;
+    text-align: left;
+}
+.tv-ed__tecla-fila:hover { background: var(--tv-panel-3); }
+.tv-ed__atajos { margin: 0; padding-left: 1.1em; line-height: 1.6; }
 
 /* ─────────────────────────────────────────────
    PESTAÑA PLAYLISTS

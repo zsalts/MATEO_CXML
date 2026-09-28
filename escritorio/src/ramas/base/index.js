@@ -95,6 +95,13 @@ export default {
         });
 
         montada = {
+            // El editor de plantillas con cambios sin guardar pregunta antes.
+            async puedeSalir() {
+                for (const p of pestanas.values()) {
+                    if (p.puedeSalir && !(await p.puedeSalir())) return false;
+                }
+                return true;
+            },
             desmontar() {
                 window.removeEventListener('keydown', alTeclear);
                 dejarTema();
@@ -109,11 +116,16 @@ export default {
         const inicial = tienePartido ? 'partidos'
             : PESTANAS.some(p => p.id === params.pestana) ? params.pestana
             : lsLeer() || 'partidos';
-        await ir(inicial, tienePartido ? { partidoId: params.partidoId } : {});
+        await ir(inicial, tienePartido ? { partidoId: params.partidoId }
+            : inicial === 'plantillas' && params.nueva ? { nueva: true } : {});
     },
 
     async desmontar() {
-        if (montada) { montada.desmontar(); montada = null; }
+        if (montada) {
+            if (!(await montada.puedeSalir())) return false;
+            montada.desmontar();
+            montada = null;
+        }
         return true;
     }
 };

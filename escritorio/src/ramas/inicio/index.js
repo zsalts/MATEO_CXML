@@ -63,6 +63,9 @@ export default {
                             <h2 id="tv-inicio-t-plantillas">Mis plantillas</h2>
                             <span class="tv-chip" data-cuenta-plantillas></span>
                             <span class="tv-barra__espacio"></span>
+                            <button type="button" class="tv-btn tv-btn--chico" data-nueva-plantilla title="Armar una botonera en la compu, como en el iPad">
+                                ${iconoHTML('mas')} Nueva
+                            </button>
                             <button type="button" class="tv-btn tv-btn--chico" data-importar="archivo" title="Una copia de seguridad o una plantilla exportada desde el iPad">
                                 ${iconoHTML('ipad')} Importar del iPad (archivo)
                             </button>
@@ -93,6 +96,7 @@ export default {
         contenedor.addEventListener('click', e => {
             const imp = e.target.closest('[data-importar]');
             if (imp) return importar(imp.dataset.importar, imp);
+            if (e.target.closest('[data-nueva-plantilla]')) return ctx.navegar('base', { pestana: 'plantillas', nueva: true });
             const plantilla = e.target.closest('[data-plantilla]');
             if (plantilla) return capturarCon(ctx, idDe(plantilla.dataset.plantilla, listaPlantillas), plantilla.dataset.nombre);
             const partido = e.target.closest('[data-partido]');
@@ -167,13 +171,16 @@ function pintarPasos(raiz, primeraVez) {
         <div class="tv-inicio-pasos__texto">
             <h2>Para arrancar</h2>
             <ol>
-                <li class="es-actual"><span>1</span> Importá tus plantillas del iPad</li>
+                <li class="es-actual"><span>1</span> Armá una plantilla o importala del iPad</li>
                 <li><span>2</span> Conectá la cámara</li>
                 <li><span>3</span> Capturá</li>
             </ol>
         </div>
         <button type="button" class="tv-btn tv-btn--primario tv-inicio-pasos__boton" data-importar="archivo">
             ${iconoHTML('ipad')} Importar del iPad
+        </button>
+        <button type="button" class="tv-btn tv-inicio-pasos__boton" data-nueva-plantilla>
+            ${iconoHTML('mas')} Armar una acá
         </button>`;
 }
 
@@ -185,7 +192,7 @@ function pintarPlantillas(raiz, lista, api) {
             <div class="tv-vacio">
                 ${iconoHTML('botonera')}
                 <div class="tv-vacio__titulo">Sin plantillas todavía</div>
-                <div>Las botoneras se arman en el iPad.<br>Exportá una copia de seguridad allá e importala acá.</div>
+                <div>Armá una con "Nueva", o exportá una copia de seguridad<br>en el iPad e importala acá.</div>
             </div>`;
         return;
     }

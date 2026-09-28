@@ -55,9 +55,11 @@ en el menú Inicio y con acceso directo en el escritorio.
 
 La app abre en el **menú principal**:
 
-1. **Mis plantillas → Importar del iPad**: la copia de seguridad, una
-   plantilla o una sesión exportada desde el iPad (o "Traer de la nube"). Las
-   botoneras se arman en el iPad; acá solo se les ponen atajos de teclado.
+1. **Mis plantillas**: **Nueva** arma una botonera en la compu, igual que en
+   el iPad (Base de datos › Plantillas › Editar diseño para cambiar una que
+   ya está), con una tecla por botón para codificar con el teclado. O
+   **Importar del iPad**: la copia de seguridad, una plantilla o una sesión
+   exportada desde el iPad (o "Traer de la nube").
 2. **Captura en vivo**: elegís la cámara o la placa HDMI y la plantilla.
    **PLAY arranca la grabación.** Cada evento se ve al instante (▶ Ver) y se
    corta como clip sin esperar (✂). **Terminar** deja el video, el XML y los
