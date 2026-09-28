@@ -14,6 +14,7 @@ import { crearPestanaPartidos } from './partidos.js';
 import { crearPestanaClips } from './clips.js';
 import { crearPestanaPlantillas } from './plantillas.js';
 import { crearPestanaPlaylists } from './playlists.js';
+import { cerrarPresentacion } from './presentacion.js';
 
 const PESTANAS = [
     { id: 'partidos',   titulo: 'Partidos',   icono: 'base',     crear: crearPestanaPartidos },
@@ -103,6 +104,7 @@ export default {
                 return true;
             },
             desmontar() {
+                cerrarPresentacion();
                 window.removeEventListener('keydown', alTeclear);
                 dejarTema();
                 pestanas.forEach(p => { try { p.pausar(); p.destruir(); } catch (err) { console.error('[base] destruir', err); } });

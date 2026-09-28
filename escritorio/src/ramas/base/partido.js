@@ -9,10 +9,11 @@ import { h, llenar, boton, crearIcono, intentar, hacer, divisor, guardarDisposic
 import {
     datosDePlantilla, ordenDePlantilla, agruparMatriz, filtrarEventos, filtroVacio, filtroActivo,
     opcionesDeFiltro, colorDeEvento, tramoVideo, formatoTiempo, nombreEquipo, estadisticas,
-    csvEstadisticas, csvEventos, armarCola, seleccionar, crearHistorial, eventoAContrato,
+    csvEstadisticas, csvEventos, armarCola, armarPresentacion, seleccionar, crearHistorial, eventoAContrato,
     subcarpetaDePartido, nombreBaseDePartido, ORIGENES
 } from './logica.js';
 import { crearReproductor } from './reproductor.js';
+import { presentar } from './presentacion.js';
 import { teclaMod, sumaSeleccion, textoAtajo } from '../../ui/plataforma.js';   // ⌘ en Mac, Ctrl en Windows (Agente 7)
 import { crearMatriz } from './matriz.js';
 import {
@@ -69,6 +70,7 @@ export async function abrirPartido(ctx, contenedor, id, { alCerrar, alCambio, di
         boton('', { icono: 'lapiz', clase: 'tv-btn--icono tv-btn--fantasma tv-btn--chico', titulo: 'Renombrar el partido', alHacer: () => renombrar() }),
         chips,
         h('span', { class: 'tv-barra__espacio' }),
+        boton('Presentar', { icono: 'video', titulo: 'Los elegidos (o lo filtrado) en pantalla completa, de a uno', alHacer: () => presentarSeleccion() }),
         boton('A playlist', { icono: 'lista', titulo: 'Agregar la selección a una playlist', alHacer: () => aPlaylist() }),
         boton('Exportar', { icono: 'descargar', titulo: 'XML de Sportscode o CSV', alHacer: () => menuExportar() }),
         hayClips ? btnClips : h('span', { title: MOTIVO_SIN_CLIPS }, btnClips),
@@ -286,6 +288,18 @@ export async function abrirPartido(ctx, contenedor, id, { alCerrar, alCambio, di
         matriz.mostrar(t.desde);
         reproductor.detenerCola();
         await reproductor.reproducirTramo(partido.video_ruta, Math.max(0, t.desde - margen), t.hasta + margen);
+    }
+
+    // Presentar: los elegidos, o lo que pasa el filtro, en el orden del partido.
+    function presentarSeleccion() {
+        const lista = elegidosOFiltrados();
+        if (!lista.length) { ctx.ui.aviso('No hay eventos para presentar', 'aviso'); return; }
+        if (!partido.video_ruta || videoFalta) { ctx.ui.aviso('Este partido no tiene video para presentar', 'aviso'); return; }
+        const { items } = armarPresentacion(lista, {
+            margen, videoDe: () => partido.video_ruta, desfaseDe: () => desfase, partidoDe: () => partido.nombre
+        });
+        reproductor.pausar();
+        presentar(ctx, items, { titulo: partido.nombre });
     }
 
     function reproducirSeleccion() {

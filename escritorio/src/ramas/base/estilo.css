@@ -805,3 +805,113 @@
     .tv-base-tp__fila { grid-template-columns: minmax(160px, 2fr) 150px minmax(120px, 1.4fr) 70px 56px 132px; }
     .tv-base-tp__col--origen { display: none; }
 }
+
+/* ─────────────────────────────────────────────
+   PRESENTACIÓN (presentacion.js)
+   ─────────────────────────────────────────────
+   Toda la ventana (o la pantalla entera): el video manda, la lista al
+   costado se puede esconder. Los textos del rótulo van grandes, para que se
+   lean desde el fondo de un vestuario con un proyector. Se monta en <body>:
+   z-index por debajo de los avisos (200) y por encima de los modales (100). */
+.tv-pres {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    color: #f2f2f7;
+}
+.tv-pres__cabeza {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-2) var(--tv-esp-3);
+    background: var(--tv-panel);
+    color: var(--tv-texto);
+    border-bottom: 1px solid var(--tv-borde);
+}
+.tv-pres__titulo { font-weight: 600; max-width: 40vw; }
+.tv-pres__contador { color: var(--tv-texto-2); }
+.tv-pres .tv-btn[aria-pressed="true"] { background: var(--tv-acento-suave); border-color: var(--tv-acento); color: var(--tv-acento); }
+
+.tv-pres__cuerpo { flex: 1; display: flex; min-height: 0; }
+.tv-pres__escenario { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.tv-pres__video { flex: 1; position: relative; display: flex; min-height: 0; }
+.tv-pres .tv-base-reproductor { background: #000; }
+/* La cola propia del reproductor sobra: la presentación tiene la suya */
+.tv-pres .tv-base-cola { display: none !important; }
+
+.tv-pres__rotulo {
+    position: absolute;
+    top: var(--tv-esp-4);
+    left: var(--tv-esp-4);
+    max-width: min(70%, 900px);
+    padding: var(--tv-esp-3) var(--tv-esp-4);
+    border-radius: var(--tv-radio-2);
+    background: rgba(0, 0, 0, .62);
+    color: #fff;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+}
+.tv-pres__nombre { font-size: clamp(20px, 2.6vw, 38px); font-weight: 700; line-height: 1.15; }
+.tv-pres__detalle { margin-top: 2px; font-size: clamp(13px, 1.2vw, 18px); opacity: .8; }
+.tv-pres__nota {
+    margin-top: var(--tv-esp-2);
+    padding-left: var(--tv-esp-2);
+    border-left: 3px solid var(--tv-aviso);
+    font-size: clamp(15px, 1.6vw, 24px);
+    line-height: 1.3;
+}
+.tv-pres__nota[hidden] { display: none; }
+.tv-pres__fin {
+    position: absolute;
+    left: 50%;
+    bottom: 76px;
+    transform: translateX(-50%);
+    padding: var(--tv-esp-2) var(--tv-esp-4);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .7);
+    color: #fff;
+    font-size: 15px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.tv-pres__fin[hidden] { display: none; }
+
+.tv-pres__pie {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    gap: var(--tv-esp-3);
+    padding: var(--tv-esp-3);
+    background: var(--tv-panel);
+    border-top: 1px solid var(--tv-borde);
+}
+.tv-pres__paso { min-width: 140px; justify-content: center; font-size: var(--tv-letra-grande); padding: 8px 18px; }
+
+.tv-pres__lista {
+    flex: none;
+    width: 320px;
+    overflow-y: auto;
+    background: var(--tv-panel);
+    color: var(--tv-texto);
+    border-left: 1px solid var(--tv-borde);
+}
+.tv-pres.es-sin-lista .tv-pres__lista { display: none; }
+.tv-pres__fila {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--tv-esp-2);
+    padding: var(--tv-esp-2) var(--tv-esp-3);
+    border-bottom: 1px solid var(--tv-borde);
+    cursor: default;
+}
+.tv-pres__fila:hover { background: var(--tv-panel-3); }
+.tv-pres__fila[aria-selected="true"] { background: var(--tv-acento-suave); box-shadow: inset 3px 0 0 var(--tv-acento); }
+.tv-pres__num { flex: none; min-width: 22px; color: var(--tv-texto-2); padding-top: 1px; }
+.tv-pres__fila-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tv-pres__fila-nota { color: var(--tv-aviso); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tv-pres__quitar { opacity: 0; }
+.tv-pres__fila:hover .tv-pres__quitar, .tv-pres__quitar:focus-visible { opacity: 1; }

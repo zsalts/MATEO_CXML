@@ -276,3 +276,20 @@ test('filtrar y ordenar partidos', () => {
     assert.deepEqual(L.ordenarPartidos(P, 'duracion', true).map(p => p.id), [2, 1, 3]);
     assert.deepEqual(L.ordenarPartidos(P, 'duracion', false).map(p => p.id), [1, 2, 3]);   // vacío al final
 });
+
+test('presentación: cada clip con su nombre, detalle y nota; sin video queda afuera', () => {
+    const evs = [
+        { id: 1, nombre: 'Tiro', partido_nombre: 'Norte vs Sur', equipo: 'A', video_ruta: 'a.mp4', v_inicio: 10, v_fin: 14,
+          etiquetas: [{ grupo: 'Resultado', texto: 'Gol' }], nota_playlist: '  mirá la marca  ' },
+        { id: 2, nombre: 'Córner', partido_nombre: 'Norte vs Sur', video_ruta: null, v_inicio: 20, v_fin: 22 },
+        { id: 1, nombre: 'Tiro', partido_nombre: 'Norte vs Sur', equipo: 'A', video_ruta: 'a.mp4', v_inicio: 10, v_fin: 14, nota_playlist: 'otra vez' }
+    ];
+    const { items, sinVideo } = L.armarPresentacion(evs, { margen: 2, notaDe: ev => ev.nota_playlist });
+    assert.equal(sinVideo, 1);
+    assert.equal(items.length, 2);
+    assert.deepEqual([items[0].desde, items[0].hasta, items[0].ruta], [8, 16, 'a.mp4']);
+    assert.equal(items[0].nombre, 'Tiro');
+    assert.equal(items[0].detalle, 'Norte vs Sur · Local · Gol');
+    assert.equal(items[0].nota, 'mirá la marca');
+    assert.equal(items[1].nota, 'otra vez', 'el mismo evento dos veces conserva la nota de cada uno');
+});

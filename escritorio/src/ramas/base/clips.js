@@ -4,10 +4,11 @@
 
 import { h, llenar, boton, crearIcono, intentar, divisor, guardarDisposicion, leerMargen, vacio } from './comun.js';
 import {
-    filtrarEventos, filtroVacio, filtroActivo, opcionesDeFiltro, armarCola, seleccionar,
+    filtrarEventos, filtroVacio, filtroActivo, opcionesDeFiltro, armarCola, armarPresentacion, seleccionar,
     tramoVideo, formatoTiempo, csvEventos
 } from './logica.js';
 import { crearReproductor } from './reproductor.js';
+import { presentar } from './presentacion.js';
 import { teclaMod, sumaSeleccion, textoAtajo } from '../../ui/plataforma.js';   // ⌘ en Mac, Ctrl en Windows (Agente 7)
 import { exportarClips, clipsDisponibles, MOTIVO_SIN_CLIPS, agregarAPlaylist, guardarCsv, subcarpetaClipsDe } from './acciones.js';
 
@@ -39,6 +40,7 @@ export function crearPestanaClips(ctx, { disposicion }) {
     const centro = h('div', { class: 'tv-base-clips__lista' },
         h('div', { class: 'tv-barra' }, resumen, h('span', { class: 'tv-barra__espacio' }),
             boton('Reproducir', { icono: 'play', clase: 'tv-btn--chico tv-btn--primario', titulo: 'Reproducir la selección (o todos) seguidos · Enter', alHacer: () => reproducir() }),
+            boton('Presentar', { icono: 'video', clase: 'tv-btn--chico', titulo: 'Los elegidos (o todos) en pantalla completa, de a uno', alHacer: () => presentarClips() }),
             boton('A playlist', { icono: 'lista', clase: 'tv-btn--chico', alHacer: () => aPlaylist() }),
             btnCortar,
             boton('CSV', { icono: 'descargar', clase: 'tv-btn--chico', alHacer: () => csv() })),
@@ -203,6 +205,15 @@ export function crearPestanaClips(ctx, { disposicion }) {
         if (!items.length) { ctx.ui.aviso('Ninguno de estos clips tiene video', 'aviso'); return; }
         if (sinVideo) ctx.ui.aviso(`${sinVideo} ${sinVideo === 1 ? 'clip no tiene' : 'clips no tienen'} video: se saltean`, 'info');
         reproductor.reproducirCola(items);
+    }
+
+    // Presentar: los elegidos (o todos los que pasan el filtro), en el orden
+    // de la lista, de a uno y en pantalla completa.
+    function presentarClips() {
+        const { items, sinVideo } = armarPresentacion(elegidos(), { margen });
+        if (sinVideo && items.length) ctx.ui.aviso(`${sinVideo} ${sinVideo === 1 ? 'clip no tiene' : 'clips no tienen'} video: quedan afuera`, 'info');
+        reproductor.pausar();
+        presentar(ctx, items, { titulo: seleccion.size ? `${items.length} clips elegidos` : 'Clips' });
     }
 
     async function aPlaylist() {

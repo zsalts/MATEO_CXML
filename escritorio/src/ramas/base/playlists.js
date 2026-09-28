@@ -3,8 +3,9 @@
 // cambia de video solo) y se pueden cortar a archivos.
 
 import { h, boton, crearIcono, intentar, hacer, vacio, leerMargen } from './comun.js';
-import { armarCola, mover, tramoVideo, formatoTiempo, nombreLimpio } from './logica.js';
+import { armarCola, armarPresentacion, mover, tramoVideo, formatoTiempo, nombreLimpio } from './logica.js';
 import { crearReproductor } from './reproductor.js';
+import { presentar } from './presentacion.js';
 import { exportarClips, clipsDisponibles, MOTIVO_SIN_CLIPS } from './acciones.js';
 
 export function crearPestanaPlaylists(ctx) {
@@ -30,6 +31,7 @@ export function crearPestanaPlaylists(ctx) {
     const btnCortar = boton('Cortar', { icono: 'tijera', clase: 'tv-btn--chico', alHacer: () => cortar() });
     const barra = h('div', { class: 'tv-barra' }, titulo, h('span', { class: 'tv-barra__espacio' }),
         boton('Reproducir', { icono: 'play', clase: 'tv-btn--chico tv-btn--primario', titulo: 'Reproducir la playlist entera · Enter', alHacer: () => reproducir(0) }),
+        boton('Presentar', { icono: 'video', clase: 'tv-btn--chico', titulo: 'La playlist en pantalla completa, de a un clip, con sus notas', alHacer: () => presentarPlaylist() }),
         btnCortar,
         boton('', { icono: 'lapiz', clase: 'tv-btn--icono tv-btn--chico', titulo: 'Renombrar', alHacer: () => renombrar() }),
         boton('', { icono: 'basura', clase: 'tv-btn--icono tv-btn--chico tv-btn--peligro', titulo: 'Borrar la playlist', alHacer: () => borrar() }));
@@ -161,6 +163,18 @@ export function crearPestanaPlaylists(ctx) {
         if (!cola.length) { ctx.ui.aviso('Ningún clip de la playlist tiene video', 'aviso'); return; }
         if (saltados && i === 0) ctx.ui.aviso(`${saltados} ${saltados === 1 ? 'clip se saltea' : 'clips se saltean'}: sin video o borrados`, 'info');
         reproductor.reproducirCola(cola, inicio);
+    }
+
+    // Presentar: la playlist entera, en su orden, con la nota de cada clip
+    // en pantalla grande. Los borrados o sin video se saltean.
+    function presentarPlaylist() {
+        if (!actual || !actual.items.length) return;
+        reproductor.pausar();
+        const eventos = actual.items.filter(it => it.ev).map(it => ({ ...it.ev, nota_playlist: it.nota }));
+        const { items: lista, sinVideo } = armarPresentacion(eventos, { margen, notaDe: ev => ev.nota_playlist });
+        const faltan = sinVideo + (actual.items.length - eventos.length);
+        if (faltan && lista.length) ctx.ui.aviso(`${faltan} ${faltan === 1 ? 'clip queda afuera' : 'clips quedan afuera'}: sin video o borrados`, 'info');
+        presentar(ctx, lista, { titulo: actual.nombre });
     }
 
     async function quitar(i) {

@@ -453,6 +453,30 @@ export function armarCola(eventos, { margen = 0, videoDe = ev => ev.video_ruta, 
     return { items, sinVideo };
 }
 
+// La cola de una presentación: la de armarCola, y cada clip con lo que se
+// muestra en pantalla grande (nombre, de qué partido, etiquetas y la nota de
+// la playlist si tiene). `notaDe(ev)` y `partidoDe(ev)` son opcionales.
+export function armarPresentacion(eventos, { notaDe = () => '', partidoDe = ev => ev.partido_nombre || '', ...opciones } = {}) {
+    const { items, sinVideo } = armarCola(eventos, opciones);
+    // Un mismo evento puede estar dos veces (una playlist lo permite): se
+    // empareja por orden, no por id.
+    const conVideo = eventos.filter(ev => (opciones.videoDe || (e => e.video_ruta))(ev));
+    return {
+        sinVideo,
+        items: items.map((it, i) => {
+            const ev = conVideo[i];
+            const etiquetas = (ev.etiquetas || []).map(et => et.texto).filter(Boolean);
+            return {
+                ...it,
+                nombre: ev.nombre || 'Clip',
+                detalle: [partidoDe(ev), ev.equipo ? (ev.equipo === 'A' ? 'Local' : ev.equipo === 'B' ? 'Visitante' : ev.equipo) : '',
+                          etiquetas.join(', ')].filter(Boolean).join(' · '),
+                nota: String(notaDe(ev) || '').trim()
+            };
+        })
+    };
+}
+
 // Índice siguiente / anterior sin salirse. -1 si no hay a dónde ir.
 export function pasoCola(cola, indice, delta) {
     const i = indice + delta;

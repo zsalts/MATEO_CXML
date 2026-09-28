@@ -26,7 +26,11 @@ function iconoLocal(nombre) {
     return s;
 }
 
-export function crearReproductor(ctx, { alTiempo, alCambioCola, alFaltaVideo } = {}) {
+// alFinTramo(indice): si está, un clip de la cola que termina NO pasa solo al
+// siguiente: el video frena ahí y decide quien llama (la presentación).
+// saltearSinVideo: false = un clip cuyo video no abre se queda en pantalla
+// con el mensaje, en vez de pasar solo al siguiente.
+export function crearReproductor(ctx, { alTiempo, alCambioCola, alFaltaVideo, alFinTramo, saltearSinVideo = true } = {}) {
     const api = ctx.api;
     const video = h('video', { class: 'tv-base-video', preload: 'auto', playsinline: true });
     const mensaje = h('div', { class: 'tv-base-video__mensaje', hidden: true });
@@ -145,7 +149,7 @@ export function crearReproductor(ctx, { alTiempo, alCambioCola, alFaltaVideo } =
         pintarCola();
         const ok = await reproducirTramo(it.ruta, it.desde, it.hasta);
         // Un archivo que no abre no frena la playlist: se pasa al que sigue
-        if (!ok && indice === i) {
+        if (!ok && indice === i && saltearSinVideo) {
             ctx.ui.aviso(`No se pudo abrir el video de "${it.titulo}": se saltea`, 'error');
             await irACola(pasoCola(cola, i, 1));
         }
@@ -213,6 +217,12 @@ export function crearReproductor(ctx, { alTiempo, alCambioCola, alFaltaVideo } =
         rafId = 0;
         if (destruido) return;
         if (fin !== null && video.currentTime >= fin) {
+            if (indice >= 0 && alFinTramo) {
+                video.pause();
+                avisarTiempo();
+                alFinTramo(indice);
+                return;
+            }
             if (indice >= 0 && indice < cola.length - 1) { irACola(indice + 1); }
             else if (indice >= 0) { video.pause(); fin = null; detenerCola(); }
             else { video.pause(); fin = null; }
@@ -272,7 +282,10 @@ export function crearReproductor(ctx, { alTiempo, alCambioCola, alFaltaVideo } =
 
     return {
         el, video,
-        cargar, irA, reproducirTramo, reproducirCola, siguiente, anterior, detenerCola, alternar, teclas,
+        cargar, irA, reproducirTramo, reproducirCola, irACola, siguiente, anterior, detenerCola, alternar, teclas,
+        get indice() { return indice; },
+        // ¿El clip de la cola que suena ya llegó a su final?
+        get alFinal() { return indice >= 0 && fin !== null && video.currentTime >= fin - 0.05; },
         pausar() { video.pause(); },
         get tiempo() { return video.currentTime || 0; },
         get duracion() { return Number.isFinite(video.duration) ? video.duration : 0; },
