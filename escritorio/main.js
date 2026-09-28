@@ -22,6 +22,7 @@ const { crearVideo } = require('./main/video');
 const { crearSistema } = require('./main/sistema');
 const { registrarDatos } = require('./main/datos');
 const { crearNube } = require('./main/nube');
+const { crearActualizador } = require('./main/actualizar');
 // Lo de macOS (menu, permisos, semaforo, energia) vive en main/mac.js; aca
 // solo se enchufa. En Windows: IPC de permisos que dicen "concedido" y el
 // bloqueo de suspension mientras se graba, nada visible.
@@ -78,6 +79,10 @@ video.registrar(ipcMain);
 sistema.registrar(ipcMain);
 registrarDatos(ipcMain, { abrirBase, video, dialog, ventana: laVentana, nube });
 mac.registrarIpc({ ipcMain, systemPreferences, shell, obtenerVentana: laVentana });
+
+// Versiones nuevas desde GitHub Releases (main/actualizar.js).
+const actualizador = crearActualizador({ app, ventana: laVentana });
+actualizador.registrar(ipcMain);
 
 // Mientras se graba o el iPad esta conectado, ni App Nap (Mac) ni el reposo
 // pueden frenar la app. Se mira cada 2 s en vez de tocar video.js y remoto.js.
@@ -168,6 +173,7 @@ app.whenReady().then(async () => {
 
     enchufarRemoto();
     vigilarEnergia();
+    actualizador.arrancar();
 
     // La copia semanal no frena el arranque.
     setTimeout(() => sistema.respaldoSemanal().catch(e => console.warn('Respaldo semanal:', e.message)), 5000);
@@ -220,6 +226,8 @@ app.on('before-quit', (e) => {
         try { if (remoto && typeof remoto.detener === 'function') await remoto.detener(); } catch (err) { console.error('Al detener el remoto:', err); }
         try { bd.cerrar(); } catch (err) { console.error('Al cerrar la base:', err); }
         listoParaSalir = true;
+        // "Reiniciar ahora" de una actualización: instala y vuelve a abrir.
+        if (actualizador.alTerminarDeCerrar()) return;
         app.quit();
     })();
 });

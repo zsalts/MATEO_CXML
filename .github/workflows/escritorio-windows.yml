@@ -1,0 +1,79 @@
+# Arma el instalador de Windows y lo publica en GitHub Releases. La app
+# instalada mira ahí (main/actualizar.js) y se actualiza sola.
+#
+# Cada corrida es una versión nueva: 2.1.<número de corrida>. El número de
+# package.json no se toca en el repo; solo se cambia acá antes de armar, así
+# nunca hay que acordarse de subirlo a mano.
+#
+# Corre con cada push a la rama app que toque escritorio/. Si las pruebas
+# fallan no se publica nada y la app instalada sigue como estaba.
+
+name: Escritorio Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [app]
+    paths:
+      - 'escritorio/**'
+      - '.github/workflows/escritorio-windows.yml'
+
+# Crear el tag y la release con el token de la corrida.
+permissions:
+  contents: write
+
+# Dos pushes seguidos: se publican en orden, no a la vez.
+concurrency:
+  group: escritorio-windows
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: escritorio
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas
+        run: node --test --test-timeout=60000 --test-force-exit "test/*.test.js"
+        timeout-minutes: 10
+
+      - name: Versión
+        id: version
+        run: |
+          v="2.1.${{ github.run_number }}"
+          npm version "$v" --no-git-tag-version --allow-same-version
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      # El tag va sobre este commit. Si lo creara electron-builder, GitHub lo
+      # pondría sobre la rama principal, que no es la que se armó.
+      - name: Tag
+        run: |
+          git tag "v${{ steps.version.outputs.v }}" "$GITHUB_SHA"
+          git push origin "v${{ steps.version.outputs.v }}"
+
+      - name: Armar y publicar
+        run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tagview-windows
+          path: |
+            escritorio/dist/*.exe
+            escritorio/dist/latest.yml
+          if-no-files-found: error
+          retention-days: 14

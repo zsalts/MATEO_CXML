@@ -62,7 +62,9 @@ jobs:
       - name: Armar .dmg y .zip
         run: |
           set -o pipefail
-          npm run dist:mac -- --${{ matrix.arch }} 2>&1 | tee armado.log
+          # --publish never: package.json dice dónde publicar (lo usa el
+          # workflow de Windows); los .dmg quedan solo como artifacts.
+          npm run dist:mac -- --${{ matrix.arch }} --publish never 2>&1 | tee armado.log
         env:
           # Sin certificado: que electron-builder no busque uno en el llavero.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

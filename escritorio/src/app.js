@@ -332,6 +332,25 @@ try {
 } catch {}
 
 // ─────────────────────────────────────────────
+// ACTUALIZACIONES
+// ─────────────────────────────────────────────
+// La versión nueva se baja sola (main/actualizar.js) y se instala al cerrar
+// la app. Cuando está lista se avisa una vez, con la opción de reiniciar ya.
+let versionAvisada = null;
+function avisarActualizacion(e) {
+    if (!e || e.fase !== 'lista' || e.version === versionAvisada) return;
+    versionAvisada = e.version;
+    aviso(`Hay una versión nueva (${e.version}). Se instala sola al cerrar la app.`, 'info', {
+        duracion: 0,
+        accion: { texto: 'Reiniciar ahora', alHacer: () => api.actualizar.instalar().catch(() => {}) }
+    });
+}
+try {
+    api.actualizar?.onEstado?.(avisarActualizacion);
+    api.actualizar?.estado?.()?.then?.(avisarActualizacion, () => {});
+} catch {}
+
+// ─────────────────────────────────────────────
 // ARRANQUE
 // ─────────────────────────────────────────────
 armarLateral();

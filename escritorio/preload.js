@@ -127,6 +127,16 @@ const tv = {
         abrirAjustesSistema: (pagina) => llamar('sys:abrirAjustesSistema', pagina)
     },
 
+    // Versiones nuevas (main/actualizar.js). estado = { fase: 'nada' |
+    // 'buscando' | 'bajando' | 'lista' | 'error', version, porcentaje, actual, activo }
+    actualizar: {
+        estado:    () => llamar('actualizar:estado'),
+        buscar:    () => llamar('actualizar:buscar'),
+        // Cierra (preguntando si se graba), instala y vuelve a abrir.
+        instalar:  () => llamar('actualizar:instalar'),
+        onEstado:  escuchar('actualizar:estado')
+    },
+
     ventana: {
         tema: (colores) => llamar('ventana:tema', colores),
         // cb(boolean). En Mac el semaforo desaparece en pantalla completa.
