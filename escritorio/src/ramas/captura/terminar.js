@@ -32,6 +32,7 @@ const mensaje = err => (err && err.message) || String(err);
  * @param o.grabadora       null si no hay (archivo, o recuperando un respaldo)
  * @param o.grabado         { ruta } del video ya cerrado (recuperando un respaldo)
  * @param o.cola            la cola de cortes, o null
+ * @param o.antesDeMover    async () => void, o null (los clips en vivo que falten)
  * @param o.ponerFinal      ({ ruta, nombre }) => void: desde acá los cortes van a ese archivo
  * @param o.alPaso          (texto) => void
  */
@@ -57,6 +58,9 @@ export async function terminarCaptura(o) {
             const s = o.grabadora.estado();
             grabado = s.grabando || s.deteniendo ? await o.grabadora.detener() : (s.ultima || grabado);
         }
+        // Los clips para el que mira (compartir.js) que falten, antes de
+        // mover el video: en Windows no se mueve lo que ffmpeg está leyendo.
+        if (o.antesDeMover) { try { await o.antesDeMover(); } catch (_) {} }
         if (grabado && grabado.ruta) {
             paso('Moviendo el video a su carpeta…');
             video = { ruta: grabado.ruta, mime: grabado.mime || null, bytes: grabado.bytes || null };

@@ -15,6 +15,7 @@
 //   /            escritorio/remoto/**      (la pagina del iPad)
 //   /nucleo/     escritorio/src/nucleo/**  (botonera-vista.js, plantilla.js…)
 //   /ws          el WebSocket
+//   /clips       la misma pagina, para MIRAR los clips (nunca codifica)
 //   /clip/<id>?d=<dispositivo>&t=<token>
 //                un clip cortado en vivo, para el iPad que mira. Solo los
 //                que la rama publico, y solo a un iPad que ya paso el PIN.
@@ -22,7 +23,7 @@
 //
 // Protocolo (todo JSON por el WebSocket):
 //   iPad → compu
-//     {tipo:'hola', dispositivo, nombre, pin?, token?}
+//     {tipo:'hola', dispositivo, nombre, pin?, token?, rol?:'mirar'}
 //     {tipo:'ping', t0, latenciaMs?}
 //     {tipo:'accion', n, accion:{tipo:'tocar', elementoId, momento}, …}
 //         n = numero creciente por dispositivo; momento = ms en el reloj de
@@ -314,6 +315,7 @@ function crearServidorRemoto(opciones = {}) {
             ip: d.ip,
             conectado: !!(d.socket && d.socket.readyState === 1),
             activo: d.id === activo,
+            rol: d.rol || 'codificar',
             latenciaMs: d.latenciaMs,
             aplicado: d.aplicado
         }));
@@ -466,17 +468,23 @@ function crearServidorRemoto(opciones = {}) {
                 try { disp.socket.close(4006, 'reemplazado'); } catch (_) {}
             }
             disp.socket = socket;
+            // Entro por /clips (o la compu codifica sola): solo mira los
+            // clips, nunca codifica, llegue primero o ultimo.
+            disp.rol = (msg.rol === 'mirar' || sesion.soloMirar) ? 'mirar' : 'codificar';
             dispositivos.set(id, disp);
 
-            // Un iPad por vez: el primero codifica, los demas miran y pueden
-            // pedir el control (lo confirma la compu).
-            if (!activo || !dispositivos.has(activo)) activo = id;
+            // Un iPad por vez: el primero que entra a codificar codifica, los
+            // demas miran y pueden pedir el control (lo confirma la compu).
+            const activoVale = activo && dispositivos.has(activo) && dispositivos.get(activo).rol !== 'mirar';
+            if (disp.rol !== 'mirar' && !activoVale) activo = id;
+            if (disp.rol === 'mirar' && activo === id) activo = null;
             sesion.conectoAlguien = true;   // ya no hace falta la ayuda del firewall
 
             enviarA(socket, {
                 tipo: 'bienvenida',
                 token: disp.token,
                 sesion: sesion.id,
+                rol: disp.rol,
                 activo: activo === id,
                 aplicado: disp.aplicado,
                 plantilla: sesion.plantilla || null,
@@ -520,7 +528,7 @@ function crearServidorRemoto(opciones = {}) {
                     return;
                 }
                 case 'pedirControl':
-                    if (disp.id !== activo) avisarClientes({ evento: 'pideControl', dispositivo: disp.id, nombre: disp.nombre });
+                    if (disp.id !== activo && disp.rol !== 'mirar') avisarClientes({ evento: 'pideControl', dispositivo: disp.id, nombre: disp.nombre });
                     return;
                 case 'pedirTerminar':
                     if (disp.id === activo) alMensaje({ tipo: 'pedirTerminar', dispositivo: disp.id, nombre: disp.nombre });
@@ -534,19 +542,24 @@ function crearServidorRemoto(opciones = {}) {
     }
 
     // ── API ──
-    async function iniciar({ plantillaId = null, plantilla = null, puerto } = {}) {
+    // soloMirar: la compu codifica sola (Captura en vivo) y los que entran
+    // son todos para ver los clips, por cualquiera de las dos direcciones.
+    async function iniciar({ plantillaId = null, plantilla = null, puerto, soloMirar = false } = {}) {
         if (!WebSocketServer) ({ WebSocketServer } = require('ws'));
         if (qrcode === null) { try { qrcode = require('qrcode'); } catch (_) { qrcode = false; } }
 
         await detener();
 
         const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
-        sesion = { id: crypto.randomBytes(9).toString('base64url'), pin, plantillaId, plantilla, estado: null, desde: ahora(), clips: new Map() };
+        sesion = { id: crypto.randomBytes(9).toString('base64url'), pin, plantillaId, plantilla, estado: null, desde: ahora(), clips: new Map(), soloMirar: !!soloMirar };
         dispositivos.clear();
         activo = null;
 
         servidor = http.createServer((req, res) => {
             if (/^\/clip\//.test(req.url || '')) return servirClip(req, res);
+            // /clips es la misma pagina, que ahi entra a mirar: se sirve el
+            // index.html de siempre (sus archivos van con ruta absoluta).
+            if (/^\/clips\/?(\?|$)/.test(req.url || '')) req.url = '/';
             servirArchivo(req, res, raices);
         });
         servidor.on('clientError', (_e, s) => { try { s.destroy(); } catch (_) {} });
@@ -605,9 +618,12 @@ function crearServidorRemoto(opciones = {}) {
     async function datosConexion() {
         const ips = ipsLocales(interfaces(), plataforma);
         const urls = ips.map(i => `http://${i.ip}:${sesion.puerto}/`);
+        // La direccion para mirar los clips: otra, asi el que mira no le
+        // gana la botonera al que codifica por llegar primero.
+        const urlsClips = urls.map(u => u + 'clips');
         const qrs = {};
         if (qrcode) {
-            for (const u of urls) {
+            for (const u of [...urls, ...urlsClips]) {
                 try { qrs[u] = await qrcode.toString(u, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }); }
                 catch (_) { /* sin QR para esa, queda la direccion escrita */ }
             }
@@ -620,7 +636,10 @@ function crearServidorRemoto(opciones = {}) {
             puerto: sesion.puerto,
             pin: sesion.pin,
             qrSvg: urls[0] ? (qrs[urls[0]] || null) : null,
-            qrs
+            qrs,
+            urlClips: urlsClips[0] || `http://localhost:${sesion.puerto}/clips`,
+            urlsClips,
+            soloMirar: !!sesion.soloMirar
         };
     }
 
@@ -670,7 +689,8 @@ function crearServidorRemoto(opciones = {}) {
                 sesion.plantilla = msg.plantilla || null;
                 break;   // y se reenvia: el iPad redibuja
             case 'darControl':
-                if (dispositivos.has(msg.dispositivo)) darControl(msg.dispositivo);
+                // Al que entro por /clips no se le da: esa pagina no tiene botonera.
+                if (dispositivos.has(msg.dispositivo) && dispositivos.get(msg.dispositivo).rol !== 'mirar') darControl(msg.dispositivo);
                 return true;
             case 'negarControl': {
                 const d = dispositivos.get(msg.dispositivo);
@@ -729,7 +749,7 @@ function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc } = {}) {
     ipcMain.handle('remoto:iniciar', async (_e, opciones = {}) => {
         let plantilla = opciones.plantilla || null;
         if (!plantilla && opciones.plantillaId != null) plantilla = await leerPlantilla(bd, opciones.plantillaId);
-        return instancia.iniciar({ plantillaId: opciones.plantillaId ?? null, plantilla, puerto: opciones.puerto });
+        return instancia.iniciar({ plantillaId: opciones.plantillaId ?? null, plantilla, puerto: opciones.puerto, soloMirar: !!opciones.soloMirar });
     });
     ipcMain.handle('remoto:detener', () => instancia.detener());
     ipcMain.handle('remoto:estado', () => instancia.estado());

@@ -12,10 +12,11 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#0e1014">
 <title>Tag &amp; View — iPad</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icono-192.png">
-<link rel="icon" href="icono-192.png">
-<link rel="stylesheet" href="estilo.css">
+<!-- Con / adelante: la misma pagina se abre tambien en /clips. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icono-192.png">
+<link rel="icon" href="/icono-192.png">
+<link rel="stylesheet" href="/estilo.css">
 <!-- Trampa de errores. ES5 a proposito: tiene que correr en cualquier
      Safari, aunque no entienda el resto. Si app.js no arranca (Safari viejo,
      un archivo que no llego), lo dice en pantalla con la version de Safari,
@@ -119,6 +120,6 @@
 
 <div class="aviso" id="aviso" hidden></div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

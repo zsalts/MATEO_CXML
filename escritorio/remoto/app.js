@@ -29,16 +29,23 @@ const almacen = (() => {
 const leer = k => { try { return almacen ? almacen.getItem(k) : null; } catch (_) { return null; } };
 const escribir = (k, v) => { try { if (almacen) v == null ? almacen.removeItem(k) : almacen.setItem(k, v); } catch (_) {} };
 
+// Abierta en /clips, la pagina solo mira los clips: nunca codifica, llegue
+// primero o ultimo. Es otra direccion justamente para que no se pisen.
+const MIRAR = /^\/clips\/?$/.test(location.pathname);
+const sufijo = MIRAR ? '-mirar' : '';
+
 // Id de este iPad: la compu lo usa para no aplicar dos veces el mismo toque.
-let dispositivo = leer('tv-remoto-dispositivo');
+// Mirando es otro id: el mismo iPad puede tener las dos pestañas abiertas
+// sin que una cierre a la otra.
+let dispositivo = leer('tv-remoto-dispositivo' + sufijo);
 if (!dispositivo || !/^[\w-]{6,64}$/.test(dispositivo)) {
     const r = crypto.getRandomValues ? crypto.getRandomValues(new Uint32Array(3)) : [Date.now(), Math.random() * 1e9, 7];
-    dispositivo = 'ipad-' + Array.from(r, n => Math.floor(n).toString(36)).join('');
-    escribir('tv-remoto-dispositivo', dispositivo);
+    dispositivo = 'ipad-' + Array.from(r, n => Math.floor(n).toString(36)).join('') + sufijo;
+    escribir('tv-remoto-dispositivo' + sufijo, dispositivo);
 }
 // El token vale para ESTA compu y ESTE arranque del servidor: se guarda por
 // host, asi dos compus distintas no se pisan.
-const claveToken = 'tv-remoto-token:' + location.host;
+const claveToken = 'tv-remoto-token:' + location.host + sufijo;
 
 const reloj = crearReloj();
 const cola = crearCola({ almacen, clave: 'tv-remoto-cola:' + location.host, reloj });
@@ -77,6 +84,7 @@ function conectar(pin) {
     ws.onopen = () => {
         const token = leer(claveToken);
         const hola = { tipo: 'hola', dispositivo, nombre: nombreDispositivo() };
+        if (MIRAR) hola.rol = 'mirar';
         if (pin) hola.pin = pin;
         else if (token) hola.token = token;
         else { ws.close(); mostrarPin(); return; }
@@ -146,6 +154,9 @@ function recibir(m) {
             cola.sesion(m.sesion);
             cola.confirmar(m.aplicado || 0);
             S.activo = !!m.activo;
+            // La compu dice si este solo mira (entro por /clips, o la compu
+            // codifica sola): entonces no hay "Codificar desde acá".
+            S.soloMira = MIRAR || m.rol === 'mirar';
             if (m.plantilla) ponerPlantilla(m.plantilla);
             if (m.estado) ponerEstado(m.estado);
             ponerClips(m.clips || []);
@@ -545,7 +556,7 @@ function mostrarBotonera() {
     $('clips').hidden = !mira;
     $('btnPlay').hidden = mira;
     $('btnTerminar').hidden = mira;
-    $('btnPedirControl').hidden = !mira || S.terminado;
+    $('btnPedirControl').hidden = !mira || S.terminado || S.soloMira;
     if (mira) $('btnVolver').hidden = true;
     else { const v = $('clipsVideo'); if (!v.paused) v.pause(); }
     if (S.terminado && !mira) return;

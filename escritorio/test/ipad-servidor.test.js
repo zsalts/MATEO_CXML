@@ -495,6 +495,57 @@ test('clips: la rama publica, el iPad que mira los recibe y los baja con su toke
     }
 });
 
+test('/clips: el que entra a mirar nunca codifica, aunque llegue primero', async () => {
+    const { srv, mensajes } = nuevo();
+    const c = await srv.iniciar({ puerto: 0 });
+    try {
+        assert.match(c.urlClips, /^http:\/\/192\.168\.1\.50:\d+\/clips$/);
+        assert.deepEqual(c.urlsClips, [c.urlClips]);
+        assert.equal(c.soloMirar, false);
+        // La pagina se sirve tambien en /clips.
+        assert.match((await pedir(c.puerto, '/clips')).cuerpo, /iPad/);
+        assert.match((await pedir(c.puerto, '/clips/')).cuerpo, /iPad/);
+
+        // El que mira llega PRIMERO.
+        const m = cliente(c.puerto);
+        await m.abierto;
+        m.mandar({ tipo: 'hola', dispositivo: 'ipad-mira-9', nombre: 'iPhone', pin: c.pin, rol: 'mirar' });
+        const bm = await m.esperar(x => x.tipo === 'bienvenida');
+        assert.equal(bm.activo, false);
+        assert.equal(bm.rol, 'mirar');
+        // Igual el que entra a codificar codifica.
+        const a = await entrar(c.puerto, { pin: c.pin });
+        assert.equal(a.r.activo, true);
+        assert.equal(a.r.rol, 'codificar');
+
+        // El que mira no toca, no pide el control y no se le puede dar.
+        m.mandar({ tipo: 'accion', n: 1, accion: { tipo: 'tocar', elementoId: 1, momento: 1 } });
+        m.mandar({ tipo: 'pedirControl' });
+        srv.enviar({ tipo: 'darControl', dispositivo: 'ipad-mira-9' });
+        await new Promise(r => setTimeout(r, 60));
+        assert.equal(mensajes.filter(x => x.tipo === 'accion').length, 0);
+        assert.equal(srv.estado().clientes.find(x => x.activo).dispositivo, 'ipad-prueba-1');
+        assert.equal(srv.estado().clientes.find(x => x.dispositivo === 'ipad-mira-9').rol, 'mirar');
+        m.ws.close(); a.c.ws.close();
+    } finally {
+        await srv.detener();
+    }
+});
+
+test('soloMirar (la compu codifica sola): nadie codifica, entre por donde entre', async () => {
+    const { srv } = nuevo();
+    const c = await srv.iniciar({ puerto: 0, soloMirar: true });
+    try {
+        assert.equal(c.soloMirar, true);
+        const a = await entrar(c.puerto, { pin: c.pin });
+        assert.equal(a.r.activo, false);
+        assert.equal(a.r.rol, 'mirar');
+        a.c.ws.close();
+    } finally {
+        await srv.detener();
+    }
+});
+
 test('clips: sin permitirClip no se publica ninguno', async () => {
     const { srv } = nuevo();
     await srv.iniciar({ puerto: 0 });

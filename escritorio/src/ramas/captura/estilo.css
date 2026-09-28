@@ -338,3 +338,14 @@
 .tv-captura-fin__avisos li { display: flex; gap: var(--tv-esp-2); }
 .tv-captura-fin__avisos .tv-icono { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 .tv-captura-fin__acciones { display: flex; gap: var(--tv-esp-2); flex-wrap: wrap; justify-content: center; margin-top: var(--tv-esp-3); }
+
+/* ── Clips en vivo para otro iPad o iPhone (compartir.js) ── */
+.tv-captura-compartir { display: flex; flex-direction: column; align-items: center; gap: var(--tv-esp-3); text-align: center; max-width: 420px; }
+.tv-captura-compartir__qr { width: 220px; background: #fff; padding: var(--tv-esp-2); border-radius: var(--tv-radio); }
+.tv-captura-compartir__qr svg { display: block; width: 100%; height: auto; }
+.tv-captura-compartir__url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem; user-select: all; }
+.tv-captura-compartir__pin { display: flex; align-items: baseline; gap: var(--tv-esp-3); }
+.tv-captura-compartir__pin span { color: var(--tv-texto-2); }
+.tv-captura-compartir__pin strong { font-size: 2.6rem; letter-spacing: .3em; font-variant-numeric: tabular-nums; }
+.tv-captura-compartir__quien { color: var(--tv-texto-2); margin: 0; }
+.tv-captura-compartir__error { color: var(--tv-peligro); margin: 0; }

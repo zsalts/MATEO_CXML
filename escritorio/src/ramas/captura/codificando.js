@@ -31,6 +31,7 @@ import {
 } from './piezas.js';
 import { rangoDeClip, nombreDeClip, subcarpetaDe, crearColaCortes, armarRespaldo } from './logica.js';
 import { guardarRespaldo as guardarRespaldoEnDisco } from './respaldo.js';
+import { crearCompartir } from './compartir.js';
 
 const ESPERA_VER = 3000;   // ms que se espera a que el final de un clip llegue al disco
 
@@ -103,6 +104,12 @@ export function montarCodificacion(contenedor, o) {
     const colaVista = crearColaVista(barra, cola);
     barra.append(el('span', { class: 'tv-barra__espacio' }));
     barra.append(el('span', { class: 'tv-captura-cod__nombre tv-recortar', title: `Partidos/${config.nombre}`, texto: config.nombre }));
+    // Clips en vivo para otro iPad o iPhone (solo grabando: con un archivo no
+    // hay nada en vivo que mandar).
+    const compartir = conCamara ? crearCompartir({
+        ctx, config, motor, datos, grabadora: g, subcarpeta: () => subcarpetaDe(config.nombre)
+    }) : null;
+    if (compartir) barra.append(compartir.boton());
     if (conCamara) {
         barra.append(el('button', { type: 'button', class: 'tv-btn', title: 'Cambiar o reconectar la cámara', onClick: abrirCamara },
             icono('camara'), el('span', { texto: 'Cámara' })));
@@ -294,6 +301,7 @@ export function montarCodificacion(contenedor, o) {
             if (config.cortarAuto) nuevos.slice().reverse().forEach(ev => cortarEvento(ev));
         }
         if (est.andando || est.inicioReal != null) asegurarGrabacion();
+        if (compartir) compartir.alCambiar();
         pedirPintar(est);
         guardarRespaldo(false);
     }
@@ -372,6 +380,7 @@ export function montarCodificacion(contenedor, o) {
         rutaVideo,
         ponerFinal(f) { final = f; },
         conCamara,
+        compartir,   // lo apaga la rama (index.js): sigue prendido después de Terminar
         video,
         // true mientras hay algo que perder si se sale.
         enCurso() {

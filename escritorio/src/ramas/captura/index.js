@@ -44,6 +44,7 @@ function cambiarPantalla(p) {
 
 // ── a) ───────────────────────────────────────
 function mostrarPreparacion(ctx) {
+    apagarCompartir();
     R.fase = 'prep';
     R.config = null;
     if (R.ctx.miga) R.ctx.miga(null);
@@ -95,6 +96,7 @@ async function terminar() {
             motor: cod.motor,
             grabadora: cod.conCamara ? R.grabadora : null,
             cola: cod.cola,
+            antesDeMover: cod.compartir ? () => cod.compartir.esperar() : null,
             ponerFinal: cod.ponerFinal,
             alPaso: cerrando.paso
         });
@@ -106,7 +108,15 @@ async function terminar() {
     }
 }
 
+// Los clips en vivo: al terminar no se corta más, pero el servidor queda
+// prendido para que el que mira siga viendo. Se apaga al empezar otra
+// captura o al salir de la rama.
+function apagarCompartir() {
+    if (R && R.compartir) { R.compartir.detener(); R.compartir = null; }
+}
+
 function soltarCodificacion() {
+    if (R.cod && R.cod.compartir) { R.cod.compartir.terminar(); R.compartir = R.cod.compartir; }
     if (R.pantalla && R.pantalla === R.cod) R.pantalla = null;
     if (R.cod) { try { R.cod.destruir(); } catch (_) {} R.cod = null; }
     estadoGlobal.poner('grabando', null);
@@ -233,6 +243,7 @@ export default {
             return false;
         }
         soltarCodificacion();
+        apagarCompartir();
         if (R.pantalla) { try { R.pantalla.destruir(); } catch (_) {} }
         if (R.grabadora) R.grabadora.destruir();
         R = null;

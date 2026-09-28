@@ -26,7 +26,7 @@ import { xmlSportscode, csvTiempoEnHielo, csvPosesion, fechaPartido } from '../.
 import { nombresEquipos, equipoDeBoton } from '../../nucleo/plantilla.js';
 import { crearPartido } from './partido.js';
 import { resumir, crearEmisor } from './espejo.js';
-import { planClipsEnVivo } from './clips-vivo.js';
+import { crearClipsEnVivo } from './clips-vivo.js';
 
 const ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
     '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18.5h2"/>' +
@@ -77,9 +77,7 @@ function estadoNuevo(ctx) {
         sinIpad: false,
         partido: null, emisor: null, vista: null,
         caidoDesde: null,         // Date.now() desde que no hay iPad activo conectado
-        // Clips en vivo para el iPad que mira. porEvento: id del evento →
-        // {id, tiempos, meta, ruta}; cola: los cortes, de a uno.
-        enVivo: { ffmpeg: false, porEvento: new Map(), n: 0, cola: Promise.resolve(), fallo: false },
+        enVivo: null,             // clips en vivo para el iPad que mira (clips-vivo.js)
         timers: [], quitar: [],
         guardado: null
     };
@@ -291,7 +289,9 @@ async function empezar({ sinIpad = false } = {}) {
     });
     st.emisor = crearEmisor(m => st.api.remoto.enviar({ ...m, tServidor: Date.now() }).catch(() => {}));
     st.quitar.push(st.partido.motor.alCambiar(() => { emitir(); pintarEstadoVivo(); pintarRegistro(); revisarClipsEnVivo(); }));
-    try { st.enVivo.ffmpeg = st.camara && await st.api.clips.disponible(); } catch (_) {}
+    let ffmpeg = false;
+    try { ffmpeg = st.camara && await st.api.clips.disponible(); } catch (_) {}
+    if (ffmpeg) prepararClipsEnVivo();
     st.fase = 'vivo';
     seguirConexion();
 
@@ -360,65 +360,26 @@ async function guardarClip(ev) {
 // estaban se cortan igual (planClipsEnVivo los ve como nuevos).
 const hayQuienMire = () => st.clientes.some(c => !c.activo);
 
-function revisarClipsEnVivo() {
-    if (!st || st.fase !== 'vivo' || !st.enVivo.ffmpeg || !st.conexion || !hayQuienMire()) return;
-    const g = st.grab && st.grab.estado();
-    if (!g || !g.grabando || !g.ruta) return;
-    const cv = st.enVivo;
-    const eq = { A: st.local || 'Local', B: st.visitante || 'Visitante' };
-    const plan = planClipsEnVivo(st.partido.motor.estado().eventos, cv.porEvento, {
-        clipDe,
-        equipoDe: ev => eq[equipoDeBoton(st.plantilla.datos, ev.buttonId)] || null
-    });
-    for (const { ev, tiempos, meta } of plan.cortar) {
-        // Se anota ya, antes de cortar: el próximo cambio del motor no lo
-        // tiene que volver a encolar. Si el corte falla no se reintenta.
-        const previo = cv.porEvento.get(ev.id);
-        const hecho = { id: previo ? previo.id : 'c' + (++cv.n), tiempos, meta, ruta: null };
-        cv.porEvento.set(ev.id, hecho);
-        encolarCorte(hecho, g.ruta, ev);
-    }
-    for (const { ev, meta } of plan.actualizar) {
-        const hecho = cv.porEvento.get(ev.id);
-        hecho.meta = meta;
-        if (hecho.ruta) publicarClip(hecho);
-    }
-    for (const id of plan.quitar) {
-        const hecho = cv.porEvento.get(id);
-        cv.porEvento.delete(id);
-        st.api.remoto.enviar({ tipo: 'quitarClip', id: hecho.id }).catch(() => {});
-    }
-}
-
-function encolarCorte(hecho, video, ev) {
+function prepararClipsEnVivo() {
     const s = st;
-    s.enVivo.cola = s.enVivo.cola.then(async () => {
-        // Ya se volvió a cortar con otros segundos, o el evento se borró.
-        if (s.enVivo.porEvento.get(ev.id) !== hecho) return;
-        const r = await s.api.clips.exportar({
-            ruta: video,
-            cortes: [{ desde: hecho.tiempos.desde, hasta: hecho.tiempos.hasta, nombre: `${hecho.meta.nombre} ${formatoTiempo(hecho.meta.inicio)}` }],
-            destino: 'carpeta',
-            subcarpeta: `Partidos/${s.nombre}`
-        });
-        hecho.ruta = r && r.rutas && r.rutas[0];
-        if (hecho.ruta && s.enVivo.porEvento.get(ev.id) === hecho) publicarClip(hecho, s);
-    }).catch(err => {
-        console.warn('Clip en vivo:', err);
-        // Una vez por partido: si ffmpeg no puede con este video, no puede
-        // con ninguno, y un aviso por evento taparía la pantalla.
-        if (!s.enVivo.fallo && st === s) {
-            s.enVivo.fallo = true;
-            s.ui.aviso('No se pudo cortar un clip para el iPad que mira: ' + ((err && err.message) || err), 'error');
-        }
+    const eq = { A: s.local || 'Local', B: s.visitante || 'Visitante' };
+    s.enVivo = crearClipsEnVivo({
+        api: s.api,
+        eventos: () => s.partido.motor.estado().eventos,
+        clipDe,
+        video: () => {
+            const g = s.grab && s.grab.estado();
+            return s.fase === 'vivo' && s.conexion && hayQuienMire() && g && g.grabando ? g.ruta : null;
+        },
+        subcarpeta: () => `Partidos/${s.nombre}`,
+        equipoDe: ev => eq[equipoDeBoton(s.plantilla.datos, ev.buttonId)] || null,
+        nombreClip: m => `${m.nombre} ${formatoTiempo(m.inicio)}`,
+        alFallar: err => { if (st === s) s.ui.aviso('No se pudo cortar un clip para el iPad que mira: ' + ((err && err.message) || err), 'error'); }
     });
 }
 
-function publicarClip(hecho, s = st) {
-    return s.api.remoto.enviar({
-        tipo: 'clip',
-        clip: { id: hecho.id, ruta: hecho.ruta, ...hecho.meta, duracion: hecho.tiempos.hasta - hecho.tiempos.desde }
-    }).catch(() => {});
+function revisarClipsEnVivo() {
+    if (st && st.enVivo) st.enVivo.revisar();
 }
 
 // ─────────────────────────────────────────────
@@ -463,7 +424,7 @@ async function guardarPartido() {
     // Los clips en vivo que falten se terminan de cortar antes de mover el
     // video: en Windows no se puede renombrar un archivo que ffmpeg está
     // leyendo. Con la grabación cerrada, ninguno espera a que llegue más.
-    await st.enVivo.cola;
+    if (st.enVivo) await st.enVivo.esperar();
     const subcarpeta = 'Partidos/' + st.nombre;
     let videoRuta = null;
     if (video && video.ruta) videoRuta = (await api.video.ubicar(video.ruta, { nombre: st.nombre, subcarpeta })).ruta;
@@ -596,6 +557,7 @@ function pintarPreparar() {
                         texto: u + (c.adaptadores && c.adaptadores[i] ? ` (${c.adaptadores[i].adaptador})` : '') })))
                 : h('div', { class: 'tv-ipad-url', texto: urls[0] }),
             h('div', { class: 'tv-ipad-pin' }, h('span', { texto: 'PIN' }), h('strong', { texto: c.pin })),
+            direccionClips(c, st.urlElegida),
             listaIpads());
         if (st.firewall) con.append(ayudaFirewall());
     }
@@ -607,6 +569,20 @@ function pintarPreparar() {
             title: 'Codificar desde la compu', onClick: () => empezar({ sinIpad: true }) }),
         h('button', { class: 'tv-btn tv-btn--primario', texto: 'Empezar', disabled: !st.plantilla || !hayIpad(),
             onClick: () => empezar() }));
+}
+
+// La otra dirección, para el iPad o iPhone que solo mira los clips. Es otra
+// a propósito: el que entra por ahí nunca se queda con la botonera, llegue
+// antes o después del que codifica. Mismo PIN.
+function direccionClips(c, urlElegida) {
+    const url = (urlElegida || c.url) + 'clips';
+    const qr = c.qrs && c.qrs[url];
+    // Abierto o cerrado sobrevive al repintado (cada iPad que entra repinta).
+    return h('details', { class: 'tv-ipad-clips', open: !!st.clipsAbierto, onToggle: e => { st.clipsAbierto = e.target.open; } },
+        h('summary', { texto: 'Ver los clips en vivo en otro iPad o iPhone' }),
+        h('p', { texto: 'Con el mismo PIN. El que entra por esta dirección solo mira: cada evento que se marca le llega como clip.' }),
+        qr ? h('div', { class: 'tv-ipad-qr', html: qr }) : null,
+        h('div', { class: 'tv-ipad-url', texto: url }));
 }
 
 function listaIpads() {

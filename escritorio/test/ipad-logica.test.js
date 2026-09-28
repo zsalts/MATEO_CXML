@@ -285,3 +285,44 @@ test('clips en vivo: corta los cerrados con video, reenvía etiquetas, quita los
     const p3 = planClipsEnVivo([despues[0]], hechos, { clipDe });
     assert.deepEqual(p3.quitar, [1]);
 });
+
+import { crearClipsEnVivo } from '../src/ramas/ipad/clips-vivo.js';
+
+test('crearClipsEnVivo: corta de a uno, publica, no repite, quita y apaga', async () => {
+    const cortes = [], enviados = [];
+    const api = {
+        clips: { exportar: async o => { cortes.push(o); return { rutas: ['/t/' + o.cortes[0].nombre + '.mp4'] }; } },
+        remoto: { enviar: async m => { enviados.push(m); return true; } }
+    };
+    let eventos = [{ id: 1, name: 'Tiro', start: 10, end: 15, buttonId: 1 }];
+    let grabando = true;
+    const cv = crearClipsEnVivo({
+        api, eventos: () => eventos,
+        clipDe: ev => ({ vInicio: ev.start, vFin: ev.end }),
+        video: () => (grabando ? '/t/partido.mp4' : null),
+        subcarpeta: () => 'Partidos/Demo',
+        equipoDe: () => 'Local',
+        nombreClip: m => m.nombre
+    });
+    cv.revisar(); cv.revisar();          // dos cambios seguidos: un solo corte
+    await cv.esperar();
+    assert.equal(cortes.length, 1);
+    assert.deepEqual(cortes[0].cortes[0], { desde: 10, hasta: 15, nombre: 'Tiro' });
+    assert.equal(cortes[0].subcarpeta, 'Partidos/Demo');
+    assert.deepEqual(enviados[0], { tipo: 'clip', clip: { id: 'c1', ruta: '/t/Tiro.mp4', nombre: 'Tiro', etiquetas: [], equipo: 'Local', inicio: 10, duracion: 5 } });
+
+    eventos = [];                        // borrado
+    cv.revisar();
+    assert.deepEqual(enviados[1], { tipo: 'quitarClip', id: 'c1' });
+
+    grabando = false;                    // sin grabación no se corta
+    eventos = [{ id: 2, name: 'Gol', start: 20, end: 25 }];
+    cv.revisar();
+    await cv.esperar();
+    assert.equal(cortes.length, 1);
+    grabando = true;
+    cv.apagar();
+    cv.revisar();
+    await cv.esperar();
+    assert.equal(cortes.length, 1, 'apagado no corta más');
+});
