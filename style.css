@@ -860,121 +860,230 @@ html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
 html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
 /* ─────────────────────────────────────────────
-   INICIO — la misma cara que el menú principal de la compu: saludo,
-   tarjetas grandes con una línea de color arriba y la lista de plantillas en
-   un panel. Tarjetas grandes a propósito: se tocan con el dedo.
+   INICIO — la misma cara que el menú principal de la app de la compu:
+   sus colores (escritorio/src/estilos/tokens.css, en claro y en oscuro),
+   tarjetas con una franja de color arriba, íconos de trazo, y las dos
+   listas en paneles con cabecera. Todo un poco más grande que en la compu:
+   acá se toca con el dedo.
    ───────────────────────────────────────────── */
 .inicio {
-    --in-fondo: #f2f2f7; --in-panel: #fff; --in-borde: #d1d1d6; --in-texto: #1c1c1e;
-    --in-texto-2: #6e6e73; --in-acento: #007aff; --in-ok: #2ca038; --in-hover: #f3f4f6;
+    --in-fondo: #eef0f3; --in-panel: #fff; --in-panel-2: #f5f6f8; --in-panel-3: #e8ebf0;
+    --in-borde: #d6dae1; --in-borde-fuerte: #b9bfc9;
+    --in-texto: #161a21; --in-texto-2: #555d6b; --in-texto-3: #8a919d;
+    --in-acento: #0a5fc2; --in-acento-suave: rgba(10, 95, 194, .10);
+    --in-ok: #17804d; --in-ok-suave: rgba(23, 128, 77, .12); --in-peligro: #c4371f;
     background: var(--in-fondo);
     color: var(--in-texto);
+    font-size: 15px;
 }
 html[data-tema="oscuro"] .inicio {
-    --in-fondo: #000; --in-panel: #1c1c1e; --in-borde: #2c2c2e; --in-texto: #f2f2f7;
-    --in-texto-2: #98989d; --in-acento: #0a84ff; --in-ok: #30d158; --in-hover: #2c2c2e;
+    --in-fondo: #0e1014; --in-panel: #161920; --in-panel-2: #1e222b; --in-panel-3: #272c37;
+    --in-borde: #2d323d; --in-borde-fuerte: #3d4452;
+    --in-texto: #e7e9ee; --in-texto-2: #9ba2b0; --in-texto-3: #6d7482;
+    --in-acento: #5aa9ff; --in-acento-suave: rgba(90, 169, 255, .14);
+    --in-ok: #3ecf8e; --in-ok-suave: rgba(62, 207, 142, .16); --in-peligro: #f0705a;
 }
 .inicio__scroll {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 28px max(20px, env(safe-area-inset-left)) 40px;
-    max-width: 980px;
     width: 100%;
+    max-width: 1200px;
     margin: 0 auto;
+    padding: 24px max(24px, env(safe-area-inset-left)) 32px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
-.inicio__saludo { font-size: 28px; font-weight: 700; margin: 0; }
-.inicio__sub { color: var(--in-texto-2); margin: 2px 0 22px; }
+/* Sin esto los paneles se achican para entrar en la pantalla y el que tiene
+   el foco se corre por dentro (se pierde su título): mejor que scrollee todo. */
+.inicio__scroll > * { flex-shrink: 0; }
+.inicio__cabecera h1 { font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+.inicio__cabecera p { color: var(--in-texto-2); margin: 2px 0 0; }
 
-.inicio__tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 560px) { .inicio__tarjetas { grid-template-columns: 1fr; } }
+.inicio__svg {
+    width: 24px; height: 24px;
+    fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Tarjetas ── */
+.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 600px) { .inicio__tarjetas, .inicio__columnas { grid-template-columns: 1fr !important; } }
 .inicio__tarjeta {
+    --tono: var(--in-acento);
+    --tono-suave: var(--in-acento-suave);
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    min-height: 150px;
-    padding: 20px;
+    gap: 4px;
+    min-height: 148px;
+    padding: 16px;
     border: 1px solid var(--in-borde);
-    border-top: 4px solid var(--in-acento);
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--in-panel);
     color: var(--in-texto);
     text-align: left;
     font: inherit;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
-    transition: transform .1s;
+    transition: border-color .12s, transform .12s;
 }
-.inicio__tarjeta:active { transform: scale(.98); background: var(--in-hover); }
-.inicio__tarjeta--codificar { border-top-color: var(--in-ok); }
-.inicio__tarjeta[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--in-acento); }
+/* La franja del color de cada camino, como en la compu */
+.inicio__tarjeta::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--tono); opacity: .9; }
+.inicio__tarjeta:active { transform: translateY(1px); border-color: var(--tono); }
+.inicio__tarjeta[aria-expanded="true"] { border-color: var(--tono); box-shadow: 0 0 0 1px var(--tono); }
+.inicio__tarjeta--ok     { --tono: var(--in-ok); --tono-suave: var(--in-ok-suave); }
+.inicio__tarjeta--acento { --tono: var(--in-acento); }
 .inicio__icono {
     display: flex; align-items: center; justify-content: center;
-    width: 44px; height: 44px; border-radius: 12px;
-    background: rgba(0, 122, 255, .12); font-size: 22px; margin-bottom: 6px;
+    width: 44px; height: 44px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: var(--tono-suave);   /* sin color-mix: Safari de iPad viejo no lo entiende */
+    color: var(--tono);
 }
-.inicio__tarjeta--codificar .inicio__icono { background: rgba(44, 160, 56, .14); }
-.inicio__titulo { font-size: 19px; font-weight: 700; }
-.inicio__texto { color: var(--in-texto-2); font-size: 14px; line-height: 1.4; }
+.inicio__titulo { font-size: 17px; font-weight: 600; }
+.inicio__texto { color: var(--in-texto-2); line-height: 1.35; font-size: 14px; }
 
+/* ── Paneles ── */
+.inicio__columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .inicio__bloque {
-    margin-top: 18px;
-    padding: 16px 18px;
     border: 1px solid var(--in-borde);
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--in-panel);
+    overflow: hidden;
 }
 .inicio__bloque.hidden { display: none; }
-.inicio__bloque-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.inicio__bloque-titulo { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--in-texto-2); margin: 0 0 10px; }
-.inicio__pasos { list-style: decimal; margin: 0 0 14px; padding-left: 22px; line-height: 1.55; font-size: 15px; }
-.inicio__fila { display: flex; gap: 10px; }
-.inicio__campo {
-    flex: 1; min-width: 0;
-    padding: 12px 14px;
-    border: 1px solid var(--in-borde);
-    border-radius: 10px;
-    background: var(--in-fondo);
-    color: var(--in-texto);
-    font-size: 17px;          /* 16 o más: Safari no hace zoom al tocarlo */
-}
-.inicio__campo:focus { outline: none; border-color: var(--in-acento); }
-.inicio__boton {
-    padding: 0 22px;
-    border: 0;
-    border-radius: 10px;
-    background: var(--in-acento);
-    color: #fff;
-    font-weight: 700;
-    font-size: 16px;
-}
-.inicio__error { color: #ff3b30; font-size: 14px; margin: 8px 0 0; }
-.inicio__error.hidden { display: none; }
-.inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
-.inicio__bloque-cabeza .inicio__nota { margin: 0 0 10px; }
-
-.inicio__lista { display: flex; flex-direction: column; border-radius: 10px; transition: box-shadow .3s; }
-.inicio__lista--marcada { box-shadow: 0 0 0 3px var(--in-ok); }
-.inicio__plantilla {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas: "nombre ir" "detalle ir";
+.inicio__bloque-cabeza {
+    display: flex;
     align-items: center;
-    column-gap: 12px;
-    padding: 12px 6px;
+    gap: 8px;
+    min-height: 46px;
+    padding: 6px 8px 6px 16px;
+    border-bottom: 1px solid var(--in-borde);
+    box-sizing: border-box;
+}
+.inicio__bloque-cabeza h2 { margin: 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--in-texto-2); }
+.inicio__chip {
+    min-width: 20px; padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--in-panel-2);
+    border: 1px solid var(--in-borde);
+    color: var(--in-texto-2);
+    font-size: 12px; font-weight: 600; text-align: center;
+}
+.inicio__chip:empty { display: none; }
+.inicio__espacio { flex: 1; }
+.inicio__btn-chico {
+    padding: 6px 10px;
+    border: 0; border-radius: 6px;
+    background: none;
+    color: var(--in-acento);
+    font: inherit; font-size: 14px; font-weight: 500;
+}
+.inicio__btn-chico:active { background: var(--in-acento-suave); }
+
+/* ── Filas (plantillas y XML) ── */
+.inicio__lista { display: flex; flex-direction: column; max-height: 420px; overflow-y: auto; -webkit-overflow-scrolling: touch; transition: box-shadow .3s; }
+.inicio__lista--marcada { box-shadow: inset 0 0 0 2px var(--in-ok); }
+.inicio__fila-lista {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    width: 100%;
+    padding: 8px 12px 8px 16px;
     border: 0;
     border-bottom: 1px solid var(--in-borde);
     background: none;
     color: var(--in-texto);
-    text-align: left;
     font: inherit;
+    text-align: left;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
-.inicio__plantilla:last-child { border-bottom: 0; }
-.inicio__plantilla:active { background: var(--in-hover); }
-.inicio__plantilla-nombre { grid-area: nombre; font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inicio__plantilla-detalle { grid-area: detalle; color: var(--in-texto-2); font-size: 13px; }
-.inicio__plantilla-ir { grid-area: ir; color: var(--in-ok); font-weight: 700; font-size: 14px; }
-.inicio__plantilla--actual .inicio__plantilla-nombre { color: var(--in-acento); }
-.inicio__vacio { color: var(--in-texto-2); font-size: 14px; line-height: 1.5; padding: 6px 2px; }
+.inicio__fila-lista:last-child { border-bottom: 0; }
+button.inicio__fila-lista:active { background: var(--in-panel-3); }
+.inicio__fila-lista.es-actual .inicio__fila-nombre { color: var(--in-acento); }
+.inicio__fila-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.inicio__fila-nombre { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inicio__fila-detalle { color: var(--in-texto-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* La foto chiquita de la plantilla: la botonera a escala */
+.inicio__mini {
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 76px; height: 44px;
+    padding: 4px;
+    border-radius: 4px;
+    background: var(--in-fondo);
+    border: 1px solid var(--in-borde);
+    color: var(--in-texto-2);
+    box-sizing: border-box;
+}
+.inicio__mini-svg { width: 100%; height: 100%; display: block; }
+.inicio__ir { flex: none; color: var(--in-acento); font-size: 14px; font-weight: 600; }
+
+.inicio__doc {
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto-2);
+}
+.inicio__doc .inicio__svg { width: 20px; height: 20px; }
+.inicio__accion {
+    flex: none;
+    padding: 7px 12px;
+    border: 1px solid var(--in-borde);
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto);
+    font: inherit; font-size: 14px; font-weight: 600;
+}
+.inicio__accion:active { background: var(--in-panel-3); }
+.inicio__accion--xml { background: var(--in-acento); border-color: var(--in-acento); color: #fff; }
+html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
+.inicio__vacio { color: var(--in-texto-2); font-size: 14px; line-height: 1.5; padding: 20px 16px; }
+
+/* ── Conectar con la compu ── */
+.inicio__conectar { border-color: var(--in-acento); }
+.inicio__conectar-cuerpo { padding: 14px 16px 16px; }
+.inicio__pasos { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--in-texto-2); line-height: 1.45; }
+.inicio__pasos li { display: flex; align-items: flex-start; gap: 10px; }
+.inicio__pasos li > span + span { flex: 1; }
+.inicio__pasos li > span:first-child {
+    flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border: 1px solid var(--in-borde-fuerte);
+    border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    color: var(--in-texto);
+}
+.inicio__pasos b { color: var(--in-texto); }
+.inicio__fila { display: flex; gap: 8px; }
+.inicio__campo {
+    flex: 1; min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--in-borde);
+    border-radius: 6px;
+    background: var(--in-panel-2);
+    color: var(--in-texto);
+    font-size: 17px;          /* 16 o más: Safari no hace zoom al tocarlo */
+}
+.inicio__campo:focus { outline: none; border-color: var(--in-acento); box-shadow: 0 0 0 2px var(--in-acento-suave); }
+.inicio__boton {
+    padding: 0 20px;
+    border: 0; border-radius: 6px;
+    background: var(--in-acento);
+    color: #fff;
+    font: inherit; font-weight: 600; font-size: 16px;
+}
+html[data-tema="oscuro"] .inicio__boton { color: #06121f; }
+.inicio__error { color: var(--in-peligro); font-size: 14px; margin: 8px 0 0; }
+.inicio__error.hidden { display: none; }
+.inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }

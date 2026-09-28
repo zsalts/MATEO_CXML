@@ -105,50 +105,68 @@
     </header>
 
     <!-- ══ PÁGINA: INICIO ══
-         Lo mismo que el menú principal de la compu, con lo que se hace desde
-         el iPad: codificar acá, o conectarse a la compu para que ella grabe
-         mientras el iPad codifica. El editor y el XML siguen en el menú ☰. -->
+         La misma cara que el menú principal de la compu (colores, tarjetas con
+         franja, íconos de trazo y dos columnas), con lo que se hace desde el
+         iPad: codificar acá, o conectarse a la compu para que ella grabe
+         mientras el iPad codifica. El editor sigue en el menú ☰. -->
     <div id="pageInicio" class="flex-1 hidden flex-col overflow-hidden inicio">
         <div class="inicio__scroll">
-            <h1 id="inicioSaludo" class="inicio__saludo">Buen día</h1>
-            <p class="inicio__sub">¿Qué hacemos hoy?</p>
+            <header class="inicio__cabecera">
+                <h1 id="inicioSaludo">Buen día</h1>
+                <p>¿Qué hacemos hoy?</p>
+            </header>
 
             <div class="inicio__tarjetas">
-                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--codificar">
-                    <span class="inicio__icono">✂</span>
+                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--ok">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><circle cx="6" cy="6.5" r="2.8"/><circle cx="6" cy="17.5" r="2.8"/><path d="M8.3 8.2L20 18.5M8.3 15.8L20 5.5"/></svg></span>
                     <span class="inicio__titulo">Codificar en el iPad</span>
                     <span class="inicio__texto">Elegí una plantilla y marcá el partido. Después exportás el XML.</span>
                 </button>
-                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--compu" aria-expanded="false" aria-controls="inicioCompu">
-                    <span class="inicio__icono">🖥</span>
+                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--acento" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono"><svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.2" r=".9" fill="currentColor"/></svg></span>
                     <span class="inicio__titulo">Conectar con la compu</span>
                     <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
                 </button>
             </div>
 
             <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
-            <section id="inicioCompu" class="inicio__bloque hidden">
-                <h2 class="inicio__bloque-titulo">Conectar con la compu</h2>
-                <ol class="inicio__pasos">
-                    <li>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</li>
-                    <li>Escribí acá la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). El iPad y la compu tienen que estar en el mismo wifi.</li>
-                    <li>Te va a pedir el <b>PIN</b> de 4 números que aparece en la compu.</li>
-                </ol>
-                <form id="formCompu" class="inicio__fila" autocomplete="off">
-                    <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
-                    <button type="submit" class="inicio__boton">Conectar</button>
-                </form>
-                <p id="compuError" class="inicio__error hidden"></p>
-                <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+            <section id="inicioCompu" class="inicio__bloque inicio__conectar hidden">
+                <header class="inicio__bloque-cabeza"><h2>Conectar con la compu</h2></header>
+                <div class="inicio__conectar-cuerpo">
+                    <ol class="inicio__pasos">
+                        <li><span>1</span><span>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</span></li>
+                        <li><span>2</span><span>Escribí la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). Tienen que estar en el mismo wifi.</span></li>
+                        <li><span>3</span><span>Poné el <b>PIN</b> de 4 números que aparece en la compu.</span></li>
+                    </ol>
+                    <form id="formCompu" class="inicio__fila" autocomplete="off">
+                        <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
+                        <button type="submit" class="inicio__boton">Conectar</button>
+                    </form>
+                    <p id="compuError" class="inicio__error hidden"></p>
+                    <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+                </div>
             </section>
 
-            <section class="inicio__bloque">
-                <div class="inicio__bloque-cabeza">
-                    <h2 class="inicio__bloque-titulo">Mis plantillas</h2>
-                    <span class="inicio__nota">Tocá una para empezar a codificar</span>
-                </div>
-                <div id="inicioPlantillas" class="inicio__lista"></div>
-            </section>
+            <div class="inicio__columnas">
+                <section class="inicio__bloque">
+                    <header class="inicio__bloque-cabeza">
+                        <h2>Mis plantillas</h2>
+                        <span id="inicioCuentaPlantillas" class="inicio__chip"></span>
+                        <span class="inicio__espacio"></span>
+                        <button id="btnInicioVerPlantillas" class="inicio__btn-chico">Ver todas ›</button>
+                    </header>
+                    <div id="inicioPlantillas" class="inicio__lista"></div>
+                </section>
+                <section class="inicio__bloque">
+                    <header class="inicio__bloque-cabeza">
+                        <h2>XML</h2>
+                        <span id="inicioCuentaXml" class="inicio__chip"></span>
+                        <span class="inicio__espacio"></span>
+                        <button id="btnInicioVerXml" class="inicio__btn-chico">Ver todos ›</button>
+                    </header>
+                    <div id="inicioXml" class="inicio__lista"></div>
+                </section>
+            </div>
         </div>
     </div>
 

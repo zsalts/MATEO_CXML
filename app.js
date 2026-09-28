@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v49';
+const APP_VERSION = 'v50';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1246,42 +1246,147 @@ function bindInicio() {
     on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
     on(D('btnInicioCompu'), 'click', () => alternarCompu());
     on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
+    on(D('btnInicioVerPlantillas'), 'click', () => setPage('plantillas'));
+    on(D('btnInicioVerXml'), 'click', () => setPage('xml'));
+}
+
+// Los colores con que se ve un botón sin color propio (defaultColor), para
+// la miniatura. Los de un archivo importado pasan solo si son un color de
+// verdad: van adentro de un atributo del SVG.
+const COLOR_MINI = { event: '#3a8fd6', popup_label: '#f8d022', descriptor: '#fef08a',
+                     sticky_label: '#fdba74', line: '#4c51bf', possession: '#475569' };
+function colorMini(c, porDefecto) {
+    const s = String(c || '').trim();
+    return /^#[0-9a-f]{3,8}$/i.test(s) || /^(rgb|hsl)a?\([\d\s.,%]+\)$/i.test(s) ? s : porDefecto;
+}
+
+// Una foto chiquita de la botonera: la pestaña Principal a escala, con los
+// colores de cada botón. Es la misma cuenta que la miniatura de la compu.
+function miniaturaPlantilla(t) {
+    const num = v => Number(v);
+    const els = (t.elements || []).filter(e => e && !e.hoja && e.type !== 'popup_label' &&
+        isFinite(num(e.x)) && isFinite(num(e.y)) && num(e.w) > 0 && num(e.h) > 0);
+    if (!els.length) {
+        return '<svg class="inicio__mini-svg" viewBox="0 0 160 100" aria-hidden="true"><rect x="1" y="1" width="158" height="98" rx="6" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 4"/></svg>';
+    }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    els.forEach(e => {
+        x0 = Math.min(x0, num(e.x)); y0 = Math.min(y0, num(e.y));
+        x1 = Math.max(x1, num(e.x) + num(e.w)); y1 = Math.max(y1, num(e.y) + num(e.h));
+    });
+    const m = 12, r = n => Math.round(n * 10) / 10;
+    const fondo = e => (e.type === 'container' || e.type === 'image') ? 0 : 1;
+    const partes = els.slice().sort((a, b) => fondo(a) - fondo(b)).map(e => {
+        const x = r(num(e.x) - x0 + m), y = r(num(e.y) - y0 + m), w = r(num(e.w)), h = r(num(e.h));
+        switch (e.type) {
+            case 'container':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${colorMini(e.color, 'currentColor')}" fill-opacity=".10" stroke="currentColor" stroke-opacity=".3"/>`;
+            case 'image':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="currentColor" fill-opacity=".12"/>`;
+            case 'text':
+                return `<rect x="${x}" y="${r(y + h * .35)}" width="${r(w * .7)}" height="${r(h * .3)}" rx="3" fill="currentColor" fill-opacity=".35"/>`;
+            case 'counter':
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="3"/>`;
+            case 'teams': {
+                const a = colorMini(e.colorA, '#3a8fd6'), b = colorMini(e.colorB, '#dc2626');
+                return `<rect x="${x}" y="${y}" width="${r(w / 2)}" height="${h}" rx="6" fill="${a}"/><rect x="${r(x + w / 2)}" y="${y}" width="${r(w / 2)}" height="${h}" rx="6" fill="${b}"/>`;
+            }
+            default:
+                return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${colorMini(e.color, COLOR_MINI[e.type] || '#3a8fd6')}"/>`;
+        }
+    });
+    return `<svg class="inicio__mini-svg" viewBox="0 0 ${r(x1 - x0 + m * 2)} ${r(y1 - y0 + m * 2)}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${partes.join('')}</svg>`;
+}
+
+// Una fila de las listas del Inicio. Los textos van con textContent: los
+// nombres vienen de archivos importados.
+function filaInicio({ lado, nombre, detalle, destacada, acciones = [], alTocar }) {
+    const f = document.createElement(alTocar ? 'button' : 'div');
+    f.className = 'inicio__fila-lista' + (destacada ? ' es-actual' : '');
+    const texto = document.createElement('span');
+    texto.className = 'inicio__fila-texto';
+    const n = document.createElement('span'); n.className = 'inicio__fila-nombre'; n.textContent = nombre;
+    const d = document.createElement('span'); d.className = 'inicio__fila-detalle'; d.textContent = detalle;
+    texto.append(n, d);
+    f.append(lado, texto);
+    acciones.forEach(a => f.appendChild(a));
+    if (alTocar) f.addEventListener('click', alTocar);
+    return f;
 }
 
 function renderInicio() {
     const hora = new Date().getHours();
     D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
-
-    const lista = D('inicioPlantillas');
-    lista.innerHTML = '';
-    // Los nombres van con textContent: vienen de archivos importados.
-    const fila = (titulo, detalle, alTocar, destacada) => {
-        const b = document.createElement('button');
-        b.className = 'inicio__plantilla' + (destacada ? ' inicio__plantilla--actual' : '');
-        const t = document.createElement('span'); t.className = 'inicio__plantilla-nombre'; t.textContent = titulo;
-        const d = document.createElement('span'); d.className = 'inicio__plantilla-detalle'; d.textContent = detalle;
-        const ir = document.createElement('span'); ir.className = 'inicio__plantilla-ir'; ir.textContent = '▶︎ Codificar';   // ︎: flecha de texto, no emoji
-        b.append(t, d, ir);
-        b.addEventListener('click', alTocar);
-        lista.appendChild(b);
-    };
     const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
+
+    // ── Mis plantillas ──
+    const lista = D('inicioPlantillas');
+    const plantillas = getSavedTemplates();
+    lista.innerHTML = '';
+    D('inicioCuentaPlantillas').textContent = plantillas.length || '';
+    const mini = t => {
+        const s = document.createElement('span');
+        s.className = 'inicio__mini';
+        s.innerHTML = miniaturaPlantilla(t);
+        return s;
+    };
+    const ir = () => { const s = document.createElement('span'); s.className = 'inicio__ir'; s.textContent = 'Codificar ›'; return s; };
     if (state.elements.length) {
-        fila('Seguir con la botonera de ahora', botones(state.elements.length), empezarACodificar, true);
+        lista.appendChild(filaInicio({
+            lado: mini({ elements: state.elements }), nombre: 'Seguir con la botonera de ahora',
+            detalle: botones(state.elements.length), destacada: true, acciones: [ir()], alTocar: empezarACodificar
+        }));
     }
-    getSavedTemplates().forEach(t => fila(t.name, `${t.date} · ${botones((t.elements || []).length)}`, () => {
-        if (state.mode === 'live') {
-            customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
-            setPage('botonera');
-            return;
+    plantillas.forEach(t => lista.appendChild(filaInicio({
+        lado: mini(t), nombre: t.name, detalle: `${t.date} · ${botones((t.elements || []).length)}`, acciones: [ir()],
+        alTocar: () => {
+            if (state.mode === 'live') {
+                customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
+                setPage('botonera');
+                return;
+            }
+            cargarPlantilla(t);
+            empezarACodificar();
         }
-        cargarPlantilla(t);
-        empezarACodificar();
-    }));
+    })));
     if (!lista.children.length) {
         lista.innerHTML = `<div class="inicio__vacio">Todavía no hay plantillas. Armala en la compu
             (Base de datos › Plantillas) y pasala con <b>Exportar para el iPad</b>, o armala acá
             en la Botonera, desde el menú ☰.</div>`;
+    }
+
+    // ── XML: las codificaciones guardadas, la más nueva arriba ──
+    const xml = D('inicioXml');
+    const sesiones = getSavedSessions();
+    xml.innerHTML = '';
+    D('inicioCuentaXml').textContent = sesiones.length || '';
+    const icono = () => {
+        const s = document.createElement('span');
+        s.className = 'inicio__doc';
+        s.innerHTML = '<svg viewBox="0 0 24 24" class="inicio__svg" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>';
+        return s;
+    };
+    const accion = (texto, clase, fn) => {
+        const b = document.createElement('button');
+        b.className = 'inicio__accion ' + clase;
+        b.textContent = texto;
+        b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+        return b;
+    };
+    sesiones.forEach(s => {
+        const n = (s.events || []).filter(ev => !ev.posesionDe).length;
+        xml.appendChild(filaInicio({
+            lado: icono(), nombre: s.name,
+            detalle: `${s.date} · ${n} ${n === 1 ? 'evento' : 'eventos'} · ${s.duration || '00:00'}`,
+            acciones: [
+                accion('Ver', 'inicio__accion--ver', () => verSesion(s)),
+                accion('XML', 'inicio__accion--xml', () => exportCustomXML(s.events, s.name, s.startedAt ? new Date(s.startedAt) : null))
+            ]
+        }));
+    });
+    if (!sesiones.length) {
+        xml.innerHTML = `<div class="inicio__vacio">Todavía no hay codificaciones guardadas. Al terminar
+            de codificar, guardala desde el Historial y aparece acá para exportar el XML.</div>`;
     }
 }
 
@@ -4905,6 +5010,21 @@ function saveSessions(arr) {
 
 function openSessionsModal() { setPage('xml'); }
 
+// Abre una codificación guardada en la botonera (desde XML o desde Inicio).
+function verSesion(s) {
+    // setMode('live') resetea state.events, asi que hay que entrar al modo ANTES de cargar
+    if (state.mode !== 'live') setMode('live');
+    // Los tramos de posesión salen del registro: son estadística.
+    state.tramosPos = tramosDeSesion(s);
+    state.events   = JSON.parse(JSON.stringify(s.events || [])).filter(ev => !ev.posesionDe);
+    state.counters = JSON.parse(JSON.stringify(s.counters || {}));
+    state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
+    state.sesionCargada = s.name;
+    renderLivePanel();
+    renderElements();
+    setPage('botonera');
+}
+
 function renderSessionsList() {
     const sessions = getSavedSessions();
     el.sessionsList.innerHTML = '';
@@ -4930,19 +5050,7 @@ function renderSessionsList() {
             </div>
         `;
 
-        row.querySelector('.btn-load-sess').addEventListener('click', () => {
-            // setMode('live') resetea state.events, asi que hay que entrar al modo ANTES de cargar
-            if (state.mode !== 'live') setMode('live');
-            // Los tramos de posesión salen del registro: son estadística.
-            state.tramosPos = tramosDeSesion(s);
-            state.events   = JSON.parse(JSON.stringify(s.events || [])).filter(ev => !ev.posesionDe);
-            state.counters = JSON.parse(JSON.stringify(s.counters || {}));
-            state.toi      = JSON.parse(JSON.stringify(s.toi || {}));
-            state.sesionCargada = s.name;
-            renderLivePanel();
-            renderElements();
-            setPage('botonera');
-        });
+        row.querySelector('.btn-load-sess').addEventListener('click', () => verSesion(s));
 
         row.querySelector('.btn-export-sess').addEventListener('click', () => {
             exportCustomXML(s.events, s.name, s.startedAt ? new Date(s.startedAt) : null);
