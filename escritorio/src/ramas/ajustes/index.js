@@ -280,8 +280,55 @@ export default {
                 ['Base de datos', info.base]
             ].filter(([, v]) => v);
             $('[data-acerca]').innerHTML = filas.map(([k, v]) => `<dt>${escapar(k)}</dt><dd class="tv-seleccionable">${escapar(v)}</dd>`).join('') +
+                `<dt>Actualizaciones</dt><dd class="tv-ajustes-actualizar"><span data-actualizar-texto></span>
+                    <button type="button" class="tv-btn tv-btn--chico" data-actualizar-buscar>${iconoHTML('descargar')} Buscar actualizaciones</button></dd>` +
                 `<dt>Atajos</dt><dd><span class="tv-tecla">${escapar(textoAtajo('Mod').replace('+', ' '))} 1…6</span> cambiar de pantalla · <span class="tv-tecla">${escapar(textoAtajo('Mod+K').replace('+', ' '))}</span> buscar · <span class="tv-tecla">Esc</span> cerrar</dd>`;
+            $('[data-actualizar-buscar]').addEventListener('click', buscarActualizacion);
+            try { pintarActualizacion(await api.actualizar.estado()); } catch { pintarActualizacion(null); }
         }
+
+        // ── Actualizaciones ──
+        // El estado lo manda main/actualizar.js; acá se dice en palabras y, si
+        // ya hay una bajada, el botón pasa a ser "Reiniciar e instalar".
+        function pintarActualizacion(e) {
+            const texto = $('[data-actualizar-texto]');
+            const boton = $('[data-actualizar-buscar]');
+            if (!texto || !boton) return;
+            faseActualizacion = e ? e.fase : null;
+            boton.disabled = false;
+            if (!e || !e.activo) {
+                texto.textContent = 'Solo en la app instalada en Windows. ';
+                boton.hidden = true;
+                return;
+            }
+            boton.hidden = false;
+            const frases = {
+                buscando: 'Buscando…',
+                bajando: `Bajando la ${e.version || 'versión nueva'}${e.porcentaje ? ` (${e.porcentaje}%)` : ''}… `,
+                lista: `La ${e.version} está lista: se instala al cerrar la app. `,
+                error: 'No se pudo buscar (¿sin internet?). ',
+                nada: e.buscadoEn ? 'Tenés la última versión. ' : ''
+            };
+            texto.textContent = frases[e.fase] || '';
+            boton.disabled = e.fase === 'buscando' || e.fase === 'bajando';
+            if (e.fase === 'lista') {
+                boton.innerHTML = `${iconoHTML('check')} Reiniciar e instalar`;
+            } else {
+                boton.innerHTML = `${iconoHTML('descargar')} Buscar actualizaciones`;
+            }
+        }
+
+        let faseActualizacion = null;
+        async function buscarActualizacion() {
+            // Con una versión ya bajada, el botón reinicia (pasa por el cierre
+            // de siempre: si se está grabando, pregunta).
+            if (faseActualizacion === 'lista') { api.actualizar.instalar().catch(() => {}); return; }
+            pintarActualizacion({ fase: 'buscando', activo: true });
+            try { pintarActualizacion(await api.actualizar.buscar()); }
+            catch (err) { ui.aviso('No se pudo buscar: ' + mensaje(err), 'error'); pintarActualizacion(await api.actualizar.estado().catch(() => null)); }
+        }
+        const dejarActualizar = api.actualizar && api.actualizar.onEstado
+            ? api.actualizar.onEstado(e => { if (vivo) pintarActualizacion({ ...e, activo: true }); }) : () => {};
 
         // La sección visible queda marcada en el índice.
         const contenido = $('.tv-ajustes-contenido');
@@ -293,7 +340,7 @@ export default {
             });
         }, { root: contenido, rootMargin: '0px 0px -70% 0px' });
         contenedor.querySelectorAll('.tv-ajustes-seccion').forEach(s => observador.observe(s));
-        quitar = () => observador.disconnect();
+        quitar = () => { observador.disconnect(); dejarActualizar(); };
 
         await Promise.all([pintarEquipos(), pintarAcerca()]);
     },

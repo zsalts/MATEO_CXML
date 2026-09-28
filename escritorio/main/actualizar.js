@@ -2,7 +2,10 @@
 //
 // Cada push a la rama app arma un instalador nuevo y lo publica en GitHub
 // Releases (.github/workflows/escritorio-windows.yml). La app instalada mira
-// ahí al arrancar y cada 4 horas; si hay una versión más nueva la baja en
+// ahí al arrancar, cada 30 minutos, cuando volvés a su ventana (como mucho
+// una vez cada 10 minutos) y cuando tocás "Buscar actualizaciones" en
+// Ajustes. Cada 4 horas era poco: con la app abierta todo el día, una versión
+// nueva tardaba media jornada en aparecer. Si hay una más nueva la baja en
 // segundo plano y se instala sola la próxima vez que se cierra. La pantalla
 // avisa y ofrece "Reiniciar ahora", que pasa por el mismo cierre de siempre:
 // si se está grabando, pregunta antes.
@@ -12,7 +15,8 @@
 
 const { manejar } = require('./ipc');
 
-const CADA = 4 * 60 * 60 * 1000;
+const CADA = 30 * 60 * 1000;
+const AL_VOLVER = 10 * 60 * 1000;
 
 function crearActualizador({ app, ventana }) {
     let estado = { fase: 'nada' };        // nada | buscando | bajando | lista | error
@@ -40,7 +44,7 @@ function crearActualizador({ app, ventana }) {
         updater.autoDownload = true;
         updater.autoInstallOnAppQuit = true;
         updater.on('checking-for-update', () => avisar({ fase: 'buscando' }));
-        updater.on('update-not-available', () => avisar({ fase: 'nada' }));
+        updater.on('update-not-available', () => avisar({ fase: 'nada', buscadoEn: Date.now() }));
         updater.on('update-available', i => avisar({ fase: 'bajando', version: i.version, porcentaje: 0 }));
         updater.on('download-progress', p => avisar({ fase: 'bajando', porcentaje: Math.round(p.percent || 0) }));
         updater.on('update-downloaded', i => avisar({ fase: 'lista', version: i.version }));
@@ -48,18 +52,29 @@ function crearActualizador({ app, ventana }) {
         // se reintenta en la próxima vuelta.
         updater.on('error', err => { console.warn('Actualizar:', err && err.message); avisar({ fase: 'error' }); });
 
-        const buscar = () => updater.checkForUpdates().catch(err => console.warn('Actualizar:', err && err.message));
         setTimeout(buscar, 10000);
         const t = setInterval(buscar, CADA);
         if (t.unref) t.unref();
+        app.on('browser-window-focus', () => { if (Date.now() - ultimaBusqueda > AL_VOLVER) buscar(); });
+    }
+
+    // Con una versión ya bajada (o bajándose) no se vuelve a buscar: esa se
+    // instala al cerrar, y la próxima vez que abra busca la siguiente.
+    let ultimaBusqueda = 0;
+    function buscar() {
+        if (!updater || ['buscando', 'bajando', 'lista'].includes(estado.fase)) return Promise.resolve(false);
+        ultimaBusqueda = Date.now();
+        return updater.checkForUpdates().then(() => true, err => {
+            console.warn('Actualizar:', err && err.message);
+            return false;
+        });
     }
 
     function registrar(ipcMain) {
         manejar(ipcMain, 'actualizar:estado', () => ({ ...estado, actual: app.getVersion(), activo: activo() }));
         manejar(ipcMain, 'actualizar:buscar', async () => {
-            if (!updater) return false;
-            await updater.checkForUpdates();
-            return true;
+            await buscar();
+            return { ...estado, actual: app.getVersion(), activo: activo() };
         });
         // Reiniciar ahora: app.quit() pasa por before-quit, que cierra la
         // grabación y la base en orden y al final llama a alTerminarDeCerrar().

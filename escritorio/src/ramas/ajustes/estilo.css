@@ -173,3 +173,6 @@
     .tv-ajustes-fila { gap: var(--tv-esp-3); }
     .tv-ajustes-carpeta { flex-wrap: wrap; }
 }
+
+/* Versión nueva: el estado en palabras y el botón al lado */
+.tv-ajustes-acerca dd.tv-ajustes-actualizar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tv-esp-2); word-break: normal; }
