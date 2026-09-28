@@ -1236,12 +1236,14 @@ html[data-tema="oscuro"] .inicio {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 24px max(24px, env(safe-area-inset-left)) 32px;
+    padding: 32px max(32px, env(safe-area-inset-left)) 40px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 16px;
 }
+/* Separaciones con márgenes y no con gap: el gap en flex no existe antes de
+   iPadOS 14.5, y ahí todo quedaba pegado. El gap en grid sí anda. */
+.inicio__scroll > * + * { margin-top: 28px; }
 /* Sin esto los paneles se achican para entrar en la pantalla y el que tiene
    el foco se corre por dentro (se pierde su título): mejor que scrollee todo. */
 .inicio__scroll > * { flex-shrink: 0; }
@@ -1254,7 +1256,7 @@ html[data-tema="oscuro"] .inicio {
 }
 
 /* ── Tarjetas ── */
-.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.inicio__tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; }
 @media (max-width: 600px) { .inicio__tarjetas, .inicio__columnas { grid-template-columns: 1fr !important; } }
 .inicio__tarjeta {
     --tono: var(--in-acento);
@@ -1263,9 +1265,8 @@ html[data-tema="oscuro"] .inicio {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    min-height: 148px;
-    padding: 16px;
+    min-height: 160px;
+    padding: 22px;
     border: 1px solid var(--in-borde);
     border-radius: 10px;
     background: var(--in-panel);
@@ -1294,7 +1295,8 @@ html[data-tema="oscuro"] .inicio {
 .inicio__texto { color: var(--in-texto-2); line-height: 1.35; font-size: 14px; }
 
 /* ── Paneles ── */
-.inicio__columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.inicio__tarjeta > * + * { margin-top: 4px; }
+.inicio__columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-gap: 24px; gap: 24px; align-items: start; }
 .inicio__bloque {
     border: 1px solid var(--in-borde);
     border-radius: 10px;
@@ -1305,12 +1307,12 @@ html[data-tema="oscuro"] .inicio {
 .inicio__bloque-cabeza {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 46px;
-    padding: 6px 8px 6px 16px;
+    min-height: 52px;
+    padding: 8px 12px 8px 20px;
     border-bottom: 1px solid var(--in-borde);
     box-sizing: border-box;
 }
+.inicio__bloque-cabeza > * + * { margin-left: 8px; }
 .inicio__bloque-cabeza h2 { margin: 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--in-texto-2); }
 .inicio__chip {
     min-width: 20px; padding: 1px 7px;
@@ -1337,10 +1339,9 @@ html[data-tema="oscuro"] .inicio {
 .inicio__fila-lista {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-height: 60px;
+    min-height: 68px;
     width: 100%;
-    padding: 8px 12px 8px 16px;
+    padding: 10px 16px 10px 20px;
     border: 0;
     border-bottom: 1px solid var(--in-borde);
     background: none;
@@ -1397,10 +1398,12 @@ html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
 
 /* ── Conectar con la compu ── */
 .inicio__conectar { border-color: var(--in-acento); }
-.inicio__conectar-cuerpo { padding: 14px 16px 16px; }
-.inicio__pasos { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--in-texto-2); line-height: 1.45; }
-.inicio__pasos li { display: flex; align-items: flex-start; gap: 10px; }
-.inicio__pasos li > span + span { flex: 1; }
+.inicio__fila-lista > * + * { margin-left: 14px; }
+.inicio__conectar-cuerpo { padding: 20px 20px 22px; }
+.inicio__pasos { list-style: none; margin: 0 0 18px; padding: 0; color: var(--in-texto-2); line-height: 1.45; }
+.inicio__pasos li { display: flex; align-items: flex-start; }
+.inicio__pasos li + li { margin-top: 10px; }
+.inicio__pasos li > span + span { flex: 1; margin-left: 10px; }
 .inicio__pasos li > span:first-child {
     flex: none;
     display: inline-flex; align-items: center; justify-content: center;
@@ -1411,7 +1414,8 @@ html[data-tema="oscuro"] .inicio__accion--xml { color: #06121f; }
     color: var(--in-texto);
 }
 .inicio__pasos b { color: var(--in-texto); }
-.inicio__fila { display: flex; gap: 8px; }
+.inicio__fila { display: flex; }
+.inicio__fila > * + * { margin-left: 10px; }
 .inicio__campo {
     flex: 1; min-width: 0;
     padding: 10px 12px;
@@ -2149,7 +2153,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v51';
+const APP_VERSION = 'v52';
 
 // ─────────────────────────────────────────────
 // DOM REFS
