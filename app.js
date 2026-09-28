@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v48';
+const APP_VERSION = 'v49';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -71,6 +71,7 @@ const el = {
     btnMenu:       D('btnMenu'),
     mainMenu:      D('mainMenu'),
     menuPageName:  D('menuPageName'),
+    pageInicio:    D('pageInicio'),
     pageBotonera:  D('pageBotonera'),
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
@@ -1157,7 +1158,7 @@ function init() {
     buildSvgDefs();
     bindEvents();
     setMode('setup');
-    setPage('botonera');
+    setPage('inicio');
     renderEstadoNube();
     // Entrar sola con lo guardado y recién ahí mirar la nube: así abrir la app
     // no pide nada. Mirar la nube va ANTES de subir lo pendiente, porque al
@@ -1223,6 +1224,112 @@ function releaseWakeLock() {
 }
 
 // ─────────────────────────────────────────────
+// INICIO
+// La pantalla de entrada, como el menú principal de la compu, con lo que se
+// hace desde el iPad: codificar acá, o conectarse a la compu (Captura desde
+// iPad) para que ella grabe el video mientras el iPad codifica. Conectarse
+// es abrir la página que sirve la compu por wifi; esa página pide el PIN.
+// ─────────────────────────────────────────────
+const PUERTO_COMPU = 8787;
+const CLAVE_COMPU = 'tv_compu';
+
+// "192.168.1.20", "192.168.1.20:8787" o "http://192.168.1.20:8787/" → la
+// dirección de la captura en la compu. null si no parece una dirección.
+function urlDeCompu(texto) {
+    let s = String(texto || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+    if (!/^[a-z0-9.-]+(:\d{1,5})?$/i.test(s)) return null;
+    if (!/:\d+$/.test(s)) s += ':' + PUERTO_COMPU;
+    return 'http://' + s + '/';
+}
+
+function bindInicio() {
+    on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
+    on(D('btnInicioCompu'), 'click', () => alternarCompu());
+    on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
+}
+
+function renderInicio() {
+    const hora = new Date().getHours();
+    D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
+
+    const lista = D('inicioPlantillas');
+    lista.innerHTML = '';
+    // Los nombres van con textContent: vienen de archivos importados.
+    const fila = (titulo, detalle, alTocar, destacada) => {
+        const b = document.createElement('button');
+        b.className = 'inicio__plantilla' + (destacada ? ' inicio__plantilla--actual' : '');
+        const t = document.createElement('span'); t.className = 'inicio__plantilla-nombre'; t.textContent = titulo;
+        const d = document.createElement('span'); d.className = 'inicio__plantilla-detalle'; d.textContent = detalle;
+        const ir = document.createElement('span'); ir.className = 'inicio__plantilla-ir'; ir.textContent = '▶︎ Codificar';   // ︎: flecha de texto, no emoji
+        b.append(t, d, ir);
+        b.addEventListener('click', alTocar);
+        lista.appendChild(b);
+    };
+    const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
+    if (state.elements.length) {
+        fila('Seguir con la botonera de ahora', botones(state.elements.length), empezarACodificar, true);
+    }
+    getSavedTemplates().forEach(t => fila(t.name, `${t.date} · ${botones((t.elements || []).length)}`, () => {
+        if (state.mode === 'live') {
+            customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
+            setPage('botonera');
+            return;
+        }
+        cargarPlantilla(t);
+        empezarACodificar();
+    }));
+    if (!lista.children.length) {
+        lista.innerHTML = `<div class="inicio__vacio">Todavía no hay plantillas. Armala en la compu
+            (Base de datos › Plantillas) y pasala con <b>Exportar para el iPad</b>, o armala acá
+            en la Botonera, desde el menú ☰.</div>`;
+    }
+}
+
+// Con una codificación en curso no se cambia la botonera: se vuelve a ella.
+function empezarACodificar() {
+    setPage('botonera');
+    if (state.mode !== 'live') setMode('live');
+}
+
+function codificarDesdeInicio() {
+    if (state.mode === 'live') { setPage('botonera'); return; }
+    const lista = D('inicioPlantillas');
+    if (!getSavedTemplates().length && !state.elements.length) {
+        customAlert('Todavía no hay plantillas. Pasá una desde la compu (Base de datos › Plantillas › Exportar para el iPad) o armala en la Botonera, desde el menú ☰.', 'Sin plantillas');
+        return;
+    }
+    // Elegir cuál: la lista está abajo, se la marca un momento.
+    lista.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    lista.classList.add('inicio__lista--marcada');
+    setTimeout(() => lista.classList.remove('inicio__lista--marcada'), 1200);
+}
+
+function alternarCompu(abrir) {
+    const caja = D('inicioCompu');
+    const ver = abrir !== undefined ? abrir : caja.classList.contains('hidden');
+    caja.classList.toggle('hidden', !ver);
+    D('btnInicioCompu').setAttribute('aria-expanded', String(ver));
+    if (!ver) return;
+    const campo = D('inputCompu');
+    if (!campo.value) campo.value = lsGet(CLAVE_COMPU) || '';
+    caja.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setTimeout(() => campo.focus(), 50);
+}
+
+function conectarCompu() {
+    const campo = D('inputCompu'), error = D('compuError');
+    const url = urlDeCompu(campo.value);
+    if (!url) {
+        error.textContent = 'Escribí la dirección que muestra la compu, por ejemplo 192.168.1.20:8787.';
+        error.classList.remove('hidden');
+        return;
+    }
+    error.classList.add('hidden');
+    lsSet(CLAVE_COMPU, campo.value.trim());
+    location.href = url;
+}
+
+// ─────────────────────────────────────────────
 // PÁGINAS
 // La app son tres pantallas completas en vez de modales: la botonera, las
 // plantillas y las codificaciones/XML. En un iPad un modal queda chico para
@@ -1232,11 +1339,12 @@ function setPage(page) {
     state.page = page;
 
     const paginas = {
+        inicio:     el.pageInicio,
         botonera:   el.pageBotonera,
         plantillas: el.pagePlantillas,
         xml:        el.pageXml
     };
-    const nombres = { botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
+    const nombres = { inicio: 'Inicio', botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
 
     Object.keys(paginas).forEach(k => {
         const activa = (k === page);
@@ -1259,6 +1367,7 @@ function setPage(page) {
     // sin poder medir. Para Safari sin ResizeObserver, se recalcula al volver.
     if (page === 'botonera') reajustarLienzo();
 
+    if (page === 'inicio')     renderInicio();
     if (page === 'plantillas') renderTemplatesList();
     if (page === 'xml')        renderSessionsList();
 }
@@ -1358,6 +1467,7 @@ function bindEvents() {
     document.querySelectorAll('.menu-page').forEach(b => {
         b.addEventListener('click', () => setPage(b.dataset.page));
     });
+    bindInicio();
     on(el.btnStartCoding, 'click',() => setMode('live'));
     on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
@@ -4536,6 +4646,18 @@ function saveTemplates(arr) {
 
 function openTemplatesModal() { setPage('plantillas'); }
 
+// Deja una plantilla guardada en el lienzo (de Plantillas o de Inicio).
+function cargarPlantilla(t) {
+    state.elements = JSON.parse(JSON.stringify(t.elements || []));
+    state.links    = JSON.parse(JSON.stringify(t.links || []));
+    state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
+    state.hojaActiva = null;
+    selectElement(null);
+    renderHojasBar();
+    saveData();
+    renderAll();
+}
+
 function renderTemplatesList() {
     const templates = getSavedTemplates();
     el.templatesList.innerHTML = '';
@@ -4561,14 +4683,7 @@ function renderTemplatesList() {
         `;
 
         row.querySelector('.btn-load-tmpl').addEventListener('click', () => {
-            state.elements = JSON.parse(JSON.stringify(t.elements || []));
-            state.links    = JSON.parse(JSON.stringify(t.links || []));
-            state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
-            state.hojaActiva = null;
-            selectElement(null);
-            renderHojasBar();
-            saveData();
-            renderAll();
+            cargarPlantilla(t);
             setPage('botonera');
         });
 

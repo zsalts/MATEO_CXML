@@ -1109,6 +1109,126 @@ html[data-tema="oscuro"] .pos-panel { border-bottom-color: #2c2c2e; }
 html[data-tema="oscuro"] .pos-panel-nombre { color: #f2f2f7; }
 html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
 
+/* ─────────────────────────────────────────────
+   INICIO — la misma cara que el menú principal de la compu: saludo,
+   tarjetas grandes con una línea de color arriba y la lista de plantillas en
+   un panel. Tarjetas grandes a propósito: se tocan con el dedo.
+   ───────────────────────────────────────────── */
+.inicio {
+    --in-fondo: #f2f2f7; --in-panel: #fff; --in-borde: #d1d1d6; --in-texto: #1c1c1e;
+    --in-texto-2: #6e6e73; --in-acento: #007aff; --in-ok: #2ca038; --in-hover: #f3f4f6;
+    background: var(--in-fondo);
+    color: var(--in-texto);
+}
+html[data-tema="oscuro"] .inicio {
+    --in-fondo: #000; --in-panel: #1c1c1e; --in-borde: #2c2c2e; --in-texto: #f2f2f7;
+    --in-texto-2: #98989d; --in-acento: #0a84ff; --in-ok: #30d158; --in-hover: #2c2c2e;
+}
+.inicio__scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 28px max(20px, env(safe-area-inset-left)) 40px;
+    max-width: 980px;
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+.inicio__saludo { font-size: 28px; font-weight: 700; margin: 0; }
+.inicio__sub { color: var(--in-texto-2); margin: 2px 0 22px; }
+
+.inicio__tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .inicio__tarjetas { grid-template-columns: 1fr; } }
+.inicio__tarjeta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-height: 150px;
+    padding: 20px;
+    border: 1px solid var(--in-borde);
+    border-top: 4px solid var(--in-acento);
+    border-radius: 14px;
+    background: var(--in-panel);
+    color: var(--in-texto);
+    text-align: left;
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .1s;
+}
+.inicio__tarjeta:active { transform: scale(.98); background: var(--in-hover); }
+.inicio__tarjeta--codificar { border-top-color: var(--in-ok); }
+.inicio__tarjeta[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--in-acento); }
+.inicio__icono {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(0, 122, 255, .12); font-size: 22px; margin-bottom: 6px;
+}
+.inicio__tarjeta--codificar .inicio__icono { background: rgba(44, 160, 56, .14); }
+.inicio__titulo { font-size: 19px; font-weight: 700; }
+.inicio__texto { color: var(--in-texto-2); font-size: 14px; line-height: 1.4; }
+
+.inicio__bloque {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border: 1px solid var(--in-borde);
+    border-radius: 14px;
+    background: var(--in-panel);
+}
+.inicio__bloque.hidden { display: none; }
+.inicio__bloque-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.inicio__bloque-titulo { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--in-texto-2); margin: 0 0 10px; }
+.inicio__pasos { list-style: decimal; margin: 0 0 14px; padding-left: 22px; line-height: 1.55; font-size: 15px; }
+.inicio__fila { display: flex; gap: 10px; }
+.inicio__campo {
+    flex: 1; min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--in-borde);
+    border-radius: 10px;
+    background: var(--in-fondo);
+    color: var(--in-texto);
+    font-size: 17px;          /* 16 o más: Safari no hace zoom al tocarlo */
+}
+.inicio__campo:focus { outline: none; border-color: var(--in-acento); }
+.inicio__boton {
+    padding: 0 22px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--in-acento);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+}
+.inicio__error { color: #ff3b30; font-size: 14px; margin: 8px 0 0; }
+.inicio__error.hidden { display: none; }
+.inicio__nota { color: var(--in-texto-2); font-size: 13px; margin: 10px 0 0; }
+.inicio__bloque-cabeza .inicio__nota { margin: 0 0 10px; }
+
+.inicio__lista { display: flex; flex-direction: column; border-radius: 10px; transition: box-shadow .3s; }
+.inicio__lista--marcada { box-shadow: 0 0 0 3px var(--in-ok); }
+.inicio__plantilla {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "nombre ir" "detalle ir";
+    align-items: center;
+    column-gap: 12px;
+    padding: 12px 6px;
+    border: 0;
+    border-bottom: 1px solid var(--in-borde);
+    background: none;
+    color: var(--in-texto);
+    text-align: left;
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+.inicio__plantilla:last-child { border-bottom: 0; }
+.inicio__plantilla:active { background: var(--in-hover); }
+.inicio__plantilla-nombre { grid-area: nombre; font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inicio__plantilla-detalle { grid-area: detalle; color: var(--in-texto-2); font-size: 13px; }
+.inicio__plantilla-ir { grid-area: ir; color: var(--in-ok); font-weight: 700; font-size: 14px; }
+.inicio__plantilla--actual .inicio__plantilla-nombre { color: var(--in-acento); }
+.inicio__vacio { color: var(--in-texto-2); font-size: 14px; line-height: 1.5; padding: 6px 2px; }
+
 </style>
     <meta name="theme-color" content="#1f2937">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1132,7 +1252,10 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
                 <span id="menuPageName" class="ml-2">Botonera</span>
             </button>
             <div id="mainMenu" class="absolute top-full left-0 mt-2 w-52 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
-                <button class="menu-page ios-menu-row" data-page="botonera">
+                <button class="menu-page ios-menu-row" data-page="inicio">
+                    <span class="menu-check">✓</span><span>Inicio</span>
+                </button>
+                <button class="menu-page ios-menu-row border-t border-gray-100" data-page="botonera">
                     <span class="menu-check">✓</span><span>Botonera</span>
                 </button>
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="plantillas">
@@ -1158,6 +1281,54 @@ html[data-tema="oscuro"] .pos-panel-tiempo { color: #98989d; }
             <button id="btnExport" class="text-[#007aff] text-base hidden">Exportar XML</button>
         </div>
     </header>
+
+    <!-- ══ PÁGINA: INICIO ══
+         Lo mismo que el menú principal de la compu, con lo que se hace desde
+         el iPad: codificar acá, o conectarse a la compu para que ella grabe
+         mientras el iPad codifica. El editor y el XML siguen en el menú ☰. -->
+    <div id="pageInicio" class="flex-1 hidden flex-col overflow-hidden inicio">
+        <div class="inicio__scroll">
+            <h1 id="inicioSaludo" class="inicio__saludo">Buen día</h1>
+            <p class="inicio__sub">¿Qué hacemos hoy?</p>
+
+            <div class="inicio__tarjetas">
+                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--codificar">
+                    <span class="inicio__icono">✂</span>
+                    <span class="inicio__titulo">Codificar en el iPad</span>
+                    <span class="inicio__texto">Elegí una plantilla y marcá el partido. Después exportás el XML.</span>
+                </button>
+                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--compu" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono">🖥</span>
+                    <span class="inicio__titulo">Conectar con la compu</span>
+                    <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
+                </button>
+            </div>
+
+            <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
+            <section id="inicioCompu" class="inicio__bloque hidden">
+                <h2 class="inicio__bloque-titulo">Conectar con la compu</h2>
+                <ol class="inicio__pasos">
+                    <li>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</li>
+                    <li>Escribí acá la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). El iPad y la compu tienen que estar en el mismo wifi.</li>
+                    <li>Te va a pedir el <b>PIN</b> de 4 números que aparece en la compu.</li>
+                </ol>
+                <form id="formCompu" class="inicio__fila" autocomplete="off">
+                    <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
+                    <button type="submit" class="inicio__boton">Conectar</button>
+                </form>
+                <p id="compuError" class="inicio__error hidden"></p>
+                <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+            </section>
+
+            <section class="inicio__bloque">
+                <div class="inicio__bloque-cabeza">
+                    <h2 class="inicio__bloque-titulo">Mis plantillas</h2>
+                    <span class="inicio__nota">Tocá una para empezar a codificar</span>
+                </div>
+                <div id="inicioPlantillas" class="inicio__lista"></div>
+            </section>
+        </div>
+    </div>
 
     <!-- ══ PÁGINA: BOTONERA ══ -->
     <div id="pageBotonera" class="flex-1 flex flex-col overflow-hidden">
@@ -1755,7 +1926,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v48';
+const APP_VERSION = 'v49';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1769,6 +1940,7 @@ const el = {
     btnMenu:       D('btnMenu'),
     mainMenu:      D('mainMenu'),
     menuPageName:  D('menuPageName'),
+    pageInicio:    D('pageInicio'),
     pageBotonera:  D('pageBotonera'),
     pagePlantillas:D('pagePlantillas'),
     pageXml:       D('pageXml'),
@@ -2855,7 +3027,7 @@ function init() {
     buildSvgDefs();
     bindEvents();
     setMode('setup');
-    setPage('botonera');
+    setPage('inicio');
     renderEstadoNube();
     // Entrar sola con lo guardado y recién ahí mirar la nube: así abrir la app
     // no pide nada. Mirar la nube va ANTES de subir lo pendiente, porque al
@@ -2921,6 +3093,112 @@ function releaseWakeLock() {
 }
 
 // ─────────────────────────────────────────────
+// INICIO
+// La pantalla de entrada, como el menú principal de la compu, con lo que se
+// hace desde el iPad: codificar acá, o conectarse a la compu (Captura desde
+// iPad) para que ella grabe el video mientras el iPad codifica. Conectarse
+// es abrir la página que sirve la compu por wifi; esa página pide el PIN.
+// ─────────────────────────────────────────────
+const PUERTO_COMPU = 8787;
+const CLAVE_COMPU = 'tv_compu';
+
+// "192.168.1.20", "192.168.1.20:8787" o "http://192.168.1.20:8787/" → la
+// dirección de la captura en la compu. null si no parece una dirección.
+function urlDeCompu(texto) {
+    let s = String(texto || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+    if (!/^[a-z0-9.-]+(:\d{1,5})?$/i.test(s)) return null;
+    if (!/:\d+$/.test(s)) s += ':' + PUERTO_COMPU;
+    return 'http://' + s + '/';
+}
+
+function bindInicio() {
+    on(D('btnInicioCodificar'), 'click', codificarDesdeInicio);
+    on(D('btnInicioCompu'), 'click', () => alternarCompu());
+    on(D('formCompu'), 'submit', e => { e.preventDefault(); conectarCompu(); });
+}
+
+function renderInicio() {
+    const hora = new Date().getHours();
+    D('inicioSaludo').textContent = hora < 12 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
+
+    const lista = D('inicioPlantillas');
+    lista.innerHTML = '';
+    // Los nombres van con textContent: vienen de archivos importados.
+    const fila = (titulo, detalle, alTocar, destacada) => {
+        const b = document.createElement('button');
+        b.className = 'inicio__plantilla' + (destacada ? ' inicio__plantilla--actual' : '');
+        const t = document.createElement('span'); t.className = 'inicio__plantilla-nombre'; t.textContent = titulo;
+        const d = document.createElement('span'); d.className = 'inicio__plantilla-detalle'; d.textContent = detalle;
+        const ir = document.createElement('span'); ir.className = 'inicio__plantilla-ir'; ir.textContent = '▶︎ Codificar';   // ︎: flecha de texto, no emoji
+        b.append(t, d, ir);
+        b.addEventListener('click', alTocar);
+        lista.appendChild(b);
+    };
+    const botones = n => `${n} ${n === 1 ? 'botón' : 'botones'}`;
+    if (state.elements.length) {
+        fila('Seguir con la botonera de ahora', botones(state.elements.length), empezarACodificar, true);
+    }
+    getSavedTemplates().forEach(t => fila(t.name, `${t.date} · ${botones((t.elements || []).length)}`, () => {
+        if (state.mode === 'live') {
+            customAlert('Hay una codificación en curso. Terminala antes de cambiar de plantilla.', 'Codificando');
+            setPage('botonera');
+            return;
+        }
+        cargarPlantilla(t);
+        empezarACodificar();
+    }));
+    if (!lista.children.length) {
+        lista.innerHTML = `<div class="inicio__vacio">Todavía no hay plantillas. Armala en la compu
+            (Base de datos › Plantillas) y pasala con <b>Exportar para el iPad</b>, o armala acá
+            en la Botonera, desde el menú ☰.</div>`;
+    }
+}
+
+// Con una codificación en curso no se cambia la botonera: se vuelve a ella.
+function empezarACodificar() {
+    setPage('botonera');
+    if (state.mode !== 'live') setMode('live');
+}
+
+function codificarDesdeInicio() {
+    if (state.mode === 'live') { setPage('botonera'); return; }
+    const lista = D('inicioPlantillas');
+    if (!getSavedTemplates().length && !state.elements.length) {
+        customAlert('Todavía no hay plantillas. Pasá una desde la compu (Base de datos › Plantillas › Exportar para el iPad) o armala en la Botonera, desde el menú ☰.', 'Sin plantillas');
+        return;
+    }
+    // Elegir cuál: la lista está abajo, se la marca un momento.
+    lista.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    lista.classList.add('inicio__lista--marcada');
+    setTimeout(() => lista.classList.remove('inicio__lista--marcada'), 1200);
+}
+
+function alternarCompu(abrir) {
+    const caja = D('inicioCompu');
+    const ver = abrir !== undefined ? abrir : caja.classList.contains('hidden');
+    caja.classList.toggle('hidden', !ver);
+    D('btnInicioCompu').setAttribute('aria-expanded', String(ver));
+    if (!ver) return;
+    const campo = D('inputCompu');
+    if (!campo.value) campo.value = lsGet(CLAVE_COMPU) || '';
+    caja.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setTimeout(() => campo.focus(), 50);
+}
+
+function conectarCompu() {
+    const campo = D('inputCompu'), error = D('compuError');
+    const url = urlDeCompu(campo.value);
+    if (!url) {
+        error.textContent = 'Escribí la dirección que muestra la compu, por ejemplo 192.168.1.20:8787.';
+        error.classList.remove('hidden');
+        return;
+    }
+    error.classList.add('hidden');
+    lsSet(CLAVE_COMPU, campo.value.trim());
+    location.href = url;
+}
+
+// ─────────────────────────────────────────────
 // PÁGINAS
 // La app son tres pantallas completas en vez de modales: la botonera, las
 // plantillas y las codificaciones/XML. En un iPad un modal queda chico para
@@ -2930,11 +3208,12 @@ function setPage(page) {
     state.page = page;
 
     const paginas = {
+        inicio:     el.pageInicio,
         botonera:   el.pageBotonera,
         plantillas: el.pagePlantillas,
         xml:        el.pageXml
     };
-    const nombres = { botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
+    const nombres = { inicio: 'Inicio', botonera: 'Botonera', plantillas: 'Plantillas', xml: 'XML' };
 
     Object.keys(paginas).forEach(k => {
         const activa = (k === page);
@@ -2957,6 +3236,7 @@ function setPage(page) {
     // sin poder medir. Para Safari sin ResizeObserver, se recalcula al volver.
     if (page === 'botonera') reajustarLienzo();
 
+    if (page === 'inicio')     renderInicio();
     if (page === 'plantillas') renderTemplatesList();
     if (page === 'xml')        renderSessionsList();
 }
@@ -3056,6 +3336,7 @@ function bindEvents() {
     document.querySelectorAll('.menu-page').forEach(b => {
         b.addEventListener('click', () => setPage(b.dataset.page));
     });
+    bindInicio();
     on(el.btnStartCoding, 'click',() => setMode('live'));
     on(el.btnStartCodingMenu, 'click', () => { closeInsertMenu(); setMode('live'); });
     on(el.btnStopCoding, 'click', () => setMode('setup'));
@@ -6234,6 +6515,18 @@ function saveTemplates(arr) {
 
 function openTemplatesModal() { setPage('plantillas'); }
 
+// Deja una plantilla guardada en el lienzo (de Plantillas o de Inicio).
+function cargarPlantilla(t) {
+    state.elements = JSON.parse(JSON.stringify(t.elements || []));
+    state.links    = JSON.parse(JSON.stringify(t.links || []));
+    state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
+    state.hojaActiva = null;
+    selectElement(null);
+    renderHojasBar();
+    saveData();
+    renderAll();
+}
+
 function renderTemplatesList() {
     const templates = getSavedTemplates();
     el.templatesList.innerHTML = '';
@@ -6259,14 +6552,7 @@ function renderTemplatesList() {
         `;
 
         row.querySelector('.btn-load-tmpl').addEventListener('click', () => {
-            state.elements = JSON.parse(JSON.stringify(t.elements || []));
-            state.links    = JSON.parse(JSON.stringify(t.links || []));
-            state.hojas    = JSON.parse(JSON.stringify(t.hojas || []));
-            state.hojaActiva = null;
-            selectElement(null);
-            renderHojasBar();
-            saveData();
-            renderAll();
+            cargarPlantilla(t);
             setPage('botonera');
         });
 
@@ -6642,6 +6928,6 @@ init();
 
 // Marca para la trampa de errores de index.html
 window.__tagviewOk = true;
-</script>
+</script>
 </body>
 </html>
