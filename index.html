@@ -74,7 +74,10 @@
                 <span id="menuPageName" class="ml-2">Botonera</span>
             </button>
             <div id="mainMenu" class="absolute top-full left-0 mt-2 w-52 bg-white border border-gray-200 shadow-2xl rounded-xl hidden overflow-hidden z-50">
-                <button class="menu-page ios-menu-row" data-page="botonera">
+                <button class="menu-page ios-menu-row" data-page="inicio">
+                    <span class="menu-check">✓</span><span>Inicio</span>
+                </button>
+                <button class="menu-page ios-menu-row border-t border-gray-100" data-page="botonera">
                     <span class="menu-check">✓</span><span>Botonera</span>
                 </button>
                 <button class="menu-page ios-menu-row border-t border-gray-100" data-page="plantillas">
@@ -100,6 +103,54 @@
             <button id="btnExport" class="text-[#007aff] text-base hidden">Exportar XML</button>
         </div>
     </header>
+
+    <!-- ══ PÁGINA: INICIO ══
+         Lo mismo que el menú principal de la compu, con lo que se hace desde
+         el iPad: codificar acá, o conectarse a la compu para que ella grabe
+         mientras el iPad codifica. El editor y el XML siguen en el menú ☰. -->
+    <div id="pageInicio" class="flex-1 hidden flex-col overflow-hidden inicio">
+        <div class="inicio__scroll">
+            <h1 id="inicioSaludo" class="inicio__saludo">Buen día</h1>
+            <p class="inicio__sub">¿Qué hacemos hoy?</p>
+
+            <div class="inicio__tarjetas">
+                <button id="btnInicioCodificar" class="inicio__tarjeta inicio__tarjeta--codificar">
+                    <span class="inicio__icono">✂</span>
+                    <span class="inicio__titulo">Codificar en el iPad</span>
+                    <span class="inicio__texto">Elegí una plantilla y marcá el partido. Después exportás el XML.</span>
+                </button>
+                <button id="btnInicioCompu" class="inicio__tarjeta inicio__tarjeta--compu" aria-expanded="false" aria-controls="inicioCompu">
+                    <span class="inicio__icono">🖥</span>
+                    <span class="inicio__titulo">Conectar con la compu</span>
+                    <span class="inicio__texto">La compu graba el video y vos codificás desde acá, por wifi.</span>
+                </button>
+            </div>
+
+            <!-- Conectar: la compu muestra la dirección y el PIN en "Captura desde iPad" -->
+            <section id="inicioCompu" class="inicio__bloque hidden">
+                <h2 class="inicio__bloque-titulo">Conectar con la compu</h2>
+                <ol class="inicio__pasos">
+                    <li>En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.</li>
+                    <li>Escribí acá la dirección que muestra (por ejemplo <span class="font-mono">192.168.1.20:8787</span>). El iPad y la compu tienen que estar en el mismo wifi.</li>
+                    <li>Te va a pedir el <b>PIN</b> de 4 números que aparece en la compu.</li>
+                </ol>
+                <form id="formCompu" class="inicio__fila" autocomplete="off">
+                    <input id="inputCompu" class="inicio__campo font-mono" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.1.20:8787">
+                    <button type="submit" class="inicio__boton">Conectar</button>
+                </form>
+                <p id="compuError" class="inicio__error hidden"></p>
+                <p class="inicio__nota">También podés escanear el QR de la compu con la cámara del iPad.</p>
+            </section>
+
+            <section class="inicio__bloque">
+                <div class="inicio__bloque-cabeza">
+                    <h2 class="inicio__bloque-titulo">Mis plantillas</h2>
+                    <span class="inicio__nota">Tocá una para empezar a codificar</span>
+                </div>
+                <div id="inicioPlantillas" class="inicio__lista"></div>
+            </section>
+        </div>
+    </div>
 
     <!-- ══ PÁGINA: BOTONERA ══ -->
     <div id="pageBotonera" class="flex-1 flex flex-col overflow-hidden">
