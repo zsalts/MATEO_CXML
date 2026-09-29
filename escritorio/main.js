@@ -58,7 +58,9 @@ function abrirBase() {
     return bd.abrir(path.join(config.carpeta(), 'tagview.sqlite'));
 }
 
-const video = crearVideo({ carpeta: config.carpeta, ventana: laVentana, dialog, origen: ORIGEN });
+// La imagen en vivo para el iPad que mira: la grabación pasa también por acá.
+const vivo = require('./main/vivo').crearVivo();
+const video = crearVideo({ carpeta: config.carpeta, ventana: laVentana, dialog, origen: ORIGEN, vivo });
 const sistema = crearSistema({ app, dialog, shell, config, ventana: laVentana, video, abrirBase });
 
 // La sesion de la nube se guarda cifrada con la cuenta de Windows si se puede;
@@ -115,7 +117,7 @@ function enchufarRemoto() {
             leerPlantilla: async id => { await abrirBase(); return bd.leerPlantilla(id); },
             listarPlantillas: async () => { await abrirBase(); return bd.listarPlantillas(); }
         });
-        servidorIpad = remoto.registrar({ ipcMain, ventana: laVentana, bd: bdRemoto, carpeta: config.carpeta, rutaSrc: RUTA_SRC });
+        servidorIpad = remoto.registrar({ ipcMain, ventana: laVentana, bd: bdRemoto, carpeta: config.carpeta, rutaSrc: RUTA_SRC, vivo });
     } catch (e) {
         remoto = null;
         console.warn('Sin captura desde iPad:', e.message);

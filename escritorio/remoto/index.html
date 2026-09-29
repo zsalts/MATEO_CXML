@@ -78,12 +78,19 @@
 
 <main class="botonera" id="botonera" hidden></main>
 
-<!-- El iPad que mira: los cortes que va haciendo el otro iPad, con el video
-     que graba la compu. El mas nuevo arriba. -->
+<!-- El iPad que mira: la imagen en vivo de la compu todo el tiempo, y los
+     cortes que se van haciendo al costado (el mas nuevo arriba). Tocar un
+     corte lo muestra en el mismo lugar; al terminar vuelve al vivo. -->
 <main class="clips" id="clips" hidden>
-  <section class="clips__visor">
-    <video class="clips__video" id="clipsVideo" playsinline controls preload="auto"></video>
-    <div class="clips__vacio-visor" id="clipsVacioVisor">Tocá un clip de la lista para verlo</div>
+  <section class="clips__visor" id="clipsVisor" data-modo="vivo">
+    <video class="clips__video clips__video--vivo" id="vivoVideo" playsinline muted autoplay></video>
+    <video class="clips__video clips__video--clip" id="clipsVideo" playsinline controls preload="auto"></video>
+    <div class="clips__vacio-visor" id="clipsVacioVisor">Esperando la imagen de la compu…</div>
+    <div class="clips__arriba">
+      <span class="clips__envivo">● EN VIVO</span>
+      <button class="boton clips__volver" id="btnVolverVivo" type="button">● Volver al vivo</button>
+      <button class="boton clips__sonido" id="btnSonido" type="button">🔇 Activar sonido</button>
+    </div>
     <div class="clips__titulo" id="clipsTitulo"></div>
   </section>
   <aside class="clips__lado">

@@ -599,7 +599,7 @@ async function enlazarClips() {
         await st.ui.modal({
             titulo: 'Enlazar para ver cortes en vivo',
             contenido: h('div', { class: 'tv-ipad-enlazar' },
-                h('p', { texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Cada evento que se marca le llega como clip unos segundos después.' }),
+                h('p', { texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Ve la imagen en vivo todo el tiempo, y cada evento que se marca le llega como clip.' }),
                 // El SVG lo genera la librería qrcode en main a partir de la URL.
                 qr ? h('div', { class: 'tv-ipad-qr', html: qr }) : null,
                 h('div', { class: 'tv-ipad-url', texto: url }),

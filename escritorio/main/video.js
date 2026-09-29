@@ -22,7 +22,8 @@ function extDe(mime) {
     return '.bin';
 }
 
-function crearVideo({ carpeta, ventana, dialog, origen }) {
+// vivo: main/vivo.js, que reparte la grabación en curso a los que miran.
+function crearVideo({ carpeta, ventana, dialog, origen, vivo = null }) {
     // ─── Lista blanca ───
     // /__video sirve solo lo que esta en la carpeta de trabajo o lo que el
     // usuario eligio con un dialogo (o se enlazo a un partido). Sin esto,
@@ -80,6 +81,7 @@ function crearVideo({ carpeta, ventana, dialog, origen }) {
         const g = { ruta, mime: mime || null, bytes: 0, stream, inicio: Date.now(), ultimoTrozo: 0, error: null };
         stream.on('error', err => alFallar(g, err));
         grabacion = g;
+        if (vivo) vivo.iniciar(mime);
         permitir(ruta);
         return { ruta, nombre: path.basename(ruta) };
     }
@@ -92,6 +94,8 @@ function crearVideo({ carpeta, ventana, dialog, origen }) {
         if (!(datos instanceof Uint8Array)) throw new Error('trozo espera un Uint8Array');
         const buf = Buffer.from(datos.buffer, datos.byteOffset, datos.byteLength);
         g.bytes += buf.length;
+        // Antes que el disco: el que mira lo ve sin esperar la escritura.
+        if (vivo) vivo.trozo(buf);
         // Backpressure: si el disco va mas lento que la camara (un pendrive, un
         // disco de red) no se juntan trozos en memoria sin limite.
         const sigue = g.stream.write(buf);
@@ -114,6 +118,7 @@ function crearVideo({ carpeta, ventana, dialog, origen }) {
             if (!grabacion) return resolve(null);
             const g = grabacion;
             grabacion = null;
+            if (vivo) vivo.terminar();
             const listo = () => {
                 let bytes = g.bytes;
                 try { bytes = fs.statSync(g.ruta).size; } catch (_) {}

@@ -288,7 +288,7 @@ test('clips en vivo: corta los cerrados con video, reenvía etiquetas, quita los
 
 import { crearClipsEnVivo } from '../src/ramas/ipad/clips-vivo.js';
 
-test('crearClipsEnVivo: corta de a uno, publica, no repite, quita y apaga', async () => {
+test('crearClipsEnVivo: avisa "cortando", corta, publica, no repite, quita y apaga', async () => {
     const cortes = [], enviados = [];
     const api = {
         clips: { exportar: async o => { cortes.push(o); return { rutas: ['/t/' + o.cortes[0].nombre + '.mp4'] }; } },
@@ -309,7 +309,10 @@ test('crearClipsEnVivo: corta de a uno, publica, no repite, quita y apaga', asyn
     assert.equal(cortes.length, 1);
     assert.deepEqual(cortes[0].cortes[0], { desde: 10, hasta: 15, nombre: 'Tiro' });
     assert.equal(cortes[0].subcarpeta, 'Partidos/Demo');
-    assert.deepEqual(enviados[0], { tipo: 'clip', clip: { id: 'c1', ruta: '/t/Tiro.mp4', nombre: 'Tiro', etiquetas: [], equipo: 'Local', inicio: 10, duracion: 5 } });
+    // Primero aparece como "cortando…", después llega el mismo id con el archivo.
+    assert.deepEqual(enviados[0], { tipo: 'clip', clip: { id: 'c1', pendiente: true, nombre: 'Tiro', etiquetas: [], equipo: 'Local', inicio: 10, duracion: 5 } });
+    assert.deepEqual(enviados[1], { tipo: 'clip', clip: { id: 'c1', ruta: '/t/Tiro.mp4', nombre: 'Tiro', etiquetas: [], equipo: 'Local', inicio: 10, duracion: 5 } });
+    enviados.shift();
 
     eventos = [];                        // borrado
     cv.revisar();
@@ -325,4 +328,39 @@ test('crearClipsEnVivo: corta de a uno, publica, no repite, quita y apaga', asyn
     cv.revisar();
     await cv.esperar();
     assert.equal(cortes.length, 1, 'apagado no corta más');
+});
+
+test('crearClipsEnVivo: uno que espera su video no frena a los demás; si falla, sale de la lista', async () => {
+    const enviados = [];
+    let soltarLargo;
+    const api = {
+        clips: {
+            exportar: o => o.cortes[0].nombre === 'Largo'
+                ? new Promise(ok => { soltarLargo = () => ok({ rutas: ['/t/Largo.mp4'] }); })
+                : o.cortes[0].nombre === 'Roto' ? Promise.reject(new Error('ffmpeg'))
+                : Promise.resolve({ rutas: ['/t/' + o.cortes[0].nombre + '.mp4'] })
+        },
+        remoto: { enviar: async m => { enviados.push(m); return true; } }
+    };
+    const eventos = [{ id: 1, name: 'Largo', start: 0, end: 30 }, { id: 2, name: 'Corto', start: 5, end: 8 }, { id: 3, name: 'Roto', start: 9, end: 10 }];
+    let fallos = 0;
+    const cv = crearClipsEnVivo({
+        api, eventos: () => eventos,
+        clipDe: ev => ({ vInicio: ev.start, vFin: ev.end }),
+        video: () => '/t/partido.mp4', subcarpeta: () => 'x', nombreClip: m => m.nombre,
+        alFallar: () => { fallos++; }
+    });
+    cv.revisar();
+    await new Promise(r => setTimeout(r, 10));
+    const listos = enviados.filter(m => m.tipo === 'clip' && m.clip.ruta).map(m => m.clip.nombre);
+    assert.deepEqual(listos, ['Corto'], 'el corto sale sin esperar al largo');
+    assert.ok(enviados.some(m => m.tipo === 'quitarClip'), 'el que falló no queda como "cortando…"');
+    assert.equal(fallos, 1);
+    let termino = false;
+    const espera = cv.esperar().then(() => { termino = true; });
+    await new Promise(r => setTimeout(r, 10));
+    assert.equal(termino, false, 'esperar() espera al largo');
+    soltarLargo();
+    await espera;
+    assert.ok(enviados.some(m => m.tipo === 'clip' && m.clip.nombre === 'Largo' && m.clip.ruta));
 });

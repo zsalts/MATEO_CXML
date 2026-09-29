@@ -16,6 +16,7 @@ import { crearVista } from '/nucleo/botonera-vista.js';
 import * as plantillaNucleo from '/nucleo/plantilla.js';
 import { crearReloj } from './reloj.js';
 import { crearCola } from './cola.js';
+import { crearVivo } from './vivo.js';
 
 const $ = id => document.getElementById(id);
 
@@ -409,11 +410,57 @@ setInterval(pintarReloj, 250);
 // ─────────────────────────────────────────────
 // CLIPS (el iPad que mira)
 // ─────────────────────────────────────────────
-// La compu corta cada evento que se cierra y avisa {tipo:'clip'}. El video
-// se pide a /clip/<id> con el token de este iPad: sin él, la compu no lo da.
+// La compu corta cada evento que se cierra y avisa {tipo:'clip'}: primero
+// como pendiente ("cortando…") y enseguida con el archivo. El video se pide
+// a /clip/<id> con el token de este iPad: sin él, la compu no lo da.
+const permiso = () => `d=${encodeURIComponent(dispositivo)}&t=${encodeURIComponent(leer(claveToken) || '')}`;
 function urlClip(id) {
-    return `/clip/${encodeURIComponent(id)}?d=${encodeURIComponent(dispositivo)}&t=${encodeURIComponent(leer(claveToken) || '')}`;
+    return `/clip/${encodeURIComponent(id)}?${permiso()}`;
 }
+
+// ── En vivo ──
+// Todo el tiempo se ve la imagen de la compu (vivo.js). Un corte se ve en
+// el mismo lugar y al terminar vuelve solo al vivo.
+const vivo = crearVivo($('vivoVideo'), { url: () => `/vivo?${permiso()}`, alEstado: pintarVivo });
+let estadoVivo = 'esperando';
+
+function pintarVivo(e) {
+    if (e) estadoVivo = e;
+    const visor = $('clipsVisor');
+    visor.dataset.vivo = estadoVivo;
+    if (visor.dataset.modo !== 'vivo') return;
+    const vacio = $('clipsVacioVisor');
+    vacio.hidden = estadoVivo === 'vivo';
+    vacio.textContent = estadoVivo === 'sinSoporte'
+        ? 'Este aparato no puede mostrar la imagen en vivo. Los cortes llegan igual: tocá uno de la lista.'
+        : 'Esperando la imagen de la compu…';
+}
+
+function volverAlVivo() {
+    const v = $('clipsVideo');
+    if (!v.paused) v.pause();
+    S.clipActual = null;
+    const previo = $('clipsLista').querySelector('.es-actual');
+    if (previo) previo.classList.remove('es-actual');
+    $('clipsTitulo').textContent = '';
+    $('clipsVisor').dataset.modo = 'vivo';
+    pintarVivo();
+}
+
+$('btnVolverVivo').addEventListener('click', volverAlVivo);
+$('clipsVideo').addEventListener('ended', volverAlVivo);
+
+// Arranca sin sonido (Safari no deja reproducir solo con sonido); con el
+// toque se prende.
+function pintarSonido() {
+    $('btnSonido').textContent = $('vivoVideo').muted ? '🔇 Activar sonido' : '🔊 Sonido';
+}
+$('btnSonido').addEventListener('click', () => {
+    const v = $('vivoVideo');
+    v.muted = !v.muted;
+    if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    pintarSonido();
+});
 
 function ponerClips(lista) {
     S.clips = lista.filter(c => c && c.id);
@@ -427,17 +474,17 @@ function agregarClip(c) {
     if (i >= 0) S.clips[i] = c; else S.clips.push(c);
     pintarClips(i < 0 ? c.id : null);
     // Si justo se estaba viendo ese y se volvio a cortar, se recarga.
-    if (i >= 0 && S.clipActual === c.id) verClip(c.id, { seguir: true });
+    if (i >= 0 && S.clipActual === c.id && !c.pendiente) verClip(c.id, { seguir: true });
 }
 
 function quitarClip(id) {
     S.clips = S.clips.filter(c => c.id !== id);
     if (S.clipActual === id) {
-        S.clipActual = null;
         const v = $('clipsVideo');
         v.pause();
         v.removeAttribute('src');
         v.load();
+        volverAlVivo();
     }
     pintarClips();
 }
@@ -457,7 +504,8 @@ function pintarClips(nuevo) {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'clip' + (c.id === S.clipActual ? ' es-actual' : '') + (c.id === nuevo ? ' es-nuevo' : '');
+        b.className = 'clip' + (c.id === S.clipActual ? ' es-actual' : '') + (c.id === nuevo ? ' es-nuevo' : '') +
+            (c.pendiente ? ' es-pendiente' : '');
         b.dataset.id = c.id;
         const min = document.createElement('span');
         min.className = 'clip__minuto';
@@ -477,7 +525,7 @@ function pintarClips(nuevo) {
         }
         const dur = document.createElement('span');
         dur.className = 'clip__dur';
-        dur.textContent = c.duracion != null ? Math.round(c.duracion) + ' s' : '';
+        dur.textContent = c.pendiente ? 'cortando…' : c.duracion != null ? Math.round(c.duracion) + ' s' : '';
         b.appendChild(min); b.appendChild(texto); b.appendChild(dur);
         li.appendChild(b);
         ul.appendChild(li);
@@ -490,7 +538,9 @@ function pintarClips(nuevo) {
 function verClip(id, { seguir = false } = {}) {
     const c = S.clips.find(x => x.id === id);
     if (!c) return;
+    if (c.pendiente) return avisar('Se está cortando: en unos segundos está.');
     const v = $('clipsVideo');
+    $('clipsVisor').dataset.modo = 'clip';
     const donde = seguir ? v.currentTime : 0;
     const andar = !seguir || !v.paused;
     S.clipActual = id;
@@ -557,8 +607,8 @@ function mostrarBotonera() {
     $('btnPlay').hidden = mira;
     $('btnTerminar').hidden = mira;
     $('btnPedirControl').hidden = !mira || S.terminado || S.soloMira;
-    if (mira) $('btnVolver').hidden = true;
-    else { const v = $('clipsVideo'); if (!v.paused) v.pause(); }
+    if (mira) { $('btnVolver').hidden = true; vivo.prender(); pintarVivo(); }
+    else { const v = $('clipsVideo'); if (!v.paused) v.pause(); vivo.apagar(); }
     if (S.terminado && !mira) return;
     $('pantallaMensaje').hidden = true;
     pedirWakeLock();

@@ -152,6 +152,38 @@ button {
     text-overflow: ellipsis;
 }
 .clips__titulo:empty { display: none; }
+
+/* En vivo o un corte: el mismo lugar, uno de los dos a la vista. El vivo
+   sigue bajando atrás mientras se ve un corte, para volver al toque. */
+.clips__visor[data-modo="vivo"] .clips__video--clip,
+.clips__visor[data-modo="clip"] .clips__video--vivo { display: none; }
+.clips__visor[data-modo="vivo"] .clips__titulo { display: none; }
+.clips__arriba {
+    position: absolute;
+    top: var(--tv-esp-3); left: var(--tv-esp-3); right: var(--tv-esp-3);
+    display: flex; align-items: center; gap: var(--tv-esp-2);
+    pointer-events: none;
+    z-index: 2;
+}
+.clips__arriba > * { pointer-events: auto; }
+.clips__arriba .boton { background: rgba(14, 16, 20, .78); }
+.clips__envivo {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #d62d20;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.clips__visor[data-modo="clip"] .clips__envivo,
+.clips__visor[data-modo="vivo"] .clips__volver,
+.clips__visor:not([data-vivo="vivo"]) .clips__envivo { display: none; }
+.clips__sonido { margin-left: auto; }
+.clips__visor[data-modo="clip"] .clips__sonido { display: none; }
+
+.clip.es-pendiente { opacity: .6; }
+.clip.es-pendiente .clip__dur { color: var(--tv-acento); }
 .clips__lado {
     width: 340px;
     display: flex;

@@ -111,7 +111,7 @@ export function crearCompartir(o) {
         await ctx.ui.modal({
             titulo: 'Enlazar para ver cortes en vivo',
             contenido: el('div', { class: 'tv-captura-compartir' },
-                el('p', { class: 'tv-texto-2', texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Cada evento que marques le llega como clip unos segundos después.' }),
+                el('p', { class: 'tv-texto-2', texto: 'En el otro iPad (misma wifi) abrí Tag & View → Ver cortes en vivo y escribí esta dirección, o apuntá la cámara al código. Ve la imagen en vivo todo el tiempo, y cada evento que marques le llega como clip.' }),
                 qr ? qrCaja : null,
                 el('div', { class: 'tv-captura-compartir__url', texto: url }),
                 el('div', { class: 'tv-captura-compartir__pin' }, el('span', { texto: 'PIN' }), el('strong', { texto: c.pin })),

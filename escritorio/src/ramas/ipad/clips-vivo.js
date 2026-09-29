@@ -70,22 +70,29 @@ export function planClipsEnVivo(eventos, hechos, { clipDe, equipoDe = () => null
 //   nombreClip(meta) nombre del archivo
 //   alFallar(err) una sola vez: si ffmpeg no puede con uno, no puede con ninguno
 //
-// Los cortes van de a uno, en una cola. esperar() termina cuando no queda
-// ninguno: antes de mover el video hay que esperarla (en Windows no se
-// renombra un archivo que ffmpeg está leyendo).
+// Los cortes van en paralelo, no en fila: uno cuyo video todavía no llegó
+// al disco (un evento largo, o con segundos después del toque) espera solo,
+// sin frenar a los que ya se pueden cortar. Cortar sin recomprimir tarda
+// menos de medio segundo, así que varios a la vez no pesan.
+//
+// Apenas se cierra un evento nuevo, el que mira ya lo ve en la lista como
+// "cortando…" (pendiente); cuando está el archivo llega el mismo id completo.
+//
+// esperar() termina cuando no queda ninguno: antes de mover el video hay que
+// esperarlos (en Windows no se renombra un archivo que ffmpeg está leyendo).
 export function crearClipsEnVivo(o) {
     const porEvento = new Map();   // id del evento → {id, tiempos, meta, ruta}
-    let n = 0, cola = Promise.resolve(), fallo = false, apagado = false;
+    const enCurso = new Set();     // promesas de los cortes que faltan
+    let n = 0, fallo = false, apagado = false;
 
-    function publicar(hecho) {
-        return o.api.remoto.enviar({
-            tipo: 'clip',
-            clip: { id: hecho.id, ruta: hecho.ruta, ...hecho.meta, duracion: hecho.tiempos.hasta - hecho.tiempos.desde }
-        }).catch(() => {});
+    function publicar(hecho, pendiente) {
+        const clip = { id: hecho.id, ...hecho.meta, duracion: hecho.tiempos.hasta - hecho.tiempos.desde };
+        if (pendiente) clip.pendiente = true; else clip.ruta = hecho.ruta;
+        return o.api.remoto.enviar({ tipo: 'clip', clip }).catch(() => {});
     }
 
-    function encolar(hecho, video, evId) {
-        cola = cola.then(async () => {
+    function cortar(hecho, video, evId) {
+        const p = (async () => {
             // Ya se volvió a cortar con otros segundos, o el evento se borró.
             if (apagado || porEvento.get(evId) !== hecho) return;
             const r = await o.api.clips.exportar({
@@ -96,10 +103,16 @@ export function crearClipsEnVivo(o) {
             });
             hecho.ruta = r && r.rutas && r.rutas[0];
             if (hecho.ruta && !apagado && porEvento.get(evId) === hecho) publicar(hecho);
-        }).catch(err => {
+        })().catch(err => {
             console.warn('Clip en vivo:', err);
+            // El "cortando…" no queda para siempre en la lista del que mira.
+            if (!hecho.ruta && !hecho.anterior && porEvento.get(evId) === hecho) {
+                porEvento.delete(evId);
+                o.api.remoto.enviar({ tipo: 'quitarClip', id: hecho.id }).catch(() => {});
+            }
             if (!fallo && !apagado) { fallo = true; if (o.alFallar) o.alFallar(err); }
-        });
+        }).finally(() => enCurso.delete(p));
+        enCurso.add(p);
     }
 
     function revisar() {
@@ -111,14 +124,20 @@ export function crearClipsEnVivo(o) {
             // Se anota ya, antes de cortar: el próximo cambio del motor no lo
             // vuelve a encolar. Si el corte falla no se reintenta.
             const previo = porEvento.get(ev.id);
-            const hecho = { id: previo ? previo.id : 'c' + (++n), tiempos, meta, ruta: null };
+            // Vuelto a cortar: el que mira sigue viendo el anterior hasta que
+            // llegue el nuevo. Nuevo: aparece ya, como "cortando…".
+            const hecho = { id: previo ? previo.id : 'c' + (++n), tiempos, meta, ruta: null, anterior: !!(previo && (previo.ruta || previo.anterior)) };
             porEvento.set(ev.id, hecho);
-            encolar(hecho, video, ev.id);
+            if (!previo) publicar(hecho, true);
+            cortar(hecho, video, ev.id);
         }
         for (const { ev, meta } of plan.actualizar) {
             const hecho = porEvento.get(ev.id);
             hecho.meta = meta;
+            // Recortándose con el anterior a la vista: el nombre nuevo llega
+            // con el corte nuevo.
             if (hecho.ruta) publicar(hecho);
+            else if (!hecho.anterior) publicar(hecho, true);
         }
         for (const id of plan.quitar) {
             const hecho = porEvento.get(id);
@@ -129,7 +148,8 @@ export function crearClipsEnVivo(o) {
 
     return {
         revisar,
-        esperar: () => cola,
+        // Hasta que no quede ninguno (mientras se espera pueden entrar otros).
+        async esperar() { while (enCurso.size) await Promise.all([...enCurso]); },
         cantidad: () => porEvento.size,
         apagar() { apagado = true; }
     };

@@ -19,6 +19,9 @@
 //   /clip/<id>?d=<dispositivo>&t=<token>
 //                un clip cortado en vivo, para el iPad que mira. Solo los
 //                que la rama publico, y solo a un iPad que ya paso el PIN.
+//   /vivo?d=<dispositivo>&t=<token>
+//                la imagen de la grabacion en curso (main/vivo.js), para
+//                el que mira. Mismo permiso que /clip.
 // Solo GET/HEAD, sin listados de carpetas, sin salir de esas dos raices.
 //
 // Protocolo (todo JSON por el WebSocket):
@@ -45,6 +48,8 @@
 // Mensajes de la rama que entiende el servidor (no se reenvian):
 //   {tipo:'plantilla', plantilla:{nombre, datos}}   la que baja el iPad
 //   {tipo:'darControl', dispositivo} / {tipo:'negarControl', dispositivo}
+//   {tipo:'clip', clip:{id, pendiente:true, …}}  se esta cortando: aparece
+//       en la lista sin archivo hasta que llega el mismo id con la ruta
 //   {tipo:'clip', clip:{id, ruta, …}}   un clip cortado: se guarda la ruta
 //       (que nunca llega al iPad) y se reenvia sin ella. Mismo id = se
 //       reemplaza (cambiaron las etiquetas o se volvio a cortar).
@@ -287,6 +292,7 @@ function crearServidorRemoto(opciones = {}) {
     // Inyectable: las pruebas simulan adaptadores de Windows en cualquier SO.
     const plataforma = opciones.plataforma || process.platform;
     const permitirClip = opciones.permitirClip || (() => false);
+    const vivo = opciones.vivo || null;   // main/vivo.js: la grabacion en curso
 
     let servidor = null, wss = null;
     let sesion = null;   // {pin, puerto, plantillaId, plantilla, estado, desde, clips}
@@ -353,6 +359,14 @@ function crearServidorRemoto(opciones = {}) {
     // /clip/<id>?d=…&t=…  El token es el mismo del WebSocket: un iPad que no
     // paso el PIN (o de una sesion anterior) no ve nada. 404 para todo lo
     // que no cierre, sin decir por que.
+    // ?d=…&t=… de un iPad que ya paso el PIN en esta sesion.
+    function autorizado(u) {
+        const d = dispositivos.get(u.searchParams.get('d') || '');
+        const t = u.searchParams.get('t') || '';
+        return !!(sesion && d && d.token && t.length === d.token.length &&
+            crypto.timingSafeEqual(Buffer.from(t), Buffer.from(d.token)));
+    }
+
     function servirClip(req, res) {
         const no = () => {
             res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -366,19 +380,72 @@ function crearServidorRemoto(opciones = {}) {
         try { u = new URL(req.url, 'http://x'); } catch (_) { return no(); }
         const m = /^\/clip\/([\w-]{1,64})$/.exec(u.pathname);
         const c = m && sesion && sesion.clips.get(m[1]);
-        const d = dispositivos.get(u.searchParams.get('d') || '');
-        const t = u.searchParams.get('t') || '';
-        if (!c || !d || !d.token || t.length !== d.token.length ||
-            !crypto.timingSafeEqual(Buffer.from(t), Buffer.from(d.token))) return no();
+        // Uno que se esta cortando todavia no tiene archivo.
+        if (!c || !c.ruta || !autorizado(u)) return no();
         servirVideo(req, res, c.ruta);
     }
 
+    // ── Imagen en vivo ──
+    // /vivo?d=…&t=…  La grabacion en curso tal cual sale de MediaRecorder
+    // (main/vivo.js): el init y despues un fragmento por segundo, en una
+    // respuesta que no termina mientras se grabe. El codec va en X-Codecs,
+    // para addSourceBuffer. 503 si no se esta grabando: el iPad reintenta.
+    //
+    // Si el wifi del iPad no da abasto, los fragmentos no se juntan en la
+    // compu: se saltean hasta que se vacia lo pendiente y se retoma en el
+    // proximo cuadro clave. El iPad salta al final y sigue en vivo.
+    const PENDIENTE_MAX = 3 * 1024 * 1024;
+    const PENDIENTE_OK = 512 * 1024;
+    const mirandoVivo = new Set();   // respuestas abiertas, para cortarlas en detener()
+
+    function servirVivo(req, res) {
+        let u;
+        try { u = new URL(req.url, 'http://x'); } catch (_) { u = null; }
+        if (req.method !== 'GET' || !u || !autorizado(u)) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('No está');
+        }
+        let saltando = false;
+        const s = vivo && vivo.suscribir({
+            fragmento(frag, clave) {
+                if (saltando) {
+                    if (!clave || res.writableLength > PENDIENTE_OK) return;
+                    saltando = false;
+                }
+                if (res.writableLength > PENDIENTE_MAX) { saltando = true; return; }
+                res.write(frag);
+            },
+            fin() { res.end(); }
+        });
+        if (!s) {
+            res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+            return res.end('Todavía no se graba');
+        }
+        res.writeHead(200, {
+            'Content-Type': 'video/mp4',
+            'Cache-Control': 'no-store',
+            'X-Codecs': s.codecs,
+            'X-Content-Type-Options': 'nosniff'
+        });
+        if (res.socket) res.socket.setNoDelay(true);
+        res.write(s.init);
+        for (const f of s.gop) res.write(f);
+        mirandoVivo.add(res);
+        const cerrar = () => { s.salir(); mirandoVivo.delete(res); };
+        res.on('close', cerrar);
+        res.on('error', cerrar);
+    }
+
+    // pendiente: el evento se cerro y se esta cortando. Aparece en la lista
+    // al toque, sin archivo; el mismo id con ruta lo completa.
     function ponerClip(c) {
         if (!c || typeof c.id !== 'string' || !/^[\w-]{1,64}$/.test(c.id)) return false;
-        if (typeof c.ruta !== 'string' || !permitirClip(c.ruta) || !fs.existsSync(c.ruta)) return false;
+        const pendiente = !!c.pendiente;
+        if (!pendiente && (typeof c.ruta !== 'string' || !permitirClip(c.ruta) || !fs.existsSync(c.ruta))) return false;
         const publico = clipPublico(c);
+        if (pendiente) publico.pendiente = true;
         sesion.clips.delete(c.id);   // al final: el orden es el de llegada
-        sesion.clips.set(c.id, { ruta: c.ruta, publico });
+        sesion.clips.set(c.id, { ruta: pendiente ? null : c.ruta, publico });
         while (sesion.clips.size > MAX_CLIPS) sesion.clips.delete(sesion.clips.keys().next().value);
         for (const d of dispositivos.values()) enviarA(d.socket, { tipo: 'clip', clip: publico });
         return true;
@@ -557,6 +624,7 @@ function crearServidorRemoto(opciones = {}) {
 
         servidor = http.createServer((req, res) => {
             if (/^\/clip\//.test(req.url || '')) return servirClip(req, res);
+            if (/^\/vivo(\?|$)/.test(req.url || '')) return servirVivo(req, res);
             // /clips es la misma pagina, que ahi entra a mirar: se sirve el
             // index.html de siempre (sus archivos van con ruta absoluta).
             if (/^\/clips\/?(\?|$)/.test(req.url || '')) req.url = '/';
@@ -647,6 +715,8 @@ function crearServidorRemoto(opciones = {}) {
         const s = servidor, w = wss;
         servidor = null; wss = null; sesion = null;
         activo = null;
+        for (const r of mirandoVivo) { try { r.destroy(); } catch (_) {} }
+        mirandoVivo.clear();
         for (const d of dispositivos.values()) d.socket = null;
         dispositivos.clear();
         if (w) {
@@ -725,7 +795,7 @@ let instancia = null;
 //   ventana    BrowserWindow (o una funcion que la devuelve)
 //   bd         la base; si la rama no manda la plantilla, se lee de aca
 //   rutaSrc    escritorio/src (de ahi sale src/nucleo)
-function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc } = {}) {
+function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc, vivo } = {}) {
     // Falla temprano si falta 'ws': main.js lo atrapa y la app arranca sin
     // la rama iPad en vez de romperse cuando alguien toca "Conectar iPad".
     require.resolve('ws');
@@ -743,7 +813,8 @@ function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc } = {}) {
         alCliente: e => mandar('remoto:cliente', e),
         // Los clips los corta tv.clips.exportar en la carpeta de trabajo: el
         // servidor no sirve nada de afuera, aunque la pagina se lo pida.
-        permitirClip: ruta => !!carpeta && dentroDe(carpeta(), ruta)
+        permitirClip: ruta => !!carpeta && dentroDe(carpeta(), ruta),
+        vivo
     });
 
     ipcMain.handle('remoto:iniciar', async (_e, opciones = {}) => {
