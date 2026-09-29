@@ -57,7 +57,7 @@ const DEFAULT_H = 52;
 // Se muestra al lado del logo para saber de un vistazo qué versión quedó
 // servida. Tiene que coincidir con CACHE_VERSION de sw.js: build-ipad.py
 // corta si se desfasan.
-const APP_VERSION = 'v54';
+const APP_VERSION = 'v55';
 
 // ─────────────────────────────────────────────
 // DOM REFS
@@ -1444,7 +1444,7 @@ const TEXTOS_COMPU = {
     codificar: { titulo: 'Conectar con la compu', boton: 'Conectar',
         paso1: 'En la compu abrí <b>Captura desde iPad</b> y elegí la plantilla.' },
     cortes: { titulo: 'Ver cortes en vivo', boton: 'Ver cortes',
-        paso1: 'En la compu, en <b>Captura en vivo</b> o <b>Captura desde iPad</b>, tocá <b>Enlazar para ver cortes en vivo</b>.' }
+        paso1: 'En la compu, en <b>Captura en vivo</b> o <b>Captura desde iPad</b>, tocá <b>Enlazar para ver cortes en vivo</b>. Desde otra red: pegá abajo el link de <b>Compartir por internet</b>, o abrilo directo.' }
 };
 
 function alternarCompu(modo) {
@@ -1469,6 +1469,14 @@ function alternarCompu(modo) {
 
 function conectarCompu() {
     const campo = D('inputCompu'), error = D('compuError');
+    // El link de "Compartir por internet" (https://….trycloudflare.com/clips?k=…)
+    // se abre tal cual: trae su llave. No se guarda: cambia cada vez.
+    const link = campo.value.trim();
+    if (_modoCompu === 'cortes' && /^https:\/\/[^\s]+\/clips\?k=[\w-]+$/i.test(link)) {
+        error.classList.add('hidden');
+        location.href = link;
+        return;
+    }
     const url = urlDeCompu(campo.value);
     if (!url) {
         error.textContent = 'Escribí la dirección que muestra la compu, por ejemplo 192.168.1.20:8787.';

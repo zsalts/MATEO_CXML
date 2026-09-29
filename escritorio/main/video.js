@@ -23,7 +23,8 @@ function extDe(mime) {
 }
 
 // vivo: main/vivo.js, que reparte la grabación en curso a los que miran.
-function crearVideo({ carpeta, ventana, dialog, origen, vivo = null }) {
+// vivoBajo: la copia en calidad reducida para internet (video:espejo*).
+function crearVideo({ carpeta, ventana, dialog, origen, vivo = null, vivoBajo = null }) {
     // ─── Lista blanca ───
     // /__video sirve solo lo que esta en la carpeta de trabajo o lo que el
     // usuario eligio con un dialogo (o se enlazo a un partido). Sin esto,
@@ -287,6 +288,20 @@ function crearVideo({ carpeta, ventana, dialog, origen, vivo = null }) {
         manejar(ipcMain, 'video:elegirArchivo', () => elegirArchivo());
         manejar(ipcMain, 'video:copiarACarpeta', (ruta, o) => copiarACarpeta(ruta, o));
         manejar(ipcMain, 'video:cancelarCopia', () => cancelarCopia());
+        // La copia chica para el que mira por internet: no va al disco, solo
+        // pasa por main/vivo.js.
+        manejar(ipcMain, 'video:espejoIniciar', mime => {
+            v.texto(mime, 'mime', { opcional: true, max: 200 });
+            if (vivoBajo) vivoBajo.iniciar(mime);
+            return true;
+        });
+        manejar(ipcMain, 'video:espejoTrozo', datos => {
+            if (datos instanceof ArrayBuffer) datos = new Uint8Array(datos);
+            if (!(datos instanceof Uint8Array)) throw new Error('trozo espera un Uint8Array');
+            if (vivoBajo) vivoBajo.trozo(Buffer.from(datos.buffer, datos.byteOffset, datos.byteLength));
+            return true;
+        });
+        manejar(ipcMain, 'video:espejoTerminar', () => { if (vivoBajo) vivoBajo.terminar(); return true; });
         manejar(ipcMain, 'video:info', ruta => {
             v.texto(ruta, 'ruta', { max: 1000 });
             return permitido(ruta) ? ff.info(ruta) : null;

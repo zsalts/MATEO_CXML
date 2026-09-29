@@ -15,6 +15,16 @@ import { equipoDeBoton } from '../../nucleo/plantilla.js';
 import { crearClipsEnVivo } from '../ipad/clips-vivo.js';
 import { resumir, crearEmisor } from '../ipad/espejo.js';
 import { el, icono, reloj } from './piezas.js';
+import { seccionInternet } from '../ipad/internet.js';
+import { crearEspejoBajo } from '../../nucleo/espejo-bajo.js';
+
+// el() de piezas.js con html (el QR de internet.js).
+const h = (tag, props, ...hijos) => {
+    const { html, ...resto } = props || {};
+    const n = el(tag, resto, ...hijos);
+    if (html) n.innerHTML = html;
+    return n;
+};
 
 const CADA_MS = 2000;       // se pregunta quién está (el aviso onCliente no llega en la Mac)
 const REENVIO_MS = 5000;    // estado forzado: re-sincroniza el reloj del que mira
@@ -35,6 +45,8 @@ export function crearCompartir(o) {
     const avisarCambio = () => alCambiarOyentes.forEach(f => { try { f(); } catch (_) {} });
 
     const miran = () => clientes.filter(c => c.conectado).length;
+    // La copia chica para los que miran por internet (solo compartiendo).
+    const espejo = g ? crearEspejoBajo({ grabadora: g, api }) : null;
     const eq = { A: config.local || 'Local', B: config.visitante || 'Visitante' };
 
     const enVivo = crearClipsEnVivo({
@@ -74,6 +86,7 @@ export function crearCompartir(o) {
         timers.push(setInterval(async () => {
             let e = null;
             try { e = await api.remoto.estado(); } catch (_) {}
+            if (espejo) espejo.revisar(!!(e && e.internet) && g.estado().grabando);
             if (e && Array.isArray(e.clientes)) {
                 const antes = JSON.stringify(clientes.map(c => [c.dispositivo, c.conectado]));
                 clientes = e.clientes;
@@ -106,6 +119,7 @@ export function crearCompartir(o) {
         };
         pintarQuien();
         alCambiarOyentes.add(pintarQuien);
+        const internet = seccionInternet({ api, ui: ctx.ui, h });
         const qrCaja = el('div', { class: 'tv-captura-compartir__qr' });
         if (qr) qrCaja.innerHTML = qr;   // SVG que genera la librería qrcode en main
         await ctx.ui.modal({
@@ -116,9 +130,11 @@ export function crearCompartir(o) {
                 el('div', { class: 'tv-captura-compartir__url', texto: url }),
                 el('div', { class: 'tv-captura-compartir__pin' }, el('span', { texto: 'PIN' }), el('strong', { texto: c.pin })),
                 ffmpeg ? null : el('p', { class: 'tv-captura-compartir__error', texto: 'No está ffmpeg: sin él no se pueden cortar los clips.' }),
-                lista),
+                lista,
+                internet.el),
             botones: [{ texto: 'Listo', valor: true, primario: true }]
         });
+        internet.soltar();
         alCambiarOyentes.delete(pintarQuien);
     }
 
@@ -144,12 +160,14 @@ export function crearCompartir(o) {
         // Terminado: no se corta más, pero el que mira sigue viendo.
         terminar() {
             enVivo.apagar();
+            if (espejo) espejo.revisar(false);
             timers.forEach(clearInterval);
             timers = [];
             if (conexion) api.remoto.enviar({ tipo: 'guardado', nombre: config.nombre }).catch(() => {});
         },
         async detener() {
             enVivo.apagar();
+            if (espejo) espejo.destruir();
             timers.forEach(clearInterval);
             timers = [];
             if (conexion) { conexion = null; try { await api.remoto.detener(); } catch (_) {} }

@@ -219,3 +219,33 @@
     letter-spacing: .06em;
 }
 .tv-buscar__fila .tv-icono { color: var(--tv-texto-2); }
+
+/* Compartir por internet (ramas/ipad/internet.js): abajo de "Enlazar para
+   ver cortes en vivo", en las dos capturas. */
+.tv-internet {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--tv-esp-2);
+    margin-top: var(--tv-esp-3);
+    padding-top: var(--tv-esp-3);
+    border-top: 1px solid var(--tv-borde);
+    text-align: center;
+}
+.tv-internet__titulo { margin: 0; font-size: 1rem; }
+.tv-internet__texto { margin: 0; color: var(--tv-texto-2); }
+.tv-internet__qr {
+    width: 200px;
+    max-width: 100%;
+    padding: var(--tv-esp-2);
+    background: #fff;             /* el QR necesita fondo blanco para leerse */
+    border-radius: var(--tv-radio);
+}
+.tv-internet__qr svg { display: block; width: 100%; height: auto; }
+.tv-internet__link {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: .85rem;
+    word-break: break-all;
+    user-select: all;
+}
+.tv-internet__botones { display: flex; gap: var(--tv-esp-2); }

@@ -293,6 +293,7 @@ function crearServidorRemoto(opciones = {}) {
     const plataforma = opciones.plataforma || process.platform;
     const permitirClip = opciones.permitirClip || (() => false);
     const vivo = opciones.vivo || null;   // main/vivo.js: la grabacion en curso
+    const vivoBajo = opciones.vivoBajo || null;   // la misma, en calidad reducida (por internet)
 
     let servidor = null, wss = null;
     let sesion = null;   // {pin, puerto, plantillaId, plantilla, estado, desde, clips}
@@ -322,6 +323,7 @@ function crearServidorRemoto(opciones = {}) {
             conectado: !!(d.socket && d.socket.readyState === 1),
             activo: d.id === activo,
             rol: d.rol || 'codificar',
+            lejos: !!d.lejos,
             latenciaMs: d.latenciaMs,
             aplicado: d.aplicado
         }));
@@ -359,6 +361,60 @@ function crearServidorRemoto(opciones = {}) {
     // /clip/<id>?d=…&t=…  El token es el mismo del WebSocket: un iPad que no
     // paso el PIN (o de una sesion anterior) no ve nada. 404 para todo lo
     // que no cierre, sin decir por que.
+    // ── Por internet ──
+    // Con "Compartir por internet" prendido, main/tunel.js abre un tunel de
+    // Cloudflare que entra a este mismo servidor desde 127.0.0.1. Lo que
+    // llega por ahi:
+    //   - necesita la llave del link (?k=… la primera vez; despues queda en
+    //     una cookie) y ademas el PIN, como siempre;
+    //   - solo mira (nunca la botonera: /  da 404, el iPad entra como 'mirar');
+    //   - el bloqueo por PIN cuenta por la IP real (CF-Connecting-IP): si no,
+    //     todos los de afuera serian 127.0.0.1 y uno bloquearia a todos;
+    //   - la imagen en vivo es la de calidad reducida (vivoBajo).
+    // Cloudflare agrega CF-Connecting-IP / CF-Ray a todo lo que pasa por el
+    // tunel. Algo con esas cabeceras que llegue sin tunel prendido no entra.
+    let internet = null;   // {clave, host}
+
+    function esLejos(req) {
+        const ip = (req.socket && req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+        const local = ip === '127.0.0.1' || ip === '::1';
+        if (!local) return false;
+        const h = req.headers || {};
+        return !!(h['cf-connecting-ip'] || h['cf-ray'] || (internet && h.host === internet.host));
+    }
+
+    function ipDe(req) {
+        const ip = (req.socket && req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+        if (!req.lejos) return ip;
+        return 'internet:' + String(req.headers['cf-connecting-ip'] || '?').slice(0, 64);
+    }
+
+    const igualQueClave = s => !!(internet && typeof s === 'string' && s.length === internet.clave.length &&
+        crypto.timingSafeEqual(Buffer.from(s), Buffer.from(internet.clave)));
+
+    // true si trae la llave. Con ?k= correcto (y res) deja la cookie.
+    function llaveLejos(req, res) {
+        if (!internet) return false;
+        const galleta = /(?:^|;\s*)tvk=([\w-]+)/.exec(req.headers.cookie || '');
+        if (galleta && igualQueClave(galleta[1])) return true;
+        let k = null;
+        try { k = new URL(req.url, 'http://x').searchParams.get('k'); } catch (_) {}
+        if (!igualQueClave(k)) return false;
+        if (res) res.setHeader('Set-Cookie', `tvk=${internet.clave}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
+        return true;
+    }
+
+    // Lo prende registrar() con el tunel abierto; null lo apaga (y corta a
+    // los que estaban mirando desde afuera).
+    function ponerInternet(datos) {
+        internet = datos && datos.clave ? { clave: String(datos.clave), host: datos.host || null, link: datos.link || null } : null;
+        if (internet) return;
+        for (const d of dispositivos.values()) {
+            if (d.lejos && d.socket) { try { d.socket.close(4007, 'sin internet'); } catch (_) {} }
+        }
+        for (const r of mirandoVivo) if (r.lejos) { try { r.destroy(); } catch (_) {} }
+    }
+
     // ?d=…&t=… de un iPad que ya paso el PIN en esta sesion.
     function autorizado(u) {
         const d = dispositivos.get(u.searchParams.get('d') || '');
@@ -406,7 +462,11 @@ function crearServidorRemoto(opciones = {}) {
             return res.end('No está');
         }
         let saltando = false;
-        const s = vivo && vivo.suscribir({
+        // Por internet, la de calidad reducida: la subida de la cancha no da
+        // para la grabación entera.
+        const fuente = req.lejos ? vivoBajo : vivo;
+        res.lejos = req.lejos;
+        const s = fuente && fuente.suscribir({
             fragmento(frag, clave) {
                 if (saltando) {
                     if (!clave || res.writableLength > PENDIENTE_OK) return;
@@ -462,7 +522,7 @@ function crearServidorRemoto(opciones = {}) {
 
     // ── Una conexion ──
     function alConectar(socket, req) {
-        const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+        const ip = ipDe(req);
         let disp = null;   // se completa con un 'hola' valido
 
         // Sin 'hola' valido en 10 s, afuera: no quedan sockets colgados.
@@ -537,7 +597,9 @@ function crearServidorRemoto(opciones = {}) {
             disp.socket = socket;
             // Entro por /clips (o la compu codifica sola): solo mira los
             // clips, nunca codifica, llegue primero o ultimo.
-            disp.rol = (msg.rol === 'mirar' || sesion.soloMirar) ? 'mirar' : 'codificar';
+            // Por internet siempre mira.
+            disp.lejos = !!req.lejos;
+            disp.rol = (msg.rol === 'mirar' || sesion.soloMirar || disp.lejos) ? 'mirar' : 'codificar';
             dispositivos.set(id, disp);
 
             // Un iPad por vez: el primero que entra a codificar codifica, los
@@ -623,6 +685,16 @@ function crearServidorRemoto(opciones = {}) {
         activo = null;
 
         servidor = http.createServer((req, res) => {
+            // Por internet (el túnel): solo con la llave del link, y solo la
+            // página para mirar, nunca la botonera.
+            req.lejos = esLejos(req);
+            if (req.lejos) {
+                const pagina = /^\/(index\.html)?(\?|$)/.test(req.url || '');
+                if (!llaveLejos(req, res) || pagina) {
+                    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    return res.end('No está');
+                }
+            }
             if (/^\/clip\//.test(req.url || '')) return servirClip(req, res);
             if (/^\/vivo(\?|$)/.test(req.url || '')) return servirVivo(req, res);
             // /clips es la misma pagina, que ahi entra a mirar: se sirve el
@@ -640,11 +712,15 @@ function crearServidorRemoto(opciones = {}) {
             // Si trae Origin, tiene que ser esta misma pagina: asi una web
             // cualquiera abierta en la red no puede ni intentar el PIN.
             const origen = req.headers.origin;
+            req.lejos = esLejos(req);
             let mismoOrigen = true;
             if (origen) {
-                try { mismoOrigen = new URL(origen).host === req.headers.host; } catch (_) { mismoOrigen = false; }
+                try {
+                    const h = new URL(origen).host;
+                    mismoOrigen = h === req.headers.host || (req.lejos && !!internet && h === internet.host);
+                } catch (_) { mismoOrigen = false; }
             }
-            if (ruta !== '/ws' || !mismoOrigen) {
+            if (ruta !== '/ws' || !mismoOrigen || (req.lejos && !llaveLejos(req, null))) {
                 sock.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
                 return sock.destroy();
             }
@@ -715,6 +791,7 @@ function crearServidorRemoto(opciones = {}) {
         const s = servidor, w = wss;
         servidor = null; wss = null; sesion = null;
         activo = null;
+        internet = null;
         for (const r of mirandoVivo) { try { r.destroy(); } catch (_) {} }
         mirandoVivo.clear();
         for (const d of dispositivos.values()) d.socket = null;
@@ -746,6 +823,8 @@ function crearServidorRemoto(opciones = {}) {
             desde: sesion.desde,
             clientes,
             latenciaMs: act ? act.latenciaMs : null,
+            // Compartiendo por internet: el link para mandar (con la llave).
+            internet: internet && internet.link ? { link: internet.link } : null,
             // null hasta que pasa un minuto sin que entre nadie (Agente 7).
             ayudaRed: !sesion.conectoAlguien && ahora() - sesion.desde >= ESPERA_AYUDA_MS ? ayudaRed() : null
         };
@@ -783,7 +862,7 @@ function crearServidorRemoto(opciones = {}) {
         return true;
     }
 
-    return { iniciar, detener, estado, enviar, _raices: raices };
+    return { iniciar, detener, estado, enviar, ponerInternet, _raices: raices };
 }
 
 // ─────────────────────────────────────────────
@@ -795,7 +874,9 @@ let instancia = null;
 //   ventana    BrowserWindow (o una funcion que la devuelve)
 //   bd         la base; si la rama no manda la plantilla, se lee de aca
 //   rutaSrc    escritorio/src (de ahi sale src/nucleo)
-function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc, vivo } = {}) {
+//   vivo, vivoBajo  main/vivo.js: la grabacion, entera y en calidad reducida
+//   carpetaDatos    donde se baja cloudflared (compartir por internet)
+function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc, vivo, vivoBajo, carpetaDatos } = {}) {
     // Falla temprano si falta 'ws': main.js lo atrapa y la app arranca sin
     // la rama iPad en vez de romperse cuando alguien toca "Conectar iPad".
     require.resolve('ws');
@@ -814,15 +895,49 @@ function registrar({ ipcMain, ventana, bd, carpeta, rutaSrc, vivo } = {}) {
         // Los clips los corta tv.clips.exportar en la carpeta de trabajo: el
         // servidor no sirve nada de afuera, aunque la pagina se lo pida.
         permitirClip: ruta => !!carpeta && dentroDe(carpeta(), ruta),
-        vivo
+        vivo,
+        vivoBajo
     });
 
+    // Compartir por internet (main/tunel.js). Se apaga con el servidor.
+    const tunel = require('./tunel').crearTunel({ carpetaDatos: carpetaDatos || (() => require('os').tmpdir()) });
+    tunel.alCaer(() => {
+        instancia.ponerInternet(null);
+        mandar('remoto:internet', { fase: 'caido' });
+    });
+    function cerrarInternet() {
+        tunel.cerrar();
+        instancia.ponerInternet(null);
+    }
+    cerrarTunelAlSalir = cerrarInternet;
+
     ipcMain.handle('remoto:iniciar', async (_e, opciones = {}) => {
+        cerrarInternet();
         let plantilla = opciones.plantilla || null;
         if (!plantilla && opciones.plantillaId != null) plantilla = await leerPlantilla(bd, opciones.plantillaId);
         return instancia.iniciar({ plantillaId: opciones.plantillaId ?? null, plantilla, puerto: opciones.puerto, soloMirar: !!opciones.soloMirar });
     });
-    ipcMain.handle('remoto:detener', () => instancia.detener());
+    ipcMain.handle('remoto:detener', () => { cerrarInternet(); return instancia.detener(); });
+    // {prender:true} → {link}: la dirección https con la llave, para mandar.
+    // El progreso (bajando cloudflared, conectando) llega por 'remoto:internet'.
+    ipcMain.handle('remoto:internet', async (_e, o = {}) => {
+        if (!o.prender) { cerrarInternet(); return null; }
+        const e = instancia.estado();
+        if (!e.activo) throw new Error('Primero hay que abrir la conexión');
+        const conQr = async link => {
+            if (qrcode === null) { try { qrcode = require('qrcode'); } catch (_) { qrcode = false; } }
+            let qr = null;
+            if (qrcode) { try { qr = await qrcode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }); } catch (_) {} }
+            return { link, qr };
+        };
+        if (e.internet) return conQr(e.internet.link);
+        const { url } = await tunel.abrir(e.puerto, p => mandar('remoto:internet', p));
+        const clave = crypto.randomBytes(18).toString('base64url');
+        const link = `${url}/clips?k=${clave}`;
+        instancia.ponerInternet({ clave, host: new URL(url).host, link });
+        mandar('remoto:internet', { fase: 'listo' });
+        return conQr(link);
+    });
     ipcMain.handle('remoto:estado', () => instancia.estado());
     ipcMain.handle('remoto:enviar', (_e, msg) => instancia.enviar(msg));
 
@@ -841,7 +956,10 @@ async function leerPlantilla(bd, id) {
     }
 }
 
+// Al salir de la app: también el túnel (cloudflared es otro proceso).
+let cerrarTunelAlSalir = null;
 async function detener() {
+    if (cerrarTunelAlSalir) cerrarTunelAlSalir();
     if (instancia) await instancia.detener();
 }
 

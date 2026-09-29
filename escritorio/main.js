@@ -59,8 +59,11 @@ function abrirBase() {
 }
 
 // La imagen en vivo para el iPad que mira: la grabación pasa también por acá.
+// vivoBajo: la misma en calidad reducida, para el que mira por internet (la
+// graba aparte la pantalla, src/nucleo/espejo-bajo.js).
 const vivo = require('./main/vivo').crearVivo();
-const video = crearVideo({ carpeta: config.carpeta, ventana: laVentana, dialog, origen: ORIGEN, vivo });
+const vivoBajo = require('./main/vivo').crearVivo();
+const video = crearVideo({ carpeta: config.carpeta, ventana: laVentana, dialog, origen: ORIGEN, vivo, vivoBajo });
 const sistema = crearSistema({ app, dialog, shell, config, ventana: laVentana, video, abrirBase });
 
 // La sesion de la nube se guarda cifrada con la cuenta de Windows si se puede;
@@ -117,7 +120,8 @@ function enchufarRemoto() {
             leerPlantilla: async id => { await abrirBase(); return bd.leerPlantilla(id); },
             listarPlantillas: async () => { await abrirBase(); return bd.listarPlantillas(); }
         });
-        servidorIpad = remoto.registrar({ ipcMain, ventana: laVentana, bd: bdRemoto, carpeta: config.carpeta, rutaSrc: RUTA_SRC, vivo });
+        servidorIpad = remoto.registrar({ ipcMain, ventana: laVentana, bd: bdRemoto, carpeta: config.carpeta, rutaSrc: RUTA_SRC,
+            vivo, vivoBajo, carpetaDatos: () => app.getPath('userData') });
     } catch (e) {
         remoto = null;
         console.warn('Sin captura desde iPad:', e.message);

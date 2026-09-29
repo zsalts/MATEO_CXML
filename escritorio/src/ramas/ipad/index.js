@@ -27,6 +27,8 @@ import { nombresEquipos, equipoDeBoton } from '../../nucleo/plantilla.js';
 import { crearPartido } from './partido.js';
 import { resumir, crearEmisor } from './espejo.js';
 import { crearClipsEnVivo } from './clips-vivo.js';
+import { seccionInternet } from './internet.js';
+import { crearEspejoBajo } from '../../nucleo/espejo-bajo.js';
 
 const ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
     '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18.5h2"/>' +
@@ -144,6 +146,8 @@ function vigilarClientes() {
         let e = null;
         try { e = await st.api.remoto.estado(); } catch (_) { return; }
         if (!st || !e || !Array.isArray(e.clientes)) return;
+        // Compartiendo por internet y grabando: corre la copia chica.
+        if (st.espejo) st.espejo.revisar(!!e.internet && !!(st.grab && st.grab.estado().grabando));
         if (firma(e.clientes) === firma(st.clientes)) return;
         if (e.clientes.length > st.clientes.length) console.warn('Captura desde iPad: el servidor tiene iPads que no llegaron por onCliente', e.clientes);
         const antes = new Set(st.clientes.filter(c => c.conectado).map(c => c.dispositivo));
@@ -201,6 +205,8 @@ async function prepararGrabadora() {
     let calidad;
     try { calidad = (await st.api.ajustes.leer()).calidad; } catch (_) {}
     st.grab = crearGrabadora({ destino: st.api.video, calidad });
+    // La copia chica para los que miran por internet (solo compartiendo).
+    st.espejo = crearEspejoBajo({ grabadora: st.grab, api: st.api });
     st.quitar.push(st.grab.on('error', e => st.ui.aviso(
         e.tipo === 'disco' ? 'No se puede escribir el video en el disco: ' + e.mensaje : 'Error de grabación: ' + e.mensaje, 'error')));
     st.quitar.push(st.grab.on('desconectada', () => st.ui.aviso('Se desconectó la cámara. Si vuelve, la grabación sigue en el mismo archivo.', 'error')));
@@ -419,6 +425,7 @@ async function guardarPartido() {
 
     // 1. El video: se cierra y va a Partidos/<nombre>/<nombre>.mp4.
     let video = null;
+    if (st.espejo) st.espejo.revisar(false);
     if (st.grab && st.grab.estado().grabando) video = await st.grab.detener();
     else if (st.grab) video = st.grab.estado().ultima;
     // Los clips en vivo que falten se terminan de cortar antes de mover el
@@ -595,6 +602,7 @@ async function enlazarClips() {
     };
     pintarQuien();
     const t = setInterval(pintarQuien, 1000);
+    const internet = seccionInternet({ api: st.api, ui: st.ui, h });
     try {
         await st.ui.modal({
             titulo: 'Enlazar para ver cortes en vivo',
@@ -604,10 +612,11 @@ async function enlazarClips() {
                 qr ? h('div', { class: 'tv-ipad-qr', html: qr }) : null,
                 h('div', { class: 'tv-ipad-url', texto: url }),
                 h('div', { class: 'tv-ipad-pin' }, h('span', { texto: 'PIN' }), h('strong', { texto: c.pin })),
-                quien),
+                quien,
+                internet.el),
             botones: [{ texto: 'Listo', valor: true, primario: true }]
         });
-    } finally { clearInterval(t); }
+    } finally { clearInterval(t); internet.soltar(); }
 }
 
 function listaIpads() {
@@ -763,6 +772,7 @@ async function limpiar() {
     s.timers.forEach(t => { clearTimeout(t); clearInterval(t); });
     s.quitar.forEach(q => { try { q(); } catch (_) {} });
     if (s.vista) { try { s.vista.destruir(); } catch (_) {} }
+    if (s.espejo) { try { s.espejo.destruir(); } catch (_) {} }
     if (s.grab) { try { s.grab.destruir(); } catch (_) {} }
     try { await s.api.remoto.detener(); } catch (_) {}
 }

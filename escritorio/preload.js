@@ -95,6 +95,10 @@ const tv = {
         // Corta la copia en curso y borra lo copiado (Importar → Cancelar).
         cancelarCopia:  ()               => llamar('video:cancelarCopia'),
         info:           (ruta)           => llamar('video:info', ruta),
+        // La copia en calidad reducida (src/nucleo/espejo-bajo.js)
+        espejoIniciar:  (mime)           => llamar('video:espejoIniciar', mime),
+        espejoTrozo:    (datos)          => llamar('video:espejoTrozo', datos),
+        espejoTerminar: ()               => llamar('video:espejoTerminar'),
         onError:        escuchar('video:error'),
         onProgreso:     escuchar('video:progreso')
     },
@@ -119,6 +123,9 @@ const tv = {
         detener:   ()         => ipcRenderer.invoke('remoto:detener'),
         estado:    ()         => ipcRenderer.invoke('remoto:estado'),
         enviar:    (mensaje)  => ipcRenderer.invoke('remoto:enviar', mensaje),
+        // Compartir por internet: {prender:true} → {link, qr}; {prender:false} lo corta.
+        internet:  (opciones) => ipcRenderer.invoke('remoto:internet', opciones),
+        onInternet: escuchar('remoto:internet'),
         onMensaje: escuchar('remoto:mensaje'),
         onCliente: escuchar('remoto:cliente')
     },

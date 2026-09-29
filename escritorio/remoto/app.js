@@ -77,8 +77,9 @@ function conectar(pin) {
     clearTimeout(S.reintento);
     if (S.ws) { try { S.ws.onclose = null; S.ws.close(); } catch (_) {} }
 
-    // Mismo host y puerto que la pagina: nada de contenido mixto.
-    const ws = new WebSocket(`ws://${location.host}/ws`);
+    // Mismo host y puerto que la pagina: nada de contenido mixto. Por
+    // internet (el link https de Compartir por internet) va cifrado.
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
     S.ws = ws;
     pintarConexion();
 
